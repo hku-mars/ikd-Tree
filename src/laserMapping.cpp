@@ -164,11 +164,12 @@ void transformAssociateToMap()
     transformTobeMapped[3] = t_predict[0];
     transformTobeMapped[4] = t_predict[1];
     transformTobeMapped[5] = t_predict[2];
-
+if (0){
     std::cout<<"DEBUG transformAftMapped : "<<transformAftMapped[0]<<" "<<transformAftMapped[1]<<" "<<transformAftMapped[2]<<" "
     <<transformAftMapped[3]<<" "<<transformAftMapped[4]<<" "<<transformAftMapped[5]<<std::endl;
     std::cout<<"DEBUG transformTobeMapped : "<<transformTobeMapped[0]<<" "<<transformTobeMapped[1]<<" "<<transformTobeMapped[2]<<" "
     <<transformTobeMapped[3]<<" "<<transformTobeMapped[4]<<" "<<transformTobeMapped[5]<<std::endl;
+}
 }
 
 void transformUpdate()
@@ -454,7 +455,10 @@ int main(int argc, char** argv)
                 fabs(timeLaserCloudSurfLast - timeLaserCloudCornerLast) < 0.005 &&
                 fabs(timeLaserCloudFullRes - timeLaserCloudCornerLast) < 0.005) {
 
-            clock_t t1,t2,t3,t4;
+            clock_t match_start,match_time,solve_start,solve_time,t1,t2,t3,t4,t5;
+
+            match_time = 0;
+            solve_time = 0;
 
             t1 = clock();
 
@@ -463,7 +467,7 @@ int main(int argc, char** argv)
             newLaserCloudFullRes = false;
 
             //transformAssociateToMap();
-            std::cout<<"DEBUG mapping start "<<std::endl;
+            //std::cout<<"DEBUG mapping start "<<std::endl;
 
             PointType pointOnYAxis;
             pointOnYAxis.x = 0.0;
@@ -730,12 +734,15 @@ int main(int argc, char** argv)
             downSizeFilterSurf.filter(*laserCloudSurfLast_down);
             int laserCloudSurfLast_downNum = laserCloudSurfLast_down->points.size();
 
-            std::cout<<"DEBUG MAPPING laserCloudCornerLast_down : "<<laserCloudCornerLast_down->points.size()<<" laserCloudSurfLast_down : "
-            <<laserCloudSurfLast_down->points.size()<<std::endl;
-            std::cout<<"DEBUG MAPPING laserCloudCornerLast : "<<laserCloudCornerLast->points.size()<<" laserCloudSurfLast : "
-            <<laserCloudSurfLast->points.size()<<std::endl;
-            std::cout<<"DEBUG MAPPING laserCloudCornerFromMapNum : "<<laserCloudCornerFromMapNum<<" laserCloudSurfFromMapNum : "
-            <<laserCloudSurfFromMapNum<<std::endl;
+            if(0)
+            {
+                std::cout<<"DEBUG MAPPING laserCloudCornerLast_down : "<<laserCloudCornerLast_down->points.size()<<" laserCloudSurfLast_down : "
+                <<laserCloudSurfLast_down->points.size()<<std::endl;
+                std::cout<<"DEBUG MAPPING laserCloudCornerLast : "<<laserCloudCornerLast->points.size()<<" laserCloudSurfLast : "
+                <<laserCloudSurfLast->points.size()<<std::endl;
+                std::cout<<"DEBUG MAPPING laserCloudCornerFromMapNum : "<<laserCloudCornerFromMapNum<<" laserCloudSurfFromMapNum : "
+                <<laserCloudSurfFromMapNum<<std::endl;
+            }
 
             t2 = clock();
             if (laserCloudCornerFromMapNum > 10 && laserCloudSurfFromMapNum > 100) {
@@ -746,6 +753,7 @@ int main(int argc, char** argv)
                 int num_temp = 0;
 
                 for (int iterCount = 0; iterCount < 20; iterCount++) {
+                    match_start = clock();
                     num_temp++;
                     laserCloudOri->clear();
                     coeffSel->clear();
@@ -925,6 +933,9 @@ int main(int argc, char** argv)
                     }
                     //std::cout <<"DEBUG mapping select all points : " << coeffSel->size() << std::endl;
 
+                    match_time += clock() - match_start;
+                    solve_start = clock();
+
                     float srx = sin(transformTobeMapped[0]);
                     float crx = cos(transformTobeMapped[0]);
                     float sry = sin(transformTobeMapped[1]);
@@ -936,7 +947,6 @@ int main(int argc, char** argv)
                     if (laserCloudSelNum < 50) {
                         continue;
                     }
-
 
                     //|c1c3+s1s2s3 c3s1s2-c1s3 c2s1|
                     //|   c2s3        c2c3      -s2|
@@ -1028,11 +1038,16 @@ int main(int argc, char** argv)
                                 pow(matX.at<float>(4, 0) * 100, 2) +
                                 pow(matX.at<float>(5, 0) * 100, 2));
 
+                    solve_time += clock() - solve_start;
+                    
                     if (deltaR < 0.05 && deltaT < 0.05) {
+                        std::cout<<"iteration count:"<<iterCount<<std::endl;
                         break;
                     }
+
+                    
                 }
-                std::cout<<"DEBUG num_temp: "<<num_temp << std::endl;
+                //std::cout<<"DEBUG num_temp: "<<num_temp << std::endl;
 
                 transformUpdate();
             }
@@ -1126,13 +1141,13 @@ int main(int argc, char** argv)
             laserCloudSurround3_corner.header.frame_id = "/camera_init";
             pubLaserCloudSurround_corner.publish(laserCloudSurround3_corner);
             
-
             laserCloudFullRes2->clear();
             *laserCloudFullRes2 = *laserCloudFullRes;
 
             int laserCloudFullResNum = laserCloudFullRes2->points.size();
-            for (int i = 0; i < laserCloudFullResNum; i++) {
 
+            for (int i = 0; i < laserCloudFullResNum; i++)
+            {
                 pcl::PointXYZRGB temp_point;
                 RGBpointAssociateToMap(&laserCloudFullRes2->points[i], &temp_point);
                 laserCloudFullResColor->push_back(temp_point);
@@ -1185,8 +1200,8 @@ int main(int argc, char** argv)
             t4 = clock();
 
             std::cout<<"mapping time : "<<t2-t1<<" "<<t3-t2<<" "<<t4-t3<<std::endl;
+            std::cout<<"match time: "<<match_time<<"  solve time: "<<solve_time<<std::endl;
 
-            
         }
 
         status = ros::ok();

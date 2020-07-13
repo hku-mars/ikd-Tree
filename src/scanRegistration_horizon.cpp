@@ -151,7 +151,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
 
   int cloudSize = laserCloudIn.points.size();
 
-  std::cout<<"DEBUG first cloudSize "<<cloudSize<<std::endl; 
+  //std::cout<<"DEBUG first cloudSize "<<cloudSize<<std::endl; 
 
   if(cloudSize > 32000) cloudSize = 32000;
   
@@ -492,10 +492,17 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
     } 
   }
 
-
-  std::cout<<"ALL point: "<<cloudSize<<" outliers: "<< debugnum1 << std::endl
+  if (0)
+  {
+    std::cout<<"ALL point: "<<cloudSize<<" outliers: "<< debugnum1 << std::endl
             <<" break points: "<< debugnum2<<" break feature: "<< debugnum3 << std::endl
             <<" normal points: "<< debugnum4<<" surf-surf feature: " << debugnum5 << std::endl;
+  }
+  else
+  {
+    std::cout<<"ALL point: "<<cloudSize<<" outliers: "<< debugnum1 << std::endl;
+  }
+  
 
   sensor_msgs::PointCloud2 laserCloudOutMsg;
   pcl::toROSMsg(*laserCloud, laserCloudOutMsg);
