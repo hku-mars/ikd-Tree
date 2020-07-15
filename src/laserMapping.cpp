@@ -42,7 +42,7 @@
 #include <pcl/point_types.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/kdtree/kdtree_flann.h>
-#include<pcl/io/pcd_io.h>
+#include <pcl/io/pcd_io.h>
 
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
@@ -392,6 +392,8 @@ int main(int argc, char** argv)
 
     ros::Subscriber subLaserCloudFullRes = nh.subscribe<sensor_msgs::PointCloud2>
             ("/livox_cloud", 100, laserCloudFullResHandler);
+
+    //ros::Subscriber subIMUOri = nh.subscribe<sensor_msgs::>
 
     ros::Publisher pubLaserCloudSurround = nh.advertise<sensor_msgs::PointCloud2>
             ("/laser_cloud_surround", 100);

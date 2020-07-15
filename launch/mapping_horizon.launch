@@ -2,6 +2,8 @@
 
   <arg name="rviz" default="true" />
 
+  <node pkg="livox_mapping" type="imu_process" name="imu_process" output="screen" />
+
   <node pkg="livox_mapping" type="loam_scanRegistration_horizon" name="scanRegistration_horizon" output="screen">
   </node>
 
