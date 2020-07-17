@@ -39,13 +39,15 @@ pcl::PointCloud<pcl::PointXYZINormal>::Ptr laserCloudtmp(
 typedef pcl::PointXYZINormal PointType;
 typedef pcl::PointCloud<PointType> PointCloudXYZI;
 
-struct MeasureGroup {
+struct MeasureGroup 
+{
   sensor_msgs::PointCloud2ConstPtr lidar;
   std::vector<sensor_msgs::Imu::ConstPtr> imu;
 };
 
 /// *************Gyroscope integratioin
-class GyrInt {
+class GyrInt 
+{
  public:
   GyrInt();
   void Integrate(const sensor_msgs::ImuConstPtr &imu);
@@ -66,7 +68,8 @@ class GyrInt {
 GyrInt::GyrInt() : start_timestamp_(-1), last_imu_(nullptr) {}
 
 void GyrInt::Reset(double start_timestamp,
-                   const sensor_msgs::ImuConstPtr &lastimu) {
+                   const sensor_msgs::ImuConstPtr &lastimu) 
+{
   start_timestamp_ = start_timestamp;
   last_imu_ = lastimu;
 
@@ -74,7 +77,8 @@ void GyrInt::Reset(double start_timestamp,
   v_imu_.clear();
 }
 
-const Sophus::SO3d GyrInt::GetRot() const {
+const Sophus::SO3d GyrInt::GetRot() const 
+{
   if (v_rot_.empty()) {
     return SO3d();
   } else {
@@ -82,7 +86,8 @@ const Sophus::SO3d GyrInt::GetRot() const {
   }
 }
 
-void GyrInt::Integrate(const sensor_msgs::ImuConstPtr &imu) {
+void GyrInt::Integrate(const sensor_msgs::ImuConstPtr &imu) 
+{
   /// Init
   if (v_rot_.empty()) {
     ROS_ASSERT(start_timestamp_ > 0);
@@ -139,7 +144,8 @@ void GyrInt::Integrate(const sensor_msgs::ImuConstPtr &imu) {
 }
 
 /// *************IMU Process and undistortion
-class ImuProcess {
+class ImuProcess
+{
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -215,10 +221,12 @@ void ImuProcess::IntegrateGyr(
 }
 
 void ImuProcess::UndistortPcl(const PointCloudXYZI::Ptr &pcl_in_out,
-                              double dt_be, const Sophus::SE3d &Tbe) {
+                              double dt_be, const Sophus::SE3d &Tbe)
+{
   const Eigen::Vector3d &tbe = Tbe.translation();
   Eigen::Vector3d rso3_be = Tbe.so3().log();
-  for (auto &pt : pcl_in_out->points) {
+  for (auto &pt : pcl_in_out->points) 
+  {
     int ring = int(pt.intensity);
     float dt_bi = pt.intensity - ring;
 
@@ -246,11 +254,16 @@ void ImuProcess::UndistortPcl(const PointCloudXYZI::Ptr &pcl_in_out,
   }
 }
 
-void ImuProcess::Process(const MeasureGroup &meas) {
+void ImuProcess::Process(const MeasureGroup &meas)
+{
+  clock_t process_start, t1,t2,t3,t4;
+
+  process_start=clock();
+
   ROS_INFO("Process IMU");
   ROS_ASSERT(!meas.imu.empty());
   ROS_ASSERT(meas.lidar != nullptr);
-  ROS_INFO("Process lidar at time: %.4f, %lu imu msgs from %.4f to %.4f",
+  ROS_DEBUG("Process lidar at time: %.4f, %lu imu msgs from %.4f to %.4f",
             meas.lidar->header.stamp.toSec(), meas.imu.size(),
             meas.imu.front()->header.stamp.toSec(),
             meas.imu.back()->header.stamp.toSec());
@@ -265,7 +278,7 @@ void ImuProcess::Process(const MeasureGroup &meas) {
 
     /// Record first lidar, and first useful imu
     last_lidar_ = pcl_in_msg;
-    last_imu_ = meas.imu.back();
+    last_imu_   = meas.imu.back();
 
     ROS_WARN("The very first lidar frame");
 
@@ -277,6 +290,8 @@ void ImuProcess::Process(const MeasureGroup &meas) {
   /// Integrate all input imu message
   IntegrateGyr(meas.imu);
 
+  t1 = clock();
+
   /// Compensate lidar points with IMU rotation
   //// Initial pose from IMU (with only rotation)
   SE3d T_l_c(gyr_int_.GetRot(), Eigen::Vector3d::Zero());
@@ -284,11 +299,18 @@ void ImuProcess::Process(const MeasureGroup &meas) {
   //// Get input pcl
   pcl::fromROSMsg(*pcl_in_msg, *cur_pcl_in_);
 
+  t2 = clock();
+
   /// Undistort points
 
   Sophus::SE3d T_l_be = T_i_l.inverse() * T_l_c * T_i_l;
   pcl::copyPointCloud(*cur_pcl_in_, *cur_pcl_un_);
+
+  t3 = clock();
+
   UndistortPcl(cur_pcl_un_, dt_l_c_, T_l_be);
+
+  t4 = clock();
 
   {
     static ros::Publisher pub_UndistortPcl =
@@ -321,15 +343,21 @@ void ImuProcess::Process(const MeasureGroup &meas) {
     pub_UndistortPcl.publish(pcl_out_msg);
   }
 
+  // t3 = clock();
+
   /// Record last measurements
   last_lidar_ = pcl_in_msg;
   last_imu_ = meas.imu.back();
   cur_pcl_in_.reset(new PointCloudXYZI());
   cur_pcl_un_.reset(new PointCloudXYZI());
+
+  // t4 = clock();
+
+  std::cout<<"imu process time : "<<t1 - process_start<<" "<<t2 - t1<<" "<<t3 - t2<<" "<<t4 - t3<<std::endl;
 }
 
 /// *************ROS Node
-std::string topic_pcl = "/livox/lidar";
+std::string topic_pcl = "/laser_cloud_flat";
 std::string topic_imu = "/livox/imu";
 
 /// To notify new data
@@ -344,15 +372,17 @@ std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer;
 double last_timestamp_imu = -1;
 std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer;
 
-void SigHandle(int sig) {
+void SigHandle(int sig)
+{
   b_exit = true;
   ROS_WARN("catch sig %d", sig);
   sig_buffer.notify_all();
 }
 
-void pointcloud_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg) {
+void pointcloud_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg) 
+{
   const double timestamp = msg->header.stamp.toSec();
-  // ROS_DEBUG("get point cloud at time: %.6f", timestamp);
+  ROS_DEBUG("get point cloud at time: %.6f", timestamp);
 
   mtx_buffer.lock();
 
@@ -368,7 +398,8 @@ void pointcloud_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg) {
   sig_buffer.notify_all();
 }
 
-void imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in) {
+void imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in) 
+{
   sensor_msgs::Imu::Ptr msg(new sensor_msgs::Imu(*msg_in));
 
   double timestamp = msg->header.stamp.toSec();
@@ -389,13 +420,14 @@ void imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in) {
   sig_buffer.notify_all();
 }
 
-bool SyncMeasure(MeasureGroup &measgroup) {
+bool SyncMeasure(MeasureGroup &measgroup) 
+{
   if (lidar_buffer.empty() || imu_buffer.empty()) {
     /// Note: this will happen
     ROS_INFO("NO IMU DATA");
     return false;
   }
-  ROS_INFO("IMU DATA step 1");
+
   if (imu_buffer.front()->header.stamp.toSec() >
       lidar_buffer.back()->header.stamp.toSec()) {
     lidar_buffer.clear();
@@ -416,16 +448,20 @@ bool SyncMeasure(MeasureGroup &measgroup) {
   /// Add imu data, and pop from buffer
   measgroup.imu.clear();
   int imu_cnt = 0;
-  for (const auto &imu : imu_buffer) {
+  for (const auto &imu : imu_buffer)
+  {
     double imu_time = imu->header.stamp.toSec();
     if (imu_time <= lidar_time) {
       measgroup.imu.push_back(imu);
       imu_cnt++;
     }
   }
-  for (int i = 0; i < imu_cnt; ++i) {
+
+  for (int i = 0; i < imu_cnt; ++i)
+  {
     imu_buffer.pop_front();
   }
+
   // ROS_DEBUG("add %d imu msg", imu_cnt);
 
   return true;
@@ -465,7 +501,7 @@ int main(int argc, char **argv) {
   ros::NodeHandle nh;
   signal(SIGINT, SigHandle);
 
-  ros::Subscriber sub_pcl = nh.subscribe(topic_pcl, 10, pointcloud_cbk);
+  ros::Subscriber sub_pcl = nh.subscribe(topic_pcl, 100, pointcloud_cbk);
   ros::Subscriber sub_imu = nh.subscribe(topic_imu, 100, imu_cbk);
 
   std::shared_ptr<ImuProcess> p_imu(new ImuProcess());

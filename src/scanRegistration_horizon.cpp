@@ -119,7 +119,8 @@ bool plane_judge(const std::vector<PointType>& point_list,const int plane_thresh
     return false;
   }
 }
-void laserCloudHandler_temp(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg) //for hkmars data
+
+/* void laserCloudHandler_temp(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg) //for hkmars data
 {
 
   pcl::PointCloud<PointType>::Ptr laserCloudIn(new pcl::PointCloud<PointType>());
@@ -143,7 +144,8 @@ void laserCloudHandler_temp(const sensor_msgs::PointCloud2ConstPtr& laserCloudMs
   laserCloudOutMsg.header.frame_id = "/livox";
   pubLaserCloud_temp.publish(laserCloudOutMsg);
 
-}
+} */
+
 void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
 {
   pcl::PointCloud<PointType> laserCloudIn;
