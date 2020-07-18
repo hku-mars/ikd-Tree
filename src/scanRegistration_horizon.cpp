@@ -544,10 +544,8 @@ int main(int argc, char** argv)
   pubCornerPointsSharp = nh.advertise<sensor_msgs::PointCloud2>
                                         ("/laser_cloud_sharp", 100);
 
-
   pubSurfPointsFlat = nh.advertise<sensor_msgs::PointCloud2>
                                        ("/laser_cloud_flat", 100);
-
 
   ros::spin();
 

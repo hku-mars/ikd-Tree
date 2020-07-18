@@ -6,12 +6,12 @@ SET(CMAKE_BUILD_TYPE "Debug")
 #set(CMAKE_CXX_COMPILER "/usr/bin/clang++")
 
 #set(CMAKE_C_COMPILER "/usr/bin/clang")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fexceptions" -Wno)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -pthread -std=c++0x -std=c++11 -fexceptions -Wno-unused-local-typedefs")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fexceptions" -Wall)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -pthread -std=c++0x -std=c++11 -fexceptions -Wall")
 
 find_package(OpenMP QUIET)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}   ${OpenMP_C_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS} -Wall")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}   ${OpenMP_C_FLAGS}" -Wall)
 
 find_package(catkin REQUIRED COMPONENTS
   geometry_msgs

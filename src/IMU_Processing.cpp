@@ -45,104 +45,6 @@ struct MeasureGroup
   std::vector<sensor_msgs::Imu::ConstPtr> imu;
 };
 
-/// *************Gyroscope integratioin
-class GyrInt 
-{
- public:
-  GyrInt();
-  void Integrate(const sensor_msgs::ImuConstPtr &imu);
-  void Reset(double start_timestamp, const sensor_msgs::ImuConstPtr &lastimu);
-
-  const Sophus::SO3d GetRot() const;
-
- private:
-  // Sophus::SO3d r_;
-  /// last_imu_ is
-  double start_timestamp_;
-  sensor_msgs::ImuConstPtr last_imu_;
-  /// Making sure the equal size: v_imu_ and v_rot_
-  std::vector<sensor_msgs::ImuConstPtr> v_imu_;
-  std::vector<Sophus::SO3d> v_rot_;
-};
-
-GyrInt::GyrInt() : start_timestamp_(-1), last_imu_(nullptr) {}
-
-void GyrInt::Reset(double start_timestamp,
-                   const sensor_msgs::ImuConstPtr &lastimu) 
-{
-  start_timestamp_ = start_timestamp;
-  last_imu_ = lastimu;
-
-  v_rot_.clear();
-  v_imu_.clear();
-}
-
-const Sophus::SO3d GyrInt::GetRot() const 
-{
-  if (v_rot_.empty()) {
-    return SO3d();
-  } else {
-    return v_rot_.back();
-  }
-}
-
-void GyrInt::Integrate(const sensor_msgs::ImuConstPtr &imu) 
-{
-  /// Init
-  if (v_rot_.empty()) {
-    ROS_ASSERT(start_timestamp_ > 0);
-    ROS_ASSERT(last_imu_ != nullptr);
-
-    /// Identity rotation
-    v_rot_.push_back(SO3d());
-
-    /// Interpolate imu in
-    sensor_msgs::ImuPtr imu_inter(new sensor_msgs::Imu());
-    double dt1 = start_timestamp_ - last_imu_->header.stamp.toSec();
-    double dt2 = imu->header.stamp.toSec() - start_timestamp_;
-    ROS_ASSERT_MSG(dt1 >= 0 && dt2 >= 0, "%f - %f - %f",
-                   last_imu_->header.stamp.toSec(), start_timestamp_,
-                   imu->header.stamp.toSec());
-    double w1 = dt2 / (dt1 + dt2 + 1e-9);
-    double w2 = dt1 / (dt1 + dt2 + 1e-9);
-
-    const auto &gyr1 = last_imu_->angular_velocity;
-    const auto &acc1 = last_imu_->linear_acceleration;
-    const auto &gyr2 = imu->angular_velocity;
-    const auto &acc2 = imu->linear_acceleration;
-
-    imu_inter->header.stamp.fromSec(start_timestamp_);
-    imu_inter->angular_velocity.x = w1 * gyr1.x + w2 * gyr2.x;
-    imu_inter->angular_velocity.y = w1 * gyr1.y + w2 * gyr2.y;
-    imu_inter->angular_velocity.z = w1 * gyr1.z + w2 * gyr2.z;
-    imu_inter->linear_acceleration.x = w1 * acc1.x + w2 * acc2.x;
-    imu_inter->linear_acceleration.y = w1 * acc1.y + w2 * acc2.y;
-    imu_inter->linear_acceleration.z = w1 * acc1.z + w2 * acc2.z;
-
-    v_imu_.push_back(imu_inter);
-  }
-
-  ///
-  const SO3d &rot_last = v_rot_.back();
-  const auto &imumsg_last = v_imu_.back();
-  const double &time_last = imumsg_last->header.stamp.toSec();
-  Eigen::Vector3d gyr_last(imumsg_last->angular_velocity.x,
-                           imumsg_last->angular_velocity.y,
-                           imumsg_last->angular_velocity.z);
-  double time = imu->header.stamp.toSec();
-  Eigen::Vector3d gyr(imu->angular_velocity.x, imu->angular_velocity.y,
-                      imu->angular_velocity.z);
-  assert(time >= 0);
-  double dt = time - time_last;
-  auto delta_angle = dt * 0.5 * (gyr + gyr_last);
-  auto delta_r = SO3d::exp(delta_angle);
-
-  SO3d rot = rot_last * delta_r;
-
-  v_imu_.push_back(imu);
-  v_rot_.push_back(rot);
-}
-
 /// *************IMU Process and undistortion
 class ImuProcess
 {
@@ -162,9 +64,25 @@ class ImuProcess
 
   ros::NodeHandle nh;
 
+  void Integrate(const sensor_msgs::ImuConstPtr &imu);
+  void Reset(double start_timestamp, const sensor_msgs::ImuConstPtr &lastimu);
+
+  const Sophus::SO3d GetRot() const;
+
+  double scale_gravity;
+
+  Eigen::Vector3d zero_bias_acc;
+  Eigen::Vector3d zero_bias_gyr;
+
+  Eigen::Vector3d cov_acc;
+  Eigen::Vector3d cov_gyr;
+
  private:
   /*** Whether is the first frame, init for first frame ***/
   bool b_first_frame_ = true;
+  bool Need_init      = true;
+
+  int init_iter_num = 0;
 
   /*** Input pointcloud ***/
   PointCloudXYZI::Ptr cur_pcl_in_;
@@ -180,63 +98,162 @@ class ImuProcess
   sensor_msgs::ImuConstPtr last_imu_;
 
   /*** For gyroscope integration ***/
-  GyrInt gyr_int_;
+  double start_timestamp_;
+  /// Making sure the equal size: v_imu_ and v_rot_
+  std::vector<sensor_msgs::ImuConstPtr> v_imu_;
+  std::vector<Sophus::SO3d> v_rot_;
 };
 
 
 ImuProcess::ImuProcess()
-    : b_first_frame_(true), last_lidar_(nullptr), last_imu_(nullptr) {
+    : b_first_frame_(true), Need_init(true), last_lidar_(nullptr), last_imu_(nullptr), start_timestamp_(-1)
+{
   Eigen::Quaterniond q(0, 1, 0, 0);
   Eigen::Vector3d t(0, 0, 0);
   T_i_l = Sophus::SE3d(q, t);
+  init_iter_num = 0;
+  scale_gravity = 1.0;
 }
 
 ImuProcess::~ImuProcess() {}
 
-void ImuProcess::Reset() {
+void ImuProcess::Reset() 
+{
   ROS_WARN("Reset ImuProcess");
 
-  b_first_frame_ = true;
-  last_lidar_ = nullptr;
-  last_imu_ = nullptr;
+  scale_gravity  = 1.0;
 
-  gyr_int_.Reset(-1, nullptr);
+  zero_bias_acc  = Eigen::Vector3d(0, 0, 0);
+  zero_bias_gyr  = zero_bias_acc;
+
+  cov_acc        = Eigen::Vector3d(0.1, 0.1, 0.1);
+  cov_gyr        = Eigen::Vector3d(0.1, 0.1, 0.1);
+
+  Need_init      = true;
+  b_first_frame_ = true;
+  init_iter_num  = 0;
+
+  last_lidar_    = nullptr;
+  last_imu_      = nullptr;
+
+  //gyr_int_.Reset(-1, nullptr);
+  start_timestamp_ = -1;
+  v_rot_.clear();
+  v_imu_.clear();
 
   cur_pcl_in_.reset(new PointCloudXYZI());
   cur_pcl_un_.reset(new PointCloudXYZI());
 }
 
-void ImuProcess::IntegrateGyr(
-    const std::vector<sensor_msgs::Imu::ConstPtr> &v_imu) {
-  /// Reset gyr integrator
-  gyr_int_.Reset(last_lidar_->header.stamp.toSec(), last_imu_);
-  /// And then integrate all the imu measurements
-  for (const auto &imu : v_imu) {
-    gyr_int_.Integrate(imu);
+const Sophus::SO3d ImuProcess::GetRot() const 
+{
+  if (v_rot_.empty())
+  {
+    return SO3d();
   }
+  else 
+  {
+    return v_rot_.back();
+  }
+}
+
+void ImuProcess::IntegrateGyr(
+    const std::vector<sensor_msgs::Imu::ConstPtr> &v_imu) 
+{
+  /// Reset gyr integrator
+  // gyr_int_.Reset(last_lidar_->header.stamp.toSec(), last_imu_);
+  start_timestamp_=last_lidar_->header.stamp.toSec();
+
+  /// And then integrate all the imu measurements
+  for (const auto &imu : v_imu)
+  {
+    if (v_rot_.empty())
+    {
+      ROS_ASSERT(start_timestamp_ > 0);
+      ROS_ASSERT(last_imu_ != nullptr);
+
+      /// Identity rotation
+      v_rot_.push_back(SO3d());
+
+      /// Interpolate imu in
+      sensor_msgs::ImuPtr imu_inter(new sensor_msgs::Imu());
+      double dt1 = start_timestamp_ - last_imu_->header.stamp.toSec();
+      double dt2 = imu->header.stamp.toSec() - start_timestamp_;
+      ROS_ASSERT_MSG(dt1 >= 0 && dt2 >= 0, "%f - %f - %f",
+                    last_imu_->header.stamp.toSec(), start_timestamp_,
+                    imu->header.stamp.toSec());
+      double w1 = dt2 / (dt1 + dt2 + 1e-9);
+      double w2 = dt1 / (dt1 + dt2 + 1e-9);
+
+      const auto &gyr1 = last_imu_->angular_velocity;
+      const auto &acc1 = last_imu_->linear_acceleration;
+      const auto &gyr2 = imu->angular_velocity;
+      const auto &acc2 = imu->linear_acceleration;
+
+      imu_inter->header.stamp.fromSec(start_timestamp_);
+      imu_inter->angular_velocity.x = w1 * gyr1.x + w2 * gyr2.x;
+      imu_inter->angular_velocity.y = w1 * gyr1.y + w2 * gyr2.y;
+      imu_inter->angular_velocity.z = w1 * gyr1.z + w2 * gyr2.z;
+      imu_inter->linear_acceleration.x = w1 * acc1.x + w2 * acc2.x;
+      imu_inter->linear_acceleration.y = w1 * acc1.y + w2 * acc2.y;
+      imu_inter->linear_acceleration.z = w1 * acc1.z + w2 * acc2.z;
+
+      v_imu_.push_back(imu_inter);
+    }
+
+    const SO3d &rot_last    = v_rot_.back();
+    const auto &imumsg_last = v_imu_.back();
+    const double &time_last = imumsg_last->header.stamp.toSec();
+    Eigen::Vector3d gyr_last(imumsg_last->angular_velocity.x,
+                            imumsg_last->angular_velocity.y,
+                            imumsg_last->angular_velocity.z);
+    double time = imu->header.stamp.toSec();
+    Eigen::Vector3d gyr(imu->angular_velocity.x, imu->angular_velocity.y,
+                        imu->angular_velocity.z);
+    assert(time >= 0);
+    double dt = time - time_last;
+    auto delta_angle = dt * 0.5 * (gyr + gyr_last);
+    auto delta_r = SO3d::exp(delta_angle);
+
+    SO3d rot = rot_last * delta_r;
+
+    v_imu_.push_back(imu);
+    v_rot_.push_back(rot);
+  }
+
   ROS_INFO("integrate rotation angle [x, y, z]: [%.2f, %.2f, %.2f]",
-           gyr_int_.GetRot().angleX() * 180.0 / M_PI,
-           gyr_int_.GetRot().angleY() * 180.0 / M_PI,
-           gyr_int_.GetRot().angleZ() * 180.0 / M_PI);
+           GetRot().angleX() * 180.0 / M_PI,
+           GetRot().angleY() * 180.0 / M_PI,
+           GetRot().angleZ() * 180.0 / M_PI);
 }
 
 void ImuProcess::UndistortPcl(const PointCloudXYZI::Ptr &pcl_in_out,
                               double dt_be, const Sophus::SE3d &Tbe)
 {
   const Eigen::Vector3d &tbe = Tbe.translation();
+
+  ros::Time begin, t1;
+
+  begin = ros::Time::now();
+
   Eigen::Vector3d rso3_be = Tbe.so3().log();
+
   for (auto &pt : pcl_in_out->points) 
   {
+    
     int ring = int(pt.intensity);
     float dt_bi = pt.intensity - ring;
 
-    if (dt_bi == 0) laserCloudtmp->push_back(pt);
+    if (dt_bi == 0) {laserCloudtmp->push_back(pt);}
     double ratio_bi = dt_bi / dt_be;
     /// Rotation from i-e
     double ratio_ie = 1 - ratio_bi;
 
-    Eigen::Vector3d rso3_ie = ratio_ie * rso3_be;
+    Eigen::Vector3d rso3_ie = -1 * ratio_ie * rso3_be;
+
     SO3d Rie = SO3d::exp(rso3_ie);
+
+    // SO3d Rie = SO3d() + 
 
     /// Transform to the 'end' frame, using only the rotation
     /// Note: Compensation direction is INVERSE of Frame's moving direction
@@ -245,13 +262,21 @@ void ImuProcess::UndistortPcl(const PointCloudXYZI::Ptr &pcl_in_out,
     Eigen::Vector3d tie = ratio_ie * tbe;
     // Eigen::Vector3d tei = Eigen::Vector3d::Zero();
     Eigen::Vector3d v_pt_i(pt.x, pt.y, pt.z);
-    Eigen::Vector3d v_pt_comp_e = Rie.inverse() * (v_pt_i - tie);
+    
+    // duration1    += t1 - process_start;
+    Eigen::Vector3d v_pt_comp_e = Rie * (v_pt_i - tie);
 
     /// Undistorted point
     pt.x = v_pt_comp_e.x();
     pt.y = v_pt_comp_e.y();
     pt.z = v_pt_comp_e.z();
   }
+
+  t1 = ros::Time::now();
+  ros::Duration duration1 = t1 - begin;
+
+  std::cout<<"number of undistort point cloud : "<<pcl_in_out->points.size()<<std::endl;
+  std::cout<<"imu process time : "<<duration1.toSec()<<std::endl;
 }
 
 void ImuProcess::Process(const MeasureGroup &meas)
@@ -260,7 +285,6 @@ void ImuProcess::Process(const MeasureGroup &meas)
 
   process_start=clock();
 
-  ROS_INFO("Process IMU");
   ROS_ASSERT(!meas.imu.empty());
   ROS_ASSERT(meas.lidar != nullptr);
   ROS_DEBUG("Process lidar at time: %.4f, %lu imu msgs from %.4f to %.4f",
@@ -270,8 +294,10 @@ void ImuProcess::Process(const MeasureGroup &meas)
 
   auto pcl_in_msg = meas.lidar;
 
-  if (b_first_frame_) {
+  if (b_first_frame_) 
+  {
     /// The very first lidar frame
+    Need_init = true;
 
     /// Reset
     Reset();
@@ -287,73 +313,99 @@ void ImuProcess::Process(const MeasureGroup &meas)
     return;
   }
 
-  /// Integrate all input imu message
-  IntegrateGyr(meas.imu);
-
-  t1 = clock();
-
-  /// Compensate lidar points with IMU rotation
-  //// Initial pose from IMU (with only rotation)
-  SE3d T_l_c(gyr_int_.GetRot(), Eigen::Vector3d::Zero());
-  dt_l_c_ = pcl_in_msg->header.stamp.toSec() - last_lidar_->header.stamp.toSec();
-  //// Get input pcl
-  pcl::fromROSMsg(*pcl_in_msg, *cur_pcl_in_);
-
-  t2 = clock();
-
-  /// Undistort points
-
-  Sophus::SE3d T_l_be = T_i_l.inverse() * T_l_c * T_i_l;
-  pcl::copyPointCloud(*cur_pcl_in_, *cur_pcl_un_);
-
-  t3 = clock();
-
-  UndistortPcl(cur_pcl_un_, dt_l_c_, T_l_be);
-
-  t4 = clock();
-
+  if (Need_init)
   {
-    static ros::Publisher pub_UndistortPcl =
-        nh.advertise<sensor_msgs::PointCloud2>("/livox_first_point", 100);
-    sensor_msgs::PointCloud2 pcl_out_msg;
-    pcl::toROSMsg(*laserCloudtmp, pcl_out_msg);
-    pcl_out_msg.header = pcl_in_msg->header;
-    pcl_out_msg.header.frame_id = "/camera_init";
-    pub_UndistortPcl.publish(pcl_out_msg);
-    laserCloudtmp->clear();
-  }
+    /// 1.initializing the accelerameter and gyroscopes's covariance and bias
+    /// 2.normalize the acceleration measurenments to unit gravity
 
+    double cur_norm = 1.0;
+
+    for (const auto &imu : meas.imu)
+    {
+      const auto &acc_m = imu->linear_acceleration;
+
+      cur_norm       = std::sqrt(acc_m.x * acc_m.x + acc_m.y * acc_m.y + acc_m.z * acc_m.z);
+      
+      scale_gravity += (cur_norm - scale_gravity) / std::max(1,init_iter_num);
+
+      init_iter_num ++;
+    }
+
+    ROS_INFO("Calibrating step: %d Gravity_scale: %.4f", init_iter_num, scale_gravity);
+
+    if (init_iter_num>500)
+    {
+      scale_gravity = 1.0 / std::max(scale_gravity,0.1);
+      Need_init     = false;
+      ROS_INFO("Calibration Finised: Gravity_scale: %.4f", scale_gravity);
+    }
+  }
+  else
   {
-    static ros::Publisher pub_UndistortPcl =
-        nh.advertise<sensor_msgs::PointCloud2>("/livox_undistort", 100);
-    sensor_msgs::PointCloud2 pcl_out_msg;
-    pcl::toROSMsg(*cur_pcl_un_, pcl_out_msg);
-    pcl_out_msg.header = pcl_in_msg->header;
-    pcl_out_msg.header.frame_id = "/camera_init";
-    pub_UndistortPcl.publish(pcl_out_msg);
+    ROS_INFO("Process IMU");
+    /// Integrate all input imu message
+    IntegrateGyr(meas.imu);
+
+    t1 = clock();
+
+    /// Compensate lidar points with IMU rotation
+    //// Initial pose from IMU (with only rotation)
+    SE3d T_l_c(GetRot(), Eigen::Vector3d::Zero());
+    dt_l_c_ = pcl_in_msg->header.stamp.toSec() - last_lidar_->header.stamp.toSec();
+    //// Get input pcl
+    pcl::fromROSMsg(*pcl_in_msg, *cur_pcl_in_);
+
+    t2 = clock();
+
+    /// Undistort points
+
+    Sophus::SE3d T_l_be = T_i_l.inverse() * T_l_c * T_i_l;
+    pcl::copyPointCloud(*cur_pcl_in_, *cur_pcl_un_);
+
+    t3 = clock();
+
+    UndistortPcl(cur_pcl_un_, dt_l_c_, T_l_be);
+
+    t4 = clock();
+
+    {
+      static ros::Publisher pub_UndistortPcl =
+          nh.advertise<sensor_msgs::PointCloud2>("/livox_first_point", 100);
+      sensor_msgs::PointCloud2 pcl_out_msg;
+      pcl::toROSMsg(*laserCloudtmp, pcl_out_msg);
+      pcl_out_msg.header = pcl_in_msg->header;
+      pcl_out_msg.header.frame_id = "/livox";
+      pub_UndistortPcl.publish(pcl_out_msg);
+      laserCloudtmp->clear();
+    }
+
+    {
+      static ros::Publisher pub_UndistortPcl =
+          nh.advertise<sensor_msgs::PointCloud2>("/livox_undistort", 100);
+      sensor_msgs::PointCloud2 pcl_out_msg;
+      pcl::toROSMsg(*cur_pcl_un_, pcl_out_msg);
+      pcl_out_msg.header = pcl_in_msg->header;
+      pcl_out_msg.header.frame_id = "/livox";
+      pub_UndistortPcl.publish(pcl_out_msg);
+    }
+
+    {
+      static ros::Publisher pub_UndistortPcl =
+          nh.advertise<sensor_msgs::PointCloud2>("/livox_distort", 100);
+      sensor_msgs::PointCloud2 pcl_out_msg;
+      pcl::toROSMsg(*cur_pcl_in_, pcl_out_msg);
+      pcl_out_msg.header = pcl_in_msg->header;
+      pcl_out_msg.header.frame_id = "/livox";
+      pub_UndistortPcl.publish(pcl_out_msg);
+    }
+
+    /// Record last measurements
+    last_lidar_ = pcl_in_msg;
+    last_imu_ = meas.imu.back();
+    cur_pcl_in_.reset(new PointCloudXYZI());
+    cur_pcl_un_.reset(new PointCloudXYZI());
+    std::cout<<"imu process time : "<<t1 - process_start<<" "<<t2 - t1<<" "<<t3 - t2<<" "<<t4 - t3<<std::endl;
   }
-
-  {
-    static ros::Publisher pub_UndistortPcl =
-        nh.advertise<sensor_msgs::PointCloud2>("/livox_distort", 100);
-    sensor_msgs::PointCloud2 pcl_out_msg;
-    pcl::toROSMsg(*cur_pcl_in_, pcl_out_msg);
-    pcl_out_msg.header = pcl_in_msg->header;
-    pcl_out_msg.header.frame_id = "/camera_init";
-    pub_UndistortPcl.publish(pcl_out_msg);
-  }
-
-  // t3 = clock();
-
-  /// Record last measurements
-  last_lidar_ = pcl_in_msg;
-  last_imu_ = meas.imu.back();
-  cur_pcl_in_.reset(new PointCloudXYZI());
-  cur_pcl_un_.reset(new PointCloudXYZI());
-
-  // t4 = clock();
-
-  std::cout<<"imu process time : "<<t1 - process_start<<" "<<t2 - t1<<" "<<t3 - t2<<" "<<t4 - t3<<std::endl;
 }
 
 /// *************ROS Node
@@ -424,7 +476,7 @@ bool SyncMeasure(MeasureGroup &measgroup)
 {
   if (lidar_buffer.empty() || imu_buffer.empty()) {
     /// Note: this will happen
-    ROS_INFO("NO IMU DATA");
+    // ROS_INFO("NO IMU DATA");
     return false;
   }
 
