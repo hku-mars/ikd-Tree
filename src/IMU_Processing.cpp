@@ -1,18 +1,20 @@
 #include <cmath>
+#include <math.h>
 #include <deque>
 #include <mutex>
 #include <thread>
 #include <fstream>
 #include <csignal>
 #include <ros/ros.h>
+#include <Eigen/Eigen>
 #include <condition_variable>
 
 #include <opencv2/opencv.hpp>
 #include <nav_msgs/Odometry.h>
 #include <tf/transform_broadcaster.h>
 
-#include "sophus/se3.hpp"
-#include "sophus/so3.hpp"
+#include <sophus/se3.hpp>
+#include <sophus/so3.hpp>
 
 #include <pcl/common/io.h>
 #include <pcl/point_cloud.h>
@@ -29,6 +31,8 @@
 /// *************Preconfiguration
 using Sophus::SE3d;
 using Sophus::SO3d;
+
+#define SKEW_SYM_MATRX(v)  0.0,-v[2],v[1],v[2],0.0,-v[0],-v[1],v[0],0.0
 
 inline double rad2deg(double radians) { return radians * 180.0 / M_PI; }
 inline double deg2rad(double degrees) { return degrees * M_PI / 180.0; }
@@ -82,7 +86,9 @@ class ImuProcess
   bool b_first_frame_ = true;
   bool Need_init      = true;
 
-  int init_iter_num = 0;
+  int init_iter_num = 1;
+  Eigen::Vector3d mean_acc;
+  Eigen::Vector3d mean_gyr;
 
   /*** Input pointcloud ***/
   PointCloudXYZI::Ptr cur_pcl_in_;
@@ -111,8 +117,12 @@ ImuProcess::ImuProcess()
   Eigen::Quaterniond q(0, 1, 0, 0);
   Eigen::Vector3d t(0, 0, 0);
   T_i_l = Sophus::SE3d(q, t);
-  init_iter_num = 0;
+  init_iter_num = 1;
   scale_gravity = 1.0;
+  cov_acc       = Eigen::Vector3d(0.1, 0.1, 0.1);
+  cov_gyr       = Eigen::Vector3d(0.1, 0.1, 0.1);
+  mean_acc      = Eigen::Vector3d(0, 0, -1.0);
+  mean_gyr      = Eigen::Vector3d(0, 0, 0);
 }
 
 ImuProcess::~ImuProcess() {}
@@ -128,10 +138,12 @@ void ImuProcess::Reset()
 
   cov_acc        = Eigen::Vector3d(0.1, 0.1, 0.1);
   cov_gyr        = Eigen::Vector3d(0.1, 0.1, 0.1);
+  mean_acc       = Eigen::Vector3d(0, 0, -1.0);
+  mean_gyr       = Eigen::Vector3d(0, 0, 0);
 
   Need_init      = true;
   b_first_frame_ = true;
-  init_iter_num  = 0;
+  init_iter_num  = 1;
 
   last_lidar_    = nullptr;
   last_imu_      = nullptr;
@@ -232,11 +244,24 @@ void ImuProcess::UndistortPcl(const PointCloudXYZI::Ptr &pcl_in_out,
 {
   const Eigen::Vector3d &tbe = Tbe.translation();
 
-  ros::Time begin, t1;
+  // ros::Time begin, t1;
+  // begin = ros::Time::now();
+  Eigen::Vector3d rso3_be, r_axis;
+  rso3_be = Tbe.so3().log();
+  double r_angle = rso3_be.norm();
+  if (r_angle > 0.00000001)
+  {
+    r_axis = rso3_be / r_angle;
+  }
+  else
+  {
+    r_axis = Eigen::Vector3d(0,0,0);
+  }
 
-  begin = ros::Time::now();
-
-  Eigen::Vector3d rso3_be = Tbe.so3().log();
+  Eigen::Matrix3d K, Eye3d;
+  
+  K << SKEW_SYM_MATRX(r_axis);
+  Eye3d = Eigen::Matrix3d::Identity();
 
   for (auto &pt : pcl_in_out->points) 
   {
@@ -249,39 +274,30 @@ void ImuProcess::UndistortPcl(const PointCloudXYZI::Ptr &pcl_in_out,
     /// Rotation from i-e
     double ratio_ie = 1 - ratio_bi;
 
-    Eigen::Vector3d rso3_ie = -1 * ratio_ie * rso3_be;
+    // Eigen::Vector3d rso3_ie = -1 * ratio_ie * rso3_be;
+    // SO3d Rie = SO3d::exp(rso3_ie);
 
-    SO3d Rie = SO3d::exp(rso3_ie);
-
-    // SO3d Rie = SO3d() + 
+    double r_angle_piece = -1 * ratio_ie * r_angle;
+    Eigen::Matrix3d Rie  = Eye3d + std::sin(r_angle_piece) * K + (1.0 - std::cos(r_angle_piece)) * K * K;
 
     /// Transform to the 'end' frame, using only the rotation
     /// Note: Compensation direction is INVERSE of Frame's moving direction
     /// So if we want to compensate a point at timestamp-i to the frame-e
     /// P_compensate = R_ei * Pi + t_ei
-    Eigen::Vector3d tie = ratio_ie * tbe;
-    // Eigen::Vector3d tei = Eigen::Vector3d::Zero();
-    Eigen::Vector3d v_pt_i(pt.x, pt.y, pt.z);
-    
-    // duration1    += t1 - process_start;
-    Eigen::Vector3d v_pt_comp_e = Rie * (v_pt_i - tie);
+    Eigen::Vector3d tie         = ratio_ie * tbe;
+    Eigen::Vector3d v_pt_comp_e = Rie * (Eigen::Vector3d(pt.x, pt.y, pt.z) - tie);
 
     /// Undistorted point
     pt.x = v_pt_comp_e.x();
     pt.y = v_pt_comp_e.y();
     pt.z = v_pt_comp_e.z();
   }
-
-  t1 = ros::Time::now();
-  ros::Duration duration1 = t1 - begin;
-
-  std::cout<<"number of undistort point cloud : "<<pcl_in_out->points.size()<<std::endl;
-  std::cout<<"imu process time : "<<duration1.toSec()<<std::endl;
+  // ros::Duration duration1 = t1 - begin;
 }
 
 void ImuProcess::Process(const MeasureGroup &meas)
 {
-  clock_t process_start, t1,t2,t3,t4;
+  clock_t process_start, t1,t2,t3;
 
   process_start=clock();
 
@@ -310,6 +326,7 @@ void ImuProcess::Process(const MeasureGroup &meas)
 
     /// Do nothing more, return
     b_first_frame_ = false;
+
     return;
   }
 
@@ -317,27 +334,45 @@ void ImuProcess::Process(const MeasureGroup &meas)
   {
     /// 1.initializing the accelerameter and gyroscopes's covariance and bias
     /// 2.normalize the acceleration measurenments to unit gravity
-
     double cur_norm = 1.0;
+    int N           = init_iter_num;
+    ROS_INFO("IMU Initializing: %.1f %%", float(N) / 500 * 100);
 
     for (const auto &imu : meas.imu)
     {
-      const auto &acc_m = imu->linear_acceleration;
+      Eigen::Vector3d cur_acc(imu->linear_acceleration.x, imu->linear_acceleration.y,
+                        imu->linear_acceleration.z);
+      Eigen::Vector3d cur_gyr(imu->angular_velocity.x, imu->angular_velocity.y,
+                        imu->angular_velocity.z);
+      cur_norm = cur_acc.norm();
 
-      cur_norm       = std::sqrt(acc_m.x * acc_m.x + acc_m.y * acc_m.y + acc_m.z * acc_m.z);
-      
-      scale_gravity += (cur_norm - scale_gravity) / std::max(1,init_iter_num);
+      if (init_iter_num <= 1)
+      {
+        init_iter_num = 1;
+        scale_gravity = cur_norm;
+        mean_acc      = cur_acc;
+        mean_gyr      = cur_gyr;
+      }
+      else
+      {
+        N = init_iter_num;
 
+        scale_gravity += (cur_norm - scale_gravity) / N;
+        mean_acc      += (cur_acc - mean_acc) / N;
+        mean_gyr      += (cur_gyr - mean_gyr) / N;
+
+        cov_acc = cov_acc * (N - 1.0) / N + (cur_acc - mean_acc).cwiseProduct(cur_acc - mean_acc) * (N - 1.0) / (N * N);
+        cov_gyr = cov_gyr * (N - 1.0) / N + (cur_gyr - mean_gyr).cwiseProduct(cur_gyr - mean_gyr) * (N - 1.0) / (N * N);
+      }
       init_iter_num ++;
     }
-
-    ROS_INFO("Calibrating step: %d Gravity_scale: %.4f", init_iter_num, scale_gravity);
 
     if (init_iter_num>500)
     {
       scale_gravity = 1.0 / std::max(scale_gravity,0.1);
       Need_init     = false;
-      ROS_INFO("Calibration Finised: Gravity_scale: %.4f", scale_gravity);
+      ROS_INFO("Calibration Results: Gravity_scale: %.4f; acc covarience: %.4f %.4f %.4f; gry covarience: %.4f %.4f %.4f",\
+               scale_gravity, cov_acc[0], cov_acc[1], cov_acc[2], cov_gyr[0], cov_gyr[1], cov_gyr[2]);
     }
   }
   else
@@ -346,8 +381,6 @@ void ImuProcess::Process(const MeasureGroup &meas)
     /// Integrate all input imu message
     IntegrateGyr(meas.imu);
 
-    t1 = clock();
-
     /// Compensate lidar points with IMU rotation
     //// Initial pose from IMU (with only rotation)
     SE3d T_l_c(GetRot(), Eigen::Vector3d::Zero());
@@ -355,18 +388,14 @@ void ImuProcess::Process(const MeasureGroup &meas)
     //// Get input pcl
     pcl::fromROSMsg(*pcl_in_msg, *cur_pcl_in_);
 
-    t2 = clock();
+    t1 = clock();
 
     /// Undistort points
-
     Sophus::SE3d T_l_be = T_i_l.inverse() * T_l_c * T_i_l;
     pcl::copyPointCloud(*cur_pcl_in_, *cur_pcl_un_);
-
-    t3 = clock();
-
     UndistortPcl(cur_pcl_un_, dt_l_c_, T_l_be);
 
-    t4 = clock();
+    t2 = clock();
 
     {
       static ros::Publisher pub_UndistortPcl =
@@ -399,12 +428,16 @@ void ImuProcess::Process(const MeasureGroup &meas)
       pub_UndistortPcl.publish(pcl_out_msg);
     }
 
+    t3 = clock();
+    
+    std::cout<<"Points number in one steps: "<<cur_pcl_un_->points.size()<<"; Time Consumption: preintegration "\
+    <<t1 - process_start<<" undistort "<<t2 - t1<<" publish "<<t3 - t2<<std::endl;
+
     /// Record last measurements
     last_lidar_ = pcl_in_msg;
     last_imu_ = meas.imu.back();
     cur_pcl_in_.reset(new PointCloudXYZI());
     cur_pcl_un_.reset(new PointCloudXYZI());
-    std::cout<<"imu process time : "<<t1 - process_start<<" "<<t2 - t1<<" "<<t3 - t2<<" "<<t4 - t3<<std::endl;
   }
 }
 

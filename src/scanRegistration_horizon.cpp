@@ -156,8 +156,6 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
   //std::cout<<"DEBUG first cloudSize "<<cloudSize<<std::endl; 
 
   if(cloudSize > 32000) cloudSize = 32000;
-  
-  int count = cloudSize;
 
   PointType point;
   std::vector<pcl::PointCloud<PointType>> laserCloudScans(N_SCANS);
@@ -203,15 +201,9 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
   bool right_surf_flag = false;
   Eigen::Vector3d surf_vector_current(0,0,0);
   Eigen::Vector3d surf_vector_last(0,0,0);
-  int last_surf_position = 0;
-  double depth_threshold = 0.1;
-
 
   //********************************************************************************************************************************************
   for (int i = 5; i < cloudSize - 5; i += count_num ) {
-    float depth = sqrt(laserCloud->points[i].x * laserCloud->points[i].x +
-                       laserCloud->points[i].y * laserCloud->points[i].y +
-                       laserCloud->points[i].z * laserCloud->points[i].z);
 
     // if(depth < 2) depth_threshold = 0.05;
     // if(depth > 30) depth_threshold = 0.1;
@@ -473,11 +465,6 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
   //push_back feature
   for(int i = 0; i < cloudSize; i++){
     //laserCloud->points[i].intensity = double(CloudFeatureFlag[i]) / 10000;
-    float dis = laserCloud->points[i].x * laserCloud->points[i].x
-                + laserCloud->points[i].y * laserCloud->points[i].y
-                + laserCloud->points[i].z * laserCloud->points[i].z;
-    float dis2 = laserCloud->points[i].y * laserCloud->points[i].y + laserCloud->points[i].z * laserCloud->points[i].z;
-    float theta2 = std::asin(sqrt(dis2/dis)) / M_PI * 180;
     //std::cout<<"DEBUG theta "<<theta2<<std::endl;
     // if(theta2 > 34.2 || theta2 < 1){
     //    continue;
