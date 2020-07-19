@@ -33,6 +33,7 @@ using Sophus::SE3d;
 using Sophus::SO3d;
 
 #define SKEW_SYM_MATRX(v)  0.0,-v[2],v[1],v[2],0.0,-v[0],-v[1],v[0],0.0
+#define MAX_INI_COUNT (300)
 
 inline double rad2deg(double radians) { return radians * 180.0 / M_PI; }
 inline double deg2rad(double degrees) { return degrees * M_PI / 180.0; }
@@ -336,7 +337,7 @@ void ImuProcess::Process(const MeasureGroup &meas)
     /// 2.normalize the acceleration measurenments to unit gravity
     double cur_norm = 1.0;
     int N           = init_iter_num;
-    ROS_INFO("IMU Initializing: %.1f %%", float(N) / 500 * 100);
+    ROS_INFO("IMU Initializing: %.1f %%", float(N) / MAX_INI_COUNT * 100);
 
     for (const auto &imu : meas.imu)
     {
@@ -367,7 +368,7 @@ void ImuProcess::Process(const MeasureGroup &meas)
       init_iter_num ++;
     }
 
-    if (init_iter_num>500)
+    if (init_iter_num > MAX_INI_COUNT)
     {
       scale_gravity = 1.0 / std::max(scale_gravity,0.1);
       Need_init     = false;
@@ -442,9 +443,6 @@ void ImuProcess::Process(const MeasureGroup &meas)
 }
 
 /// *************ROS Node
-std::string topic_pcl = "/laser_cloud_flat";
-std::string topic_imu = "/livox/imu";
-
 /// To notify new data
 std::mutex mtx_buffer;
 std::condition_variable sig_buffer;
@@ -586,8 +584,8 @@ int main(int argc, char **argv) {
   ros::NodeHandle nh;
   signal(SIGINT, SigHandle);
 
-  ros::Subscriber sub_pcl = nh.subscribe(topic_pcl, 100, pointcloud_cbk);
-  ros::Subscriber sub_imu = nh.subscribe(topic_imu, 100, imu_cbk);
+  ros::Subscriber sub_pcl = nh.subscribe("/laser_cloud_flat", 100, pointcloud_cbk);
+  ros::Subscriber sub_imu = nh.subscribe("/livox/imu", 100, imu_cbk);
 
   std::shared_ptr<ImuProcess> p_imu(new ImuProcess());
 

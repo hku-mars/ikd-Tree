@@ -39,7 +39,7 @@ find_package(Sophus REQUIRED)
 message(Eigen: ${EIGEN3_INCLUDE_DIR})
 
 include_directories(
-  # include
+  include
   ${Sophus_INCLUDE_DIRS}
 	${catkin_INCLUDE_DIRS} 
         ${EIGEN3_INCLUDE_DIR}
