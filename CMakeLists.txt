@@ -10,12 +10,12 @@ set( CMAKE_CXX_FLAGS "-std=c++11 -O3" )
 #set(CMAKE_CXX_COMPILER "/usr/bin/clang++")
 
 #set(CMAKE_C_COMPILER "/usr/bin/clang")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fexceptions" -Wall)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -pthread -std=c++0x -std=c++11 -fexceptions -Wall")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fexceptions" )
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -pthread -std=c++0x -std=c++11 -fexceptions")
 
 find_package(OpenMP QUIET)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS} -Wall")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}   ${OpenMP_C_FLAGS}" -Wall)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}   ${OpenMP_C_FLAGS}")
 
 set(Sophus_INCLUDE_DIRS "/usr/local/include/sophus")
 
@@ -39,7 +39,6 @@ find_package(Sophus REQUIRED)
 message(Eigen: ${EIGEN3_INCLUDE_DIR})
 
 include_directories(
-  include
   ${Sophus_INCLUDE_DIRS}
 	${catkin_INCLUDE_DIRS} 
         ${EIGEN3_INCLUDE_DIR}
@@ -48,7 +47,7 @@ include_directories(
 catkin_package(
   CATKIN_DEPENDS geometry_msgs nav_msgs roscpp rospy std_msgs
   DEPENDS EIGEN3 PCL OpenCV Sophus
-  INCLUDE_DIRS include
+  INCLUDE_DIRS
 )
 
 add_executable(imu_process src/IMU_Processing.cpp)

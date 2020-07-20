@@ -452,7 +452,8 @@ int main(int argc, char** argv)
 
         if (newLaserCloudCornerLast && newLaserCloudSurfLast && newLaserCloudFullRes &&
                 fabs(timeLaserCloudSurfLast - timeLaserCloudCornerLast) < 0.005 &&
-                fabs(timeLaserCloudFullRes - timeLaserCloudCornerLast) < 0.005) {
+                fabs(timeLaserCloudFullRes - timeLaserCloudCornerLast) < 0.005) 
+        {
 
             clock_t match_start,match_time,solve_start,solve_time,t1,t2,t3,t4;
 
@@ -466,7 +467,7 @@ int main(int argc, char** argv)
             newLaserCloudFullRes = false;
 
             //transformAssociateToMap();
-            //std::cout<<"DEBUG mapping start "<<std::endl;
+            std::cout<<"DEBUG mapping start "<<std::endl;
 
             PointType pointOnYAxis;
             pointOnYAxis.x = 0.0;
@@ -653,7 +654,7 @@ int main(int argc, char** argv)
                 laserCloudCenDepth--;
             }
 
-            int laserCloudValidNum = 0;
+            int laserCloudValidNum    = 0;
             int laserCloudSurroundNum = 0;
 
             for (int i = centerCubeI - 2; i <= centerCubeI + 2; i++) {
@@ -703,11 +704,11 @@ int main(int argc, char** argv)
                             if (isInLaserFOV) {
                                 laserCloudValidInd[laserCloudValidNum] = i + laserCloudWidth * j
                                         + laserCloudWidth * laserCloudHeight * k;
-                                laserCloudValidNum++;
+                                laserCloudValidNum ++;
                             }
                             laserCloudSurroundInd[laserCloudSurroundNum] = i + laserCloudWidth * j
                                     + laserCloudWidth * laserCloudHeight * k;
-                            laserCloudSurroundNum++;
+                            laserCloudSurroundNum ++;
                         }
                     }
                 }
@@ -726,24 +727,26 @@ int main(int argc, char** argv)
             laserCloudCornerLast_down->clear();
             downSizeFilterCorner.setInputCloud(laserCloudCornerLast);
             downSizeFilterCorner.filter(*laserCloudCornerLast_down);
-            // int laserCloudCornerLast_downNum = laserCloudCornerLast_down->points.size();
+            int laserCloudCornerLast_downNum = laserCloudCornerLast_down->points.size();
 
             laserCloudSurfLast_down->clear();
             downSizeFilterSurf.setInputCloud(laserCloudSurfLast);
             downSizeFilterSurf.filter(*laserCloudSurfLast_down);
-            // int laserCloudSurfLast_downNum = laserCloudSurfLast_down->points.size();
+            int laserCloudSurfLast_downNum = laserCloudSurfLast_down->points.size();
 
-            if(0)
-            {
-                std::cout<<"DEBUG MAPPING laserCloudCornerLast_down : "<<laserCloudCornerLast_down->points.size()<<" laserCloudSurfLast_down : "
-                <<laserCloudSurfLast_down->points.size()<<std::endl;
-                std::cout<<"DEBUG MAPPING laserCloudCornerLast : "<<laserCloudCornerLast->points.size()<<" laserCloudSurfLast : "
-                <<laserCloudSurfLast->points.size()<<std::endl;
-                std::cout<<"DEBUG MAPPING laserCloudCornerFromMapNum : "<<laserCloudCornerFromMapNum<<" laserCloudSurfFromMapNum : "
-                <<laserCloudSurfFromMapNum<<std::endl;
-            }
+            std::cout<<"DEBUG MAPPING laserCloudCornerLast_down : "<<laserCloudCornerLast_down->points.size()<<" laserCloudSurfLast_down : "
+            <<laserCloudSurfLast_down->points.size()<<std::endl;
+            std::cout<<"DEBUG MAPPING laserCloudCornerLast : "<<laserCloudCornerLast->points.size()<<" laserCloudSurfLast : "
+            <<laserCloudSurfLast->points.size()<<std::endl;
+            std::cout<<"DEBUG MAPPING laserCloudCornerFromMapNum : "<<laserCloudCornerFromMapNum<<" laserCloudSurfFromMapNum : "
+            <<laserCloudSurfFromMapNum<<std::endl;
 
             t2 = clock();
+
+            std::cout<<"DEBUG mapping 111: "<<std::endl;
+
+            std::cout<<"DEBUG mapping "<<laserCloudCornerFromMapNum<<std::endl;
+
             if (laserCloudCornerFromMapNum > 10 && laserCloudSurfFromMapNum > 100) {
             //if (laserCloudSurfFromMapNum > 100) {
                 kdtreeCornerFromMap->setInputCloud(laserCloudCornerFromMap);
@@ -756,7 +759,7 @@ int main(int argc, char** argv)
                     num_temp++;
                     laserCloudOri->clear();
                     coeffSel->clear();
-                    for (uint i = 0; i < laserCloudCornerLast->points.size(); i++) {
+                    for (int i = 0; i < laserCloudCornerLast->points.size(); i++) {
                         pointOri = laserCloudCornerLast->points[i];
 
                         pointAssociateToMap(&pointOri, &pointSel);
@@ -865,9 +868,9 @@ int main(int argc, char** argv)
                             }
                         }
                     }
-                    //std::cout <<"DEBUG mapping select corner points : " << coeffSel->size() << std::endl;
+                    std::cout <<"DEBUG mapping select corner points : " << coeffSel->size() << std::endl;
 
-                    for (uint i = 0; i < laserCloudSurfLast_down->points.size(); i++) {
+                    for (int i = 0; i < laserCloudSurfLast_down->points.size(); i++) {
                         pointOri = laserCloudSurfLast_down->points[i];
 
                         pointAssociateToMap(&pointOri, &pointSel);
@@ -930,7 +933,7 @@ int main(int argc, char** argv)
                             }
                         }
                     }
-                    //std::cout <<"DEBUG mapping select all points : " << coeffSel->size() << std::endl;
+                    std::cout <<"DEBUG mapping select all points : " << coeffSel->size() << std::endl;
 
                     match_time += clock() - match_start;
                     solve_start = clock();
@@ -1046,14 +1049,15 @@ int main(int argc, char** argv)
 
                     
                 }
-                //std::cout<<"DEBUG num_temp: "<<num_temp << std::endl;
+                std::cout<<"DEBUG num_temp: "<<num_temp << std::endl;
 
                 transformUpdate();
             }
 
             t3 = clock();
+            std::cout<<"DEBUG mapping 222: "<< std::endl;
 
-            for (uint i = 0; i < laserCloudCornerLast->points.size(); i++) {
+            for (int i = 0; i < laserCloudCornerLast->points.size(); i++) {
                 pointAssociateToMap(&laserCloudCornerLast->points[i], &pointSel);
 
                 int cubeI = int((pointSel.x + 25.0) / 50.0) + laserCloudCenWidth;
@@ -1073,7 +1077,7 @@ int main(int argc, char** argv)
                 }
             }
 
-            for (uint i = 0; i < laserCloudSurfLast_down->points.size(); i++) {
+            for (int i = 0; i < laserCloudSurfLast_down->points.size(); i++) {
                 pointAssociateToMap(&laserCloudSurfLast_down->points[i], &pointSel);
 
                 int cubeI = int((pointSel.x + 25.0) / 50.0) + laserCloudCenWidth;
@@ -1112,12 +1116,24 @@ int main(int argc, char** argv)
                 laserCloudSurfArray2[ind] = laserCloudTemp;
             }
 
+            std::cout<<"DEBUG mapping 333: "<< std::endl;
+
             laserCloudSurround2->clear();
             laserCloudSurround2_corner->clear();
+
             for (int i = 0; i < laserCloudSurroundNum; i++) {
+                std::cout<<"DEBUG mapping 555: "<<i<< std::endl;
                 int ind = laserCloudSurroundInd[i];
+                std::cout<<"DEBUG mapping maybe 1: "<< ind << std::endl;
+                if(i >= 60)
+                {
+                    std::cout<<"*laserCloudSurround2_corner: "<< *laserCloudCornerArray[ind] << "\n AND: \n"<< *laserCloudSurround2_corner << std::endl;
+                }
+
                 *laserCloudSurround2_corner += *laserCloudCornerArray[ind];
+                std::cout<<"DEBUG mapping maybe 2: "<< ind << std::endl;
                 *laserCloudSurround2 += *laserCloudSurfArray[ind];
+                std::cout<<"DEBUG mapping maybe 3: "<< ind << std::endl;
             }
 
             // laserCloudSurround->clear();
