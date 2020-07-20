@@ -205,36 +205,6 @@ Visualization Manager:
           Use Fixed Frame: true
           Use rainbow: true
           Value: true
-        - Alpha: 0.100000001
-          Autocompute Intensity Bounds: true
-          Autocompute Value Bounds:
-            Max Value: 0.977999985
-            Min Value: -2.72600007
-            Value: true
-          Axis: Z
-          Channel Name: intensity
-          Class: rviz/PointCloud2
-          Color: 255; 255; 255
-          Color Transformer: AxisColor
-          Decay Time: 1e+09
-          Enabled: true
-          Invert Rainbow: true
-          Max Color: 255; 255; 255
-          Max Intensity: 90.0066299
-          Min Color: 0; 0; 0
-          Min Intensity: 0
-          Name: currPoints
-          Position Transformer: XYZ
-          Queue Size: 100000
-          Selectable: true
-          Size (Pixels): 1
-          Size (m): 0.00999999978
-          Style: Points
-          Topic: /livox_cloud
-          Unreliable: false
-          Use Fixed Frame: true
-          Use rainbow: true
-          Value: true
       Enabled: false
       Name: mapping
     - Class: rviz/Group
