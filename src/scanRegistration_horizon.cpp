@@ -120,32 +120,6 @@ bool plane_judge(const std::vector<PointType>& point_list,const int plane_thresh
   }
 }
 
-/* void laserCloudHandler_temp(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg) //for hkmars data
-{
-
-  pcl::PointCloud<PointType>::Ptr laserCloudIn(new pcl::PointCloud<PointType>());
-
-  if(msg_window.size() < 2){
-    msg_window.push_back(laserCloudMsg);
-  }
-  else{
-    msg_window.erase(msg_window.begin());
-    msg_window.push_back(laserCloudMsg);
-  }
-
-  for(int i = 0; i < msg_window.size();i++){
-    pcl::PointCloud<PointType> temp;
-    pcl::fromROSMsg(*msg_window[i], temp);
-    *laserCloudIn += temp;
-  }
-  sensor_msgs::PointCloud2 laserCloudOutMsg;
-  pcl::toROSMsg(*laserCloudIn, laserCloudOutMsg);
-  laserCloudOutMsg.header.stamp = laserCloudMsg->header.stamp;
-  laserCloudOutMsg.header.frame_id = "/livox";
-  pubLaserCloud_temp.publish(laserCloudOutMsg);
-
-} */
-
 void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
 {
   pcl::PointCloud<PointType> laserCloudIn;
@@ -233,7 +207,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
         left_list.push_back(laserCloud->points[i+j]);
       }
 
-      if( left_curvature < 0.001) CloudFeatureFlag[i-2] = 1; //surf point flag  && plane_judge(left_list,1000) 
+      if( left_curvature < 0.001) CloudFeatureFlag[i-2] = 1;
       
       left_surf_flag = true;
     }
@@ -265,7 +239,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
       for(int j = 1; j < 5; j++){
         right_list.push_back(laserCloud->points[i+j]);
       }
-        if(right_curvature < 0.001 ) CloudFeatureFlag[i+2] = 1; //surf point flag  && plane_judge(right_list,1000)
+        if(right_curvature < 0.001 ) CloudFeatureFlag[i+2] = 1;
 
 
       count_num = 4;

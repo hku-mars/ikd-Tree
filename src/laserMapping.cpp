@@ -743,10 +743,6 @@ int main(int argc, char** argv)
 
             t2 = clock();
 
-            std::cout<<"DEBUG mapping 111: "<<std::endl;
-
-            std::cout<<"DEBUG mapping "<<laserCloudCornerFromMapNum<<std::endl;
-
             if (laserCloudCornerFromMapNum > 10 && laserCloudSurfFromMapNum > 100) {
             //if (laserCloudSurfFromMapNum > 100) {
                 kdtreeCornerFromMap->setInputCloud(laserCloudCornerFromMap);
@@ -868,7 +864,8 @@ int main(int argc, char** argv)
                             }
                         }
                     }
-                    std::cout <<"DEBUG mapping select corner points : " << coeffSel->size() << std::endl;
+                    
+                    // std::cout <<"DEBUG mapping select corner points : " << coeffSel->size() << std::endl;
 
                     for (int i = 0; i < laserCloudSurfLast_down->points.size(); i++) {
                         pointOri = laserCloudSurfLast_down->points[i];
@@ -933,7 +930,7 @@ int main(int argc, char** argv)
                             }
                         }
                     }
-                    std::cout <<"DEBUG mapping select all points : " << coeffSel->size() << std::endl;
+                    // std::cout <<"DEBUG mapping select all points : " << coeffSel->size() << std::endl;
 
                     match_time += clock() - match_start;
                     solve_start = clock();
@@ -1055,7 +1052,6 @@ int main(int argc, char** argv)
             }
 
             t3 = clock();
-            std::cout<<"DEBUG mapping 222: "<< std::endl;
 
             for (int i = 0; i < laserCloudCornerLast->points.size(); i++) {
                 pointAssociateToMap(&laserCloudCornerLast->points[i], &pointSel);
@@ -1116,24 +1112,13 @@ int main(int argc, char** argv)
                 laserCloudSurfArray2[ind] = laserCloudTemp;
             }
 
-            std::cout<<"DEBUG mapping 333: "<< std::endl;
-
             laserCloudSurround2->clear();
             laserCloudSurround2_corner->clear();
 
             for (int i = 0; i < laserCloudSurroundNum; i++) {
-                std::cout<<"DEBUG mapping 555: "<<i<< std::endl;
                 int ind = laserCloudSurroundInd[i];
-                std::cout<<"DEBUG mapping maybe 1: "<< ind << std::endl;
-                if(i >= 60)
-                {
-                    std::cout<<"*laserCloudSurround2_corner: "<< *laserCloudCornerArray[ind] << "\n AND: \n"<< *laserCloudSurround2_corner << std::endl;
-                }
-
                 *laserCloudSurround2_corner += *laserCloudCornerArray[ind];
-                std::cout<<"DEBUG mapping maybe 2: "<< ind << std::endl;
                 *laserCloudSurround2 += *laserCloudSurfArray[ind];
-                std::cout<<"DEBUG mapping maybe 3: "<< ind << std::endl;
             }
 
             // laserCloudSurround->clear();

@@ -33,7 +33,7 @@ using Sophus::SE3d;
 using Sophus::SO3d;
 
 #define SKEW_SYM_MATRX(v)  0.0,-v[2],v[1],v[2],0.0,-v[0],-v[1],v[0],0.0
-#define MAX_INI_COUNT (300)
+#define MAX_INI_COUNT (200)
 
 inline double rad2deg(double radians) { return radians * 180.0 / M_PI; }
 inline double deg2rad(double degrees) { return degrees * M_PI / 180.0; }
@@ -232,7 +232,11 @@ void ImuProcess::IntegrateGyr(
 
     v_imu_.push_back(imu);
     v_rot_.push_back(rot);
+
+
   }
+
+  std::cout << "size of imu stack:" <<v_imu.size() <<std::endl;
 
   ROS_INFO("integrate rotation angle [x, y, z]: [%.2f, %.2f, %.2f]",
            GetRot().angleX() * 180.0 / M_PI,
@@ -266,11 +270,14 @@ void ImuProcess::UndistortPcl(const PointCloudXYZI::Ptr &pcl_in_out,
 
   for (auto &pt : pcl_in_out->points) 
   {
-    
     int ring = int(pt.intensity);
     float dt_bi = pt.intensity - ring;
 
-    if (dt_bi == 0) {laserCloudtmp->push_back(pt);}
+    if (dt_bi == 0) 
+    {
+      laserCloudtmp->push_back(pt);
+    }
+
     double ratio_bi = dt_bi / dt_be;
     /// Rotation from i-e
     double ratio_ie = 1 - ratio_bi;
@@ -366,14 +373,18 @@ void ImuProcess::Process(const MeasureGroup &meas)
         cov_gyr = cov_gyr * (N - 1.0) / N + (cur_gyr - mean_gyr).cwiseProduct(cur_gyr - mean_gyr) * (N - 1.0) / (N * N);
       }
       init_iter_num ++;
+      // std::cout<< imu->linear_acceleration_covariance[0] <<std::endl;
     }
 
     if (init_iter_num > MAX_INI_COUNT)
     {
-      scale_gravity = 1.0 / std::max(scale_gravity,0.1);
       Need_init     = false;
-      ROS_INFO("Calibration Results: Gravity_scale: %.4f; acc covarience: %.4f %.4f %.4f; gry covarience: %.4f %.4f %.4f",\
-               scale_gravity, cov_acc[0], cov_acc[1], cov_acc[2], cov_gyr[0], cov_gyr[1], cov_gyr[2]);
+
+      scale_gravity = 1.0 / std::max(scale_gravity,0.1);
+      zero_bias_gyr = mean_gyr;
+
+      ROS_INFO("Calibration Results: Gravity_scale: %.4f; zero_bias_gyr: %.4f %.4f %.4f; acc covarience: %.4f %.4f %.4f; gry covarience: %.4f %.4f %.4f",\
+               scale_gravity, zero_bias_gyr[0], zero_bias_gyr[1], zero_bias_gyr[2], cov_acc[0], cov_acc[1], cov_acc[2], cov_gyr[0], cov_gyr[1], cov_gyr[2]);
     }
   }
   else
@@ -512,14 +523,16 @@ bool SyncMeasure(MeasureGroup &measgroup)
   }
 
   if (imu_buffer.front()->header.stamp.toSec() >
-      lidar_buffer.back()->header.stamp.toSec()) {
+      lidar_buffer.back()->header.stamp.toSec()) 
+  {
     lidar_buffer.clear();
     ROS_ERROR("clear lidar buffer, only happen at the beginning");
     return false;
   }
 
   if (imu_buffer.back()->header.stamp.toSec() <
-      lidar_buffer.front()->header.stamp.toSec()) {
+      lidar_buffer.front()->header.stamp.toSec()) 
+  {
     return false;
   }
 
@@ -534,7 +547,8 @@ bool SyncMeasure(MeasureGroup &measgroup)
   for (const auto &imu : imu_buffer)
   {
     double imu_time = imu->header.stamp.toSec();
-    if (imu_time <= lidar_time) {
+    if (imu_time <= lidar_time) 
+    {
       measgroup.imu.push_back(imu);
       imu_cnt++;
     }

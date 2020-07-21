@@ -9,7 +9,8 @@
                 "/usr/local/include/eigen3",
                 "/opt/ros/kinetic/include",
                 "/home/dji/livox_ros_driver/devel/include/livox_ros_driver",
-                "/home/dji/livox_ros_driver/devel/include"
+                "/home/dji/livox_ros_driver/devel/include",
+                "/usr/include/pcl-1.8"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
