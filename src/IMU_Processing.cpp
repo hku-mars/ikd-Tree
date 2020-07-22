@@ -33,7 +33,7 @@ using Sophus::SE3d;
 using Sophus::SO3d;
 
 #define SKEW_SYM_MATRX(v)  0.0,-v[2],v[1],v[2],0.0,-v[0],-v[1],v[0],0.0
-#define MAX_INI_COUNT (200)
+#define MAX_INI_COUNT (50)
 
 inline double rad2deg(double radians) { return radians * 180.0 / M_PI; }
 inline double deg2rad(double degrees) { return degrees * M_PI / 180.0; }
@@ -44,12 +44,18 @@ pcl::PointCloud<pcl::PointXYZINormal>::Ptr laserCloudtmp(
 typedef pcl::PointXYZINormal PointType;
 typedef pcl::PointCloud<PointType> PointCloudXYZI;
 
-struct MeasureGroup 
+struct MeasureGroup
 {
   sensor_msgs::PointCloud2ConstPtr lidar;
   std::vector<sensor_msgs::Imu::ConstPtr> imu;
 };
 
+struct RotKeyPoint
+{
+  double time_sec;
+  Eigen::Vector3d ang_vel;
+  Eigen::Matrix3d R;
+};
 /// *************IMU Process and undistortion
 class ImuProcess
 {
@@ -62,10 +68,11 @@ class ImuProcess
   void Process(const MeasureGroup &meas);
   void Reset();
 
+  Eigen::Matrix3d Exp(const Eigen::Vector3d &ang_vel, const double &dt);
+
   void IntegrateGyr(const std::vector<sensor_msgs::Imu::ConstPtr> &v_imu);
 
-  void UndistortPcl(const PointCloudXYZI::Ptr &pcl_in_out, double dt_be,
-                    const Sophus::SE3d &Tbe);
+  void UndistortPcl(const MeasureGroup &meas, PointCloudXYZI &pcl_in_out);
 
   ros::NodeHandle nh;
 
@@ -109,6 +116,9 @@ class ImuProcess
   /// Making sure the equal size: v_imu_ and v_rot_
   std::vector<sensor_msgs::ImuConstPtr> v_imu_;
   std::vector<Sophus::SO3d> v_rot_;
+  std::vector<Eigen::Matrix3d> v_rot_pcl_;
+
+  std::vector<RotKeyPoint> v_rot_kp_;
 };
 
 
@@ -153,9 +163,43 @@ void ImuProcess::Reset()
   start_timestamp_ = -1;
   v_rot_.clear();
   v_imu_.clear();
+  v_rot_pcl_.clear();
+  v_rot_kp_.clear();
 
   cur_pcl_in_.reset(new PointCloudXYZI());
   cur_pcl_un_.reset(new PointCloudXYZI());
+}
+
+/* Eigen::Matrix3d Exp(const Eigen::Vector3d &r_axis, const double &r_ang)
+{
+    Eigen::Matrix3d K;
+    Eigen::Matrix3d Eye3d = Eigen::Matrix3d::Identity();
+    K << SKEW_SYM_MATRX(r_axis);
+    return (Eye3d + std::sin(-r_ang) * K + (1.0 - std::cos(-r_ang)) * K * K);
+} */
+
+Eigen::Matrix3d ImuProcess::Exp(const Eigen::Vector3d &ang_vel, const double &dt)
+{
+  double ang_vel_norm = ang_vel.norm();
+  Eigen::Matrix3d Eye3d = Eigen::Matrix3d::Identity();
+  if (ang_vel_norm > 0.0000001)
+  {
+    Eigen::Vector3d r_axis = ang_vel / ang_vel_norm;
+    Eigen::Matrix3d K;
+    
+    K << SKEW_SYM_MATRX(r_axis);
+
+    double r_ang = ang_vel_norm * dt;
+
+    Eigen::Matrix3d R = Eye3d + std::sin(r_ang) * K + (1.0 - std::cos(r_ang)) * K * K;
+
+    /// Roderigous Tranformation
+    return R;
+  }
+  else
+  {
+    return Eye3d;
+  }
 }
 
 const Sophus::SO3d ImuProcess::GetRot() const 
@@ -170,8 +214,7 @@ const Sophus::SO3d ImuProcess::GetRot() const
   }
 }
 
-void ImuProcess::IntegrateGyr(
-    const std::vector<sensor_msgs::Imu::ConstPtr> &v_imu) 
+void ImuProcess::IntegrateGyr(const std::vector<sensor_msgs::Imu::ConstPtr> &v_imu)
 {
   /// Reset gyr integrator
   // gyr_int_.Reset(last_lidar_->header.stamp.toSec(), last_imu_);
@@ -192,9 +235,9 @@ void ImuProcess::IntegrateGyr(
       sensor_msgs::ImuPtr imu_inter(new sensor_msgs::Imu());
       double dt1 = start_timestamp_ - last_imu_->header.stamp.toSec();
       double dt2 = imu->header.stamp.toSec() - start_timestamp_;
-      ROS_ASSERT_MSG(dt1 >= 0 && dt2 >= 0, "%f - %f - %f",
+      /* ROS_ASSERT_MSG(dt1 <= 0 && dt2 <= 0, "%f - %f - %f",
                     last_imu_->header.stamp.toSec(), start_timestamp_,
-                    imu->header.stamp.toSec());
+                    imu->header.stamp.toSec()); */
       double w1 = dt2 / (dt1 + dt2 + 1e-9);
       double w2 = dt1 / (dt1 + dt2 + 1e-9);
 
@@ -224,19 +267,20 @@ void ImuProcess::IntegrateGyr(
     Eigen::Vector3d gyr(imu->angular_velocity.x, imu->angular_velocity.y,
                         imu->angular_velocity.z);
     assert(time >= 0);
-    double dt = time - time_last;
-    auto delta_angle = dt * 0.5 * (gyr + gyr_last);
+    
+    Eigen::Vector3d ang_vel_avr = 0.5 * (gyr + gyr_last);
+
+    double dt_seg    = time - time_last;
+    auto delta_angle = dt_seg * ang_vel_avr;
     auto delta_r = SO3d::exp(delta_angle);
 
     SO3d rot = rot_last * delta_r;
 
     v_imu_.push_back(imu);
     v_rot_.push_back(rot);
-
-
   }
 
-  std::cout << "size of imu stack:" <<v_imu.size() <<std::endl;
+  std::cout<< "size of imu stack:" <<v_imu.size() <<std::endl;
 
   ROS_INFO("integrate rotation angle [x, y, z]: [%.2f, %.2f, %.2f]",
            GetRot().angleX() * 180.0 / M_PI,
@@ -244,16 +288,114 @@ void ImuProcess::IntegrateGyr(
            GetRot().angleZ() * 180.0 / M_PI);
 }
 
-void ImuProcess::UndistortPcl(const PointCloudXYZI::Ptr &pcl_in_out,
-                              double dt_be, const Sophus::SE3d &Tbe)
+void ImuProcess::UndistortPcl(const MeasureGroup &meas, PointCloudXYZI &pcl_in_out)
 {
-  const Eigen::Vector3d &tbe = Tbe.translation();
+  const auto &v_imu = meas.imu;
+  const double &imu_end_time = meas.imu.back()->header.stamp.toSec();
+  const double &imu_beg_time = meas.imu.front()->header.stamp.toSec();
+  const double &imu_seg_time = (imu_end_time - imu_beg_time) / (meas.imu.size() - 1);
+
+  std::vector<sensor_msgs::Imu::ConstPtr>::const_iterator it_imu = v_imu.end() - 1;
+  // std::cout<< "******IMU key time: ";
+  RotKeyPoint rot_kp;
+  for (; it_imu != v_imu.begin(); it_imu--)
+  {
+    if (v_rot_kp_.empty())
+    {
+      rot_kp.time_sec = imu_end_time;
+      rot_kp.ang_vel  = Eigen::Vector3d(v_imu.back()->angular_velocity.x,
+                                        v_imu.back()->angular_velocity.y,
+                                        v_imu.back()->angular_velocity.z);
+      rot_kp.R = Eigen::Matrix3d::Identity();
+      v_rot_kp_.push_back(rot_kp);
+    }
+    auto &imu_seg_head = *(it_imu - 1);
+    auto &imu_seg_tail = *(it_imu);
+
+    double imu_seg_tail_time = imu_seg_tail->header.stamp.toSec();
+    double imu_seg_head_time = imu_seg_head->header.stamp.toSec();
+
+    Eigen::Vector3d gyr_seg_end(imu_seg_tail->angular_velocity.x,
+                              imu_seg_tail->angular_velocity.y,
+                              imu_seg_tail->angular_velocity.z);
+
+    Eigen::Vector3d gyr_seg_head(imu_seg_head->angular_velocity.x,
+                              imu_seg_head->angular_velocity.y,
+                              imu_seg_head->angular_velocity.z);
+    
+    Eigen::Vector3d ang_vel_avr = 0.5 * (gyr_seg_end + gyr_seg_head) - zero_bias_gyr;
+    
+    rot_kp.time_sec = imu_seg_head_time;
+    rot_kp.ang_vel  = gyr_seg_head;
+    rot_kp.R        = Exp(-ang_vel_avr, imu_seg_tail_time - imu_seg_head_time) * v_rot_kp_.back().R;
+
+    v_rot_kp_.push_back(rot_kp);
+
+    // std::cout<<"  "<< imu_seg_head_time;
+  }
+  // std::cout<<"\n"<<v_rot_kp_[0].time_sec<<std::endl;
+
+  /// initialize each point cloud's rotation matrix
+  if (v_rot_pcl_.empty())
+  {
+    v_rot_pcl_.push_back(Eigen::Matrix3d::Identity());
+  }
+  /// unstort the point cloud points in each IMU segment
+  const double cur_pcl_head_time = meas.lidar->header.stamp.toSec();
+  
+  pcl::fromROSMsg(*(meas.lidar), pcl_in_out);
+
+  PointCloudXYZI::iterator it_pcl = pcl_in_out.points.end() - 1;
+
+  Eigen::Matrix3d K, Rie, Last_R;
+
+  int i = 0;
+  
+  for(; it_pcl != pcl_in_out.points.begin(); it_pcl --)
+  {
+    /// find the base tor keypoint
+    double pt_time_abs = it_pcl->curvature / double(1000) + cur_pcl_head_time;
+    int upper_kp_index = floor((imu_end_time - pt_time_abs) / imu_seg_time);
+
+    /// Transform to the 'end' frame, using only the rotation
+    /// Note: Compensation direction is INVERSE of Frame's moving direction
+    /// So if we want to compensate a point at timestamp-i to the frame-e
+    /// P_compensate = Exp(omega, dt) * R_last * Pi + t_ei
+
+    RotKeyPoint rot_kp(v_rot_kp_[upper_kp_index]);
+    Eigen::Vector3d ang_vel = 0.5 * (rot_kp.ang_vel + v_rot_kp_[upper_kp_index + 1].ang_vel);
+    double dt = rot_kp.time_sec - pt_time_abs;
+    Rie = Exp(ang_vel, dt) * rot_kp.R;
+
+    Eigen::Vector3d tie(0, 0, 0);
+    Eigen::Vector3d v_pt_comp_e = Rie * (Eigen::Vector3d(it_pcl->x, it_pcl->y, it_pcl->z) - tie);
+    v_rot_pcl_.push_back(Rie);
+
+    /// Undistorted point
+    it_pcl->x = v_pt_comp_e.x();
+    it_pcl->y = v_pt_comp_e.y();
+    it_pcl->z = v_pt_comp_e.z();
+
+    /* if ((i++) % 500 == 0)
+    {
+      std::cout<<i<< ": current pcl time:"<< std::setprecision(8) << pt_time_abs << " and "<< cur_pcl_head_time <<std::endl;
+      std::cout<< "undistort rotation matrix:\n" << Rie <<std::endl;
+    } */
+  }
+  ROS_INFO("undistort rotation angle [x, y, z]: [%.2f, %.2f, %.2f]",
+           Rie.eulerAngles(0, 1, 2)[0] * 180.0 / M_PI,
+           Rie.eulerAngles(0, 1, 2)[1] * 180.0 / M_PI,
+           Rie.eulerAngles(0, 1, 2)[2] * 180.0 / M_PI);
+}
+
+  /* const Eigen::Vector3d &tbe = Tbe.translation();
 
   // ros::Time begin, t1;
   // begin = ros::Time::now();
   Eigen::Vector3d rso3_be, r_axis;
   rso3_be = Tbe.so3().log();
   double r_angle = rso3_be.norm();
+
   if (r_angle > 0.00000001)
   {
     r_axis = rso3_be / r_angle;
@@ -299,9 +441,9 @@ void ImuProcess::UndistortPcl(const PointCloudXYZI::Ptr &pcl_in_out,
     pt.x = v_pt_comp_e.x();
     pt.y = v_pt_comp_e.y();
     pt.z = v_pt_comp_e.z();
-  }
+  } */
   // ros::Duration duration1 = t1 - begin;
-}
+
 
 void ImuProcess::Process(const MeasureGroup &meas)
 {
@@ -311,7 +453,7 @@ void ImuProcess::Process(const MeasureGroup &meas)
 
   ROS_ASSERT(!meas.imu.empty());
   ROS_ASSERT(meas.lidar != nullptr);
-  ROS_DEBUG("Process lidar at time: %.4f, %lu imu msgs from %.4f to %.4f",
+  ROS_INFO("Process lidar at time: %.4f, %lu imu msgs from %.4f to %.4f",
             meas.lidar->header.stamp.toSec(), meas.imu.size(),
             meas.imu.front()->header.stamp.toSec(),
             meas.imu.back()->header.stamp.toSec());
@@ -396,16 +538,17 @@ void ImuProcess::Process(const MeasureGroup &meas)
     /// Compensate lidar points with IMU rotation
     //// Initial pose from IMU (with only rotation)
     SE3d T_l_c(GetRot(), Eigen::Vector3d::Zero());
-    dt_l_c_ = pcl_in_msg->header.stamp.toSec() - last_lidar_->header.stamp.toSec();
+    double cur_pcl_head_time = pcl_in_msg->header.stamp.toSec();
+    dt_l_c_ = cur_pcl_head_time - last_lidar_->header.stamp.toSec();
     //// Get input pcl
     pcl::fromROSMsg(*pcl_in_msg, *cur_pcl_in_);
 
     t1 = clock();
 
     /// Undistort points
-    Sophus::SE3d T_l_be = T_i_l.inverse() * T_l_c * T_i_l;
-    pcl::copyPointCloud(*cur_pcl_in_, *cur_pcl_un_);
-    UndistortPcl(cur_pcl_un_, dt_l_c_, T_l_be);
+    // Sophus::SE3d T_l_be = T_i_l.inverse() * T_l_c * T_i_l;
+    // pcl::copyPointCloud(*cur_pcl_in_, *cur_pcl_un_);
+    UndistortPcl(meas, *cur_pcl_un_);
 
     t2 = clock();
 
@@ -480,7 +623,8 @@ void pointcloud_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg)
 
   mtx_buffer.lock();
 
-  if (timestamp < last_timestamp_lidar) {
+  if (timestamp < last_timestamp_lidar)
+  {
     ROS_ERROR("lidar loop back, clear buffer");
     lidar_buffer.clear();
   }
@@ -522,13 +666,13 @@ bool SyncMeasure(MeasureGroup &measgroup)
     return false;
   }
 
-  if (imu_buffer.front()->header.stamp.toSec() >
+  /* if (imu_buffer.front()->header.stamp.toSec() <
       lidar_buffer.back()->header.stamp.toSec()) 
   {
     lidar_buffer.clear();
     ROS_ERROR("clear lidar buffer, only happen at the beginning");
     return false;
-  }
+  } */
 
   if (imu_buffer.back()->header.stamp.toSec() <
       lidar_buffer.front()->header.stamp.toSec()) 
@@ -539,7 +683,11 @@ bool SyncMeasure(MeasureGroup &measgroup)
   /// Add lidar data, and pop from buffer
   measgroup.lidar = lidar_buffer.front();
   lidar_buffer.pop_front();
-  double lidar_time = measgroup.lidar->header.stamp.toSec();
+  pcl::PointCloud<PointType> v_pcl;
+  pcl::fromROSMsg(*(measgroup.lidar), v_pcl);
+
+  // double lidar_end_time = measgroup.lidar->header.stamp.toSec();
+  double lidar_end_time = measgroup.lidar->header.stamp.toSec() + v_pcl.points.back().curvature / double(1000);
 
   /// Add imu data, and pop from buffer
   measgroup.imu.clear();
@@ -547,7 +695,7 @@ bool SyncMeasure(MeasureGroup &measgroup)
   for (const auto &imu : imu_buffer)
   {
     double imu_time = imu->header.stamp.toSec();
-    if (imu_time <= lidar_time) 
+    if (imu_time <= lidar_end_time) 
     {
       measgroup.imu.push_back(imu);
       imu_cnt++;
@@ -559,16 +707,21 @@ bool SyncMeasure(MeasureGroup &measgroup)
     imu_buffer.pop_front();
   }
 
+  std::cout<<"imu_cnt: "<<imu_cnt<<" imu_end_time: "<<measgroup.imu.back()->header.stamp.toSec()<<"lidar_end_time"<<lidar_end_time<<std::endl;
+
   // ROS_DEBUG("add %d imu msg", imu_cnt);
 
   return true;
 }
 
-void ProcessLoop(std::shared_ptr<ImuProcess> p_imu) {
+void ProcessLoop(std::shared_ptr<ImuProcess> p_imu)
+{
   ROS_INFO("Start ProcessLoop");
 
   ros::Rate r(100);
-  while (ros::ok()) {
+
+  while (ros::ok())
+  {
     MeasureGroup meas;
     std::unique_lock<std::mutex> lk(mtx_buffer);
     ROS_INFO("wait imu");
@@ -593,7 +746,8 @@ void ProcessLoop(std::shared_ptr<ImuProcess> p_imu) {
   }
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
   ros::init(argc, argv, "data_process");
   ros::NodeHandle nh;
   signal(SIGINT, SigHandle);
