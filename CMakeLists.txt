@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(livox_mapping)
+project(livox_loam_kp)
 
 SET(CMAKE_BUILD_TYPE "Debug")
 
@@ -29,6 +29,8 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   tf
   livox_ros_driver
+  message_generation
+  eigen_conversions
   )
 
 find_package(Eigen3 REQUIRED)
@@ -41,11 +43,22 @@ message(Eigen: ${EIGEN3_INCLUDE_DIR})
 include_directories(
   ${Sophus_INCLUDE_DIRS}
 	${catkin_INCLUDE_DIRS} 
-        ${EIGEN3_INCLUDE_DIR}
-	${PCL_INCLUDE_DIRS})
+  ${EIGEN3_INCLUDE_DIR}
+  ${PCL_INCLUDE_DIRS})
+  
+add_message_files(
+  FILES
+  Pose6D.msg
+  KeyPointPose.msg
+)
+
+generate_messages(
+ DEPENDENCIES
+ geometry_msgs
+)
 
 catkin_package(
-  CATKIN_DEPENDS geometry_msgs nav_msgs roscpp rospy std_msgs
+  CATKIN_DEPENDS geometry_msgs nav_msgs roscpp rospy std_msgs message_runtime
   DEPENDS EIGEN3 PCL OpenCV Sophus
   INCLUDE_DIRS
 )

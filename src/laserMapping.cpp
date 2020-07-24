@@ -48,8 +48,12 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <tf/transform_datatypes.h>
 #include <tf/transform_broadcaster.h>
+#include <livox_loam_kp/KeyPointPose.h>
+#include <geometry_msgs/Vector3.h>
 
 typedef pcl::PointXYZI PointType;
+typedef livox_loam_kp::KeyPointPose RotKeyPoint;
+typedef livox_loam_kp::Pose6D Pose6D;
 
 int kfNum = 0;
 
@@ -96,6 +100,7 @@ pcl::PointCloud<PointType>::Ptr laserCloudSurfFromMap(new pcl::PointCloud<PointT
 
 std::vector< Eigen::Matrix<float,7,1> > keyframe_pose;
 std::vector< Eigen::Matrix4f > pose_map;
+std::vector< Pose6D > rot_kp_imu;
 //all points
 pcl::PointCloud<PointType>::Ptr laserCloudFullRes(new pcl::PointCloud<PointType>());
 pcl::PointCloud<PointType>::Ptr laserCloudFullRes2(new pcl::PointCloud<PointType>());
@@ -376,6 +381,11 @@ void laserCloudFullResHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloud
     newLaserCloudFullRes = true;
 }
 
+void KeyPointPose6DHandler(const livox_loam_kp::KeyPointPoseConstPtr& KeyPointPose)
+{
+    std::vector<Pose6D> rot_kp_imu = KeyPointPose->pose6D;
+}
+
 int main(int argc, char** argv)
 {
     ros::init(argc, argv, "laserMapping");
@@ -383,20 +393,19 @@ int main(int argc, char** argv)
 
     ros::Subscriber subLaserCloudCornerLast = nh.subscribe<sensor_msgs::PointCloud2>
             ("/laser_cloud_sharp", 100, laserCloudCornerLastHandler);
-
     ros::Subscriber subLaserCloudSurfLast = nh.subscribe<sensor_msgs::PointCloud2>
             ("/laser_cloud_flat", 100, laserCloudSurfLastHandler);
-
     ros::Subscriber subLaserCloudFullRes = nh.subscribe<sensor_msgs::PointCloud2>
             ("/livox_cloud", 100, laserCloudFullResHandler);
+    ros::Subscriber KeyPointPose6D = nh.subscribe<livox_loam_kp::KeyPointPose>
+            ("/KeyPointPose6D", 100, KeyPointPose6DHandler);
 
-    //ros::Subscriber subIMUOri = nh.subscribe<sensor_msgs::>
+    // ros::Subscriber subIMUOri = nh.subscribe<sensor_msgs::>
 
     ros::Publisher pubLaserCloudSurround = nh.advertise<sensor_msgs::PointCloud2>
             ("/laser_cloud_surround", 100);
     ros::Publisher pubLaserCloudSurround_corner = nh.advertise<sensor_msgs::PointCloud2>
             ("/laser_cloud_surround_corner", 100);
-
     ros::Publisher pubLaserCloudFullRes = nh.advertise<sensor_msgs::PointCloud2>
             ("/velodyne_cloud_registered", 100);
 
@@ -1226,13 +1235,12 @@ int main(int argc, char** argv)
     pcd_writer.writeBinary(surf_filename, surf_points);
     pcd_writer.writeBinary(corner_filename, corner_points);
     pcd_writer.writeBinary(all_points_filename, *laserCloudFullResColor_pcd);
-  } else {
+  }
+  else
+  {
     std::cout << "no points saved";
   }
     //--------------------------
     //  loss_output.close();
-
-
-    return 0;
+  return 0;
 }
-

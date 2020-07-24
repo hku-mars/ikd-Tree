@@ -496,7 +496,7 @@ int main(int argc, char** argv)
   //                                 ("/livox/lidar", 2, laserCloudHandler_temp);
   // pubLaserCloud_for_hk = nh.advertise<sensor_msgs::PointCloud2>
   //                                ("/livox/lidar_temp", 2);
-
+  
   ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>
                                   ("/livox_pcl0", 100, laserCloudHandler);
   pubLaserCloud = nh.advertise<sensor_msgs::PointCloud2>

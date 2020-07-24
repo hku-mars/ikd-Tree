@@ -7,6 +7,7 @@
 #include <csignal>
 #include <ros/ros.h>
 #include <Eigen/Eigen>
+#include <eigen_conversions/eigen_msg.h>
 #include <condition_variable>
 
 #include <opencv2/opencv.hpp>
@@ -25,6 +26,8 @@
 
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <livox_loam_kp/KeyPointPose.h>
+#include <geometry_msgs/Vector3.h>
 
 //#include "imu_processor/data_process.h"
 
@@ -34,6 +37,20 @@ using Sophus::SO3d;
 
 #define SKEW_SYM_MATRX(v)  0.0,-v[2],v[1],v[2],0.0,-v[0],-v[1],v[0],0.0
 #define MAX_INI_COUNT (50)
+#define FORWARD  (0)
+#define BACKWARD (1)
+#define SET_POS6D [](const double t, const Vec3 &a, const Vec3 &g, \
+                  const Eigen::Vector3d &b_a, const Eigen::Vector3d &b_g, \
+                  const Eigen::Vector3d &p, const Eigen::Matrix3d &R) \
+  { Pose6D rot_kp; \
+    rot_kp.offset_time = t; \
+    rot_kp.acc = a; \
+    rot_kp.gyr = g; \
+    tf::vectorEigenToMsg(b_a, rot_kp.bias_acc); \
+    tf::vectorEigenToMsg(b_g, rot_kp.bias_gyr); \
+    tf::vectorEigenToMsg(p, rot_kp.pos); \
+    for (int i = 0; i < 9; i++) {rot_kp.rot[i] = R(i/3, i%3);} \
+    return rot_kp;}
 
 inline double rad2deg(double radians) { return radians * 180.0 / M_PI; }
 inline double deg2rad(double degrees) { return degrees * M_PI / 180.0; }
@@ -43,6 +60,9 @@ pcl::PointCloud<pcl::PointXYZINormal>::Ptr laserCloudtmp(
 
 typedef pcl::PointXYZINormal PointType;
 typedef pcl::PointCloud<PointType> PointCloudXYZI;
+typedef std::vector<PointType, Eigen::aligned_allocator<PointType> > PointsList;
+typedef livox_loam_kp::Pose6D Pose6D;
+typedef geometry_msgs::Vector3 Vec3;
 
 struct MeasureGroup
 {
@@ -50,12 +70,8 @@ struct MeasureGroup
   std::vector<sensor_msgs::Imu::ConstPtr> imu;
 };
 
-struct RotKeyPoint
-{
-  double time_sec;
-  Eigen::Vector3d ang_vel;
-  Eigen::Matrix3d R;
-};
+const bool time_list(PointType &x, PointType &y) {return (x.curvature < y.curvature);};
+
 /// *************IMU Process and undistortion
 class ImuProcess
 {
@@ -72,7 +88,7 @@ class ImuProcess
 
   void IntegrateGyr(const std::vector<sensor_msgs::Imu::ConstPtr> &v_imu);
 
-  void UndistortPcl(const MeasureGroup &meas, PointCloudXYZI &pcl_in_out);
+  void UndistortPcl(const MeasureGroup &meas, PointCloudXYZI &pcl_in_out, const bool orientation);
 
   ros::NodeHandle nh;
 
@@ -103,8 +119,6 @@ class ImuProcess
   /*** Undistorted pointcloud ***/
   PointCloudXYZI::Ptr cur_pcl_un_;
 
-  double dt_l_c_;
-
   /*** Transform form lidar to imu ***/
   Sophus::SE3d T_i_l;
   //// For timestamp usage
@@ -118,7 +132,7 @@ class ImuProcess
   std::vector<Sophus::SO3d> v_rot_;
   std::vector<Eigen::Matrix3d> v_rot_pcl_;
 
-  std::vector<RotKeyPoint> v_rot_kp_;
+  livox_loam_kp::KeyPointPose v_rot_kp_;
 };
 
 
@@ -136,7 +150,7 @@ ImuProcess::ImuProcess()
   mean_gyr      = Eigen::Vector3d(0, 0, 0);
 }
 
-ImuProcess::~ImuProcess() {}
+ImuProcess::~ImuProcess() {std::cout<<"**********destroy imuprocess************"<<std::endl;}
 
 void ImuProcess::Reset() 
 {
@@ -164,7 +178,7 @@ void ImuProcess::Reset()
   v_rot_.clear();
   v_imu_.clear();
   v_rot_pcl_.clear();
-  v_rot_kp_.clear();
+  v_rot_kp_.pose6D.clear();
 
   cur_pcl_in_.reset(new PointCloudXYZI());
   cur_pcl_un_.reset(new PointCloudXYZI());
@@ -288,162 +302,175 @@ void ImuProcess::IntegrateGyr(const std::vector<sensor_msgs::Imu::ConstPtr> &v_i
            GetRot().angleZ() * 180.0 / M_PI);
 }
 
-void ImuProcess::UndistortPcl(const MeasureGroup &meas, PointCloudXYZI &pcl_in_out)
+void ImuProcess::UndistortPcl(const MeasureGroup &meas, PointCloudXYZI &pcl_in_out, const bool orientation)
 {
-  const auto &v_imu = meas.imu;
-  const double &imu_end_time = meas.imu.back()->header.stamp.toSec();
-  const double &imu_beg_time = meas.imu.front()->header.stamp.toSec();
-  const double &imu_seg_time = (imu_end_time - imu_beg_time) / (meas.imu.size() - 1);
+  Eigen::Matrix3d Eye3d(Eigen::Matrix3d::Identity());
+  Eigen::Vector3d Zero3d(0, 0, 0);
 
-  std::vector<sensor_msgs::Imu::ConstPtr>::const_iterator it_imu = v_imu.end() - 1;
-  // std::cout<< "******IMU key time: ";
-  RotKeyPoint rot_kp;
-  for (; it_imu != v_imu.begin(); it_imu--)
-  {
-    if (v_rot_kp_.empty())
-    {
-      rot_kp.time_sec = imu_end_time;
-      rot_kp.ang_vel  = Eigen::Vector3d(v_imu.back()->angular_velocity.x,
-                                        v_imu.back()->angular_velocity.y,
-                                        v_imu.back()->angular_velocity.z);
-      rot_kp.R = Eigen::Matrix3d::Identity();
-      v_rot_kp_.push_back(rot_kp);
-    }
-    auto &imu_seg_head = *(it_imu - 1);
-    auto &imu_seg_tail = *(it_imu);
-
-    double imu_seg_tail_time = imu_seg_tail->header.stamp.toSec();
-    double imu_seg_head_time = imu_seg_head->header.stamp.toSec();
-
-    Eigen::Vector3d gyr_seg_end(imu_seg_tail->angular_velocity.x,
-                              imu_seg_tail->angular_velocity.y,
-                              imu_seg_tail->angular_velocity.z);
-
-    Eigen::Vector3d gyr_seg_head(imu_seg_head->angular_velocity.x,
-                              imu_seg_head->angular_velocity.y,
-                              imu_seg_head->angular_velocity.z);
-    
-    Eigen::Vector3d ang_vel_avr = 0.5 * (gyr_seg_end + gyr_seg_head) - zero_bias_gyr;
-    
-    rot_kp.time_sec = imu_seg_head_time;
-    rot_kp.ang_vel  = gyr_seg_head;
-    rot_kp.R        = Exp(-ang_vel_avr, imu_seg_tail_time - imu_seg_head_time) * v_rot_kp_.back().R;
-
-    v_rot_kp_.push_back(rot_kp);
-
-    // std::cout<<"  "<< imu_seg_head_time;
-  }
-  // std::cout<<"\n"<<v_rot_kp_[0].time_sec<<std::endl;
-
-  /// initialize each point cloud's rotation matrix
-  if (v_rot_pcl_.empty())
-  {
-    v_rot_pcl_.push_back(Eigen::Matrix3d::Identity());
-  }
-  /// unstort the point cloud points in each IMU segment
-  const double cur_pcl_head_time = meas.lidar->header.stamp.toSec();
+  const auto &v_imu       = meas.imu;
+  const auto &v_imu_last  = meas.imu.back();
+  const auto &v_imu_first = meas.imu.front();
+  const double &imu_beg_time = v_imu_first->header.stamp.toSec();
+  const double &imu_end_time = v_imu_last->header.stamp.toSec();
+  const double &pcl_beg_time = meas.lidar->header.stamp.toSec();
   
+  /// sort point clouds by offset time
   pcl::fromROSMsg(*(meas.lidar), pcl_in_out);
+  std::sort(pcl_in_out.points.begin(), pcl_in_out.points.end(), time_list);
 
-  PointCloudXYZI::iterator it_pcl = pcl_in_out.points.end() - 1;
-
-  Eigen::Matrix3d K, Rie, Last_R;
-
-  int i = 0;
+  /// initialize the rotation of first point clouds
   
-  for(; it_pcl != pcl_in_out.points.begin(); it_pcl --)
+  double max_offs_t = imu_end_time - imu_beg_time;
+  Eigen::Matrix3d R_kp(Eye3d);
+  auto set_pose6d = SET_POS6D;
+  Pose6D rot_kp = set_pose6d(max_offs_t, v_imu_last->linear_acceleration, v_imu_last->angular_velocity, \
+                      Zero3d, zero_bias_gyr, Zero3d, R_kp);
+
+  v_rot_kp_.header = v_imu_first->header;
+  v_rot_kp_.pose6D.clear();
+  v_rot_kp_.pose6D.push_back(rot_kp);
+
+  v_rot_pcl_.clear();
+  v_rot_pcl_.push_back(Eye3d);
+
+  // std::cout<< "******IMU key time: "
+  if (orientation == FORWARD)
   {
-    /// find the base tor keypoint
-    double pt_time_abs = it_pcl->curvature / double(1000) + cur_pcl_head_time;
-    int upper_kp_index = floor((imu_end_time - pt_time_abs) / imu_seg_time);
-
-    /// Transform to the 'end' frame, using only the rotation
-    /// Note: Compensation direction is INVERSE of Frame's moving direction
-    /// So if we want to compensate a point at timestamp-i to the frame-e
-    /// P_compensate = Exp(omega, dt) * R_last * Pi + t_ei
-
-    RotKeyPoint rot_kp(v_rot_kp_[upper_kp_index]);
-    Eigen::Vector3d ang_vel = 0.5 * (rot_kp.ang_vel + v_rot_kp_[upper_kp_index + 1].ang_vel);
-    double dt = rot_kp.time_sec - pt_time_abs;
-    Rie = Exp(ang_vel, dt) * rot_kp.R;
-
-    Eigen::Vector3d tie(0, 0, 0);
-    Eigen::Vector3d v_pt_comp_e = Rie * (Eigen::Vector3d(it_pcl->x, it_pcl->y, it_pcl->z) - tie);
-    v_rot_pcl_.push_back(Rie);
-
-    /// Undistorted point
-    it_pcl->x = v_pt_comp_e.x();
-    it_pcl->y = v_pt_comp_e.y();
-    it_pcl->z = v_pt_comp_e.z();
-
-    /* if ((i++) % 500 == 0)
+    /// iterator definitions for imu and point clouds contatintor
+    std::vector<sensor_msgs::Imu::ConstPtr>::const_iterator it_imu = v_imu.begin();
+    PointCloudXYZI::iterator it_pcl = pcl_in_out.points.begin();
+    
+    for (; it_imu != (v_imu.end() - 1); it_imu++)
     {
-      std::cout<<i<< ": current pcl time:"<< std::setprecision(8) << pt_time_abs << " and "<< cur_pcl_head_time <<std::endl;
-      std::cout<< "undistort rotation matrix:\n" << Rie <<std::endl;
-    } */
-  }
-  ROS_INFO("undistort rotation angle [x, y, z]: [%.2f, %.2f, %.2f]",
-           Rie.eulerAngles(0, 1, 2)[0] * 180.0 / M_PI,
-           Rie.eulerAngles(0, 1, 2)[1] * 180.0 / M_PI,
-           Rie.eulerAngles(0, 1, 2)[2] * 180.0 / M_PI);
-}
+      auto &imu_seg_head = *(it_imu);
+      auto &imu_seg_tail = *(it_imu + 1);
 
-  /* const Eigen::Vector3d &tbe = Tbe.translation();
+      double imu_seg_tail_time = imu_seg_tail->header.stamp.toSec();
+      double imu_seg_head_time = imu_seg_head->header.stamp.toSec();
 
-  // ros::Time begin, t1;
-  // begin = ros::Time::now();
-  Eigen::Vector3d rso3_be, r_axis;
-  rso3_be = Tbe.so3().log();
-  double r_angle = rso3_be.norm();
+      Eigen::Vector3d gyr_seg_end(imu_seg_tail->angular_velocity.x,
+                                imu_seg_tail->angular_velocity.y,
+                                imu_seg_tail->angular_velocity.z);
 
-  if (r_angle > 0.00000001)
-  {
-    r_axis = rso3_be / r_angle;
+      Eigen::Vector3d gyr_seg_head(imu_seg_head->angular_velocity.x,
+                                imu_seg_head->angular_velocity.y,
+                                imu_seg_head->angular_velocity.z);
+      
+      Eigen::Vector3d ang_vel_avr = 0.5 * (gyr_seg_end + gyr_seg_head) - zero_bias_gyr;
+
+      /// unstort the point cloud points in each IMU segment
+      double pt_time_abs = it_pcl->curvature / double(1000) + pcl_beg_time;
+      int i = 0;
+      for(; (pt_time_abs <= imu_seg_tail_time) && (it_pcl != (pcl_in_out.points.end() - 1)); it_pcl ++)
+      {
+        /// find the base tor keypoint
+        pt_time_abs = it_pcl->curvature / double(1000) + pcl_beg_time;
+        double dt   = pt_time_abs - imu_seg_head_time;
+        // int upper_kp_index = floor((imu_end_time - pt_time_abs) / imu_seg_time);
+
+        /// Transform to the 'end' frame, using only the rotation
+        /// Note: Compensation direction is INVERSE of Frame's moving direction
+        /// So if we want to compensate a point at timestamp-i to the frame-e
+        /// P_compensate = Exp(omega, dt) * R_last * Pi + t_ei
+
+        Eigen::Vector3d tie(0, 0, 0);
+        Eigen::Matrix3d Rie(Exp(ang_vel_avr, dt) * R_kp);
+        Eigen::Vector3d v_pt_comp_e = Rie * (Eigen::Vector3d(it_pcl->x, it_pcl->y, it_pcl->z) - tie);
+
+        /// save Undistorted points and their rotation
+        it_pcl->x = v_pt_comp_e.x();
+        it_pcl->y = v_pt_comp_e.y();
+        it_pcl->z = v_pt_comp_e.z();
+
+        v_rot_pcl_.push_back(Rie);
+
+        // if ((i++) % 50 == 0)
+        // {
+        //   std::cout<<i<< ": current pcl time:"<< std::setprecision(8) << pt_time_abs << " and "<< pcl_beg_time <<std::endl;
+        //   // std::cout<< "undistort rotation matrix:\n" << Rie <<std::endl;
+        // }
+      }
+
+      R_kp = Exp(ang_vel_avr, imu_seg_tail_time - imu_seg_head_time) * R_kp;
+      double offset_t = imu_seg_tail_time - imu_beg_time;
+      set_pose6d(offset_t, imu_seg_tail->linear_acceleration, imu_seg_tail->angular_velocity, \
+                      Zero3d, zero_bias_gyr, Zero3d, R_kp);
+      v_rot_kp_.pose6D.push_back(rot_kp);
+    }
   }
   else
   {
-    r_axis = Eigen::Vector3d(0,0,0);
+    /// iterator definitions for imu and point clouds contatintor
+    std::vector<sensor_msgs::Imu::ConstPtr>::const_iterator it_imu = v_imu.end() - 1;
+    PointCloudXYZI::iterator it_pcl = pcl_in_out.points.end() - 1;
+    
+    for (; it_imu != v_imu.begin(); it_imu--)
+    {
+      auto &imu_seg_head = *(it_imu - 1);
+      auto &imu_seg_tail = *(it_imu);
+
+      double imu_seg_tail_time = imu_seg_tail->header.stamp.toSec();
+      double imu_seg_head_time = imu_seg_head->header.stamp.toSec();
+
+      Eigen::Vector3d gyr_seg_end(imu_seg_tail->angular_velocity.x,
+                                imu_seg_tail->angular_velocity.y,
+                                imu_seg_tail->angular_velocity.z);
+
+      Eigen::Vector3d gyr_seg_head(imu_seg_head->angular_velocity.x,
+                                imu_seg_head->angular_velocity.y,
+                                imu_seg_head->angular_velocity.z);
+      
+      Eigen::Vector3d ang_vel_avr = 0.5 * (gyr_seg_end + gyr_seg_head) - zero_bias_gyr;
+
+      std::cout<<"head time: "<<imu_seg_head_time << " tail time: " << imu_seg_tail_time <<std::endl;
+
+      /// unstort the point cloud points in each IMU segment
+      double pt_time_abs = it_pcl->curvature / double(1000) + pcl_beg_time;
+      int i = 0;
+      for(; (pt_time_abs >= imu_seg_head_time) && (it_pcl != pcl_in_out.points.begin()); it_pcl --)
+      {
+        /// find the base tor keypoint
+        pt_time_abs = it_pcl->curvature / double(1000) + pcl_beg_time;
+        double dt   = imu_seg_tail_time - pt_time_abs;
+        // int upper_kp_index = floor((imu_end_time - pt_time_abs) / imu_seg_time);
+
+        /// Transform to the 'end' frame, using only the rotation
+        /// Note: Compensation direction is INVERSE of Frame's moving direction
+        /// So if we want to compensate a point at timestamp-i to the frame-e
+        /// P_compensate = Exp(omega, dt) * R_last * Pi + t_ei
+
+        Eigen::Vector3d tie(0, 0, 0);
+        Eigen::Matrix3d Rie(Exp(-ang_vel_avr, dt) * R_kp);
+        Eigen::Vector3d v_pt_comp_e = Rie * (Eigen::Vector3d(it_pcl->x, it_pcl->y, it_pcl->z) - tie);
+
+        /// save Undistorted points and their rotation
+        it_pcl->x = v_pt_comp_e.x();
+        it_pcl->y = v_pt_comp_e.y();
+        it_pcl->z = v_pt_comp_e.z();
+
+        v_rot_pcl_.push_back(Rie);
+
+        // if ((i++) % 100 == 0)
+        // {
+        //   std::cout<<i<< " current pcl time:"<< std::setprecision(8) << pt_time_abs << " and "<< imu_seg_tail_time<<std::endl;
+        //   std::cout<<"rotation matrix: \n"<<v_rot_pcl_.back()<<std::endl;
+        //   // std::cout<< "undistort rotation matrix:\n" << Rie <<std::endl;
+        // }
+      }
+      R_kp = Exp(-ang_vel_avr, imu_seg_tail_time - imu_seg_head_time) * R_kp;
+      double offset_t = imu_seg_head_time - imu_beg_time;
+      set_pose6d(offset_t, imu_seg_head->linear_acceleration, imu_seg_head->angular_velocity, \
+                      Zero3d, zero_bias_gyr, Zero3d, R_kp);
+      v_rot_kp_.pose6D.push_back(rot_kp);
+    }
   }
 
-  Eigen::Matrix3d K, Eye3d;
-  
-  K << SKEW_SYM_MATRX(r_axis);
-  Eye3d = Eigen::Matrix3d::Identity();
-
-  for (auto &pt : pcl_in_out->points) 
-  {
-    int ring = int(pt.intensity);
-    float dt_bi = pt.intensity - ring;
-
-    if (dt_bi == 0) 
-    {
-      laserCloudtmp->push_back(pt);
-    }
-
-    double ratio_bi = dt_bi / dt_be;
-    /// Rotation from i-e
-    double ratio_ie = 1 - ratio_bi;
-
-    // Eigen::Vector3d rso3_ie = -1 * ratio_ie * rso3_be;
-    // SO3d Rie = SO3d::exp(rso3_ie);
-
-    double r_angle_piece = -1 * ratio_ie * r_angle;
-    Eigen::Matrix3d Rie  = Eye3d + std::sin(r_angle_piece) * K + (1.0 - std::cos(r_angle_piece)) * K * K;
-
-    /// Transform to the 'end' frame, using only the rotation
-    /// Note: Compensation direction is INVERSE of Frame's moving direction
-    /// So if we want to compensate a point at timestamp-i to the frame-e
-    /// P_compensate = R_ei * Pi + t_ei
-    Eigen::Vector3d tie         = ratio_ie * tbe;
-    Eigen::Vector3d v_pt_comp_e = Rie * (Eigen::Vector3d(pt.x, pt.y, pt.z) - tie);
-
-    /// Undistorted point
-    pt.x = v_pt_comp_e.x();
-    pt.y = v_pt_comp_e.y();
-    pt.z = v_pt_comp_e.z();
-  } */
-  // ros::Duration duration1 = t1 - begin;
-
+  ROS_INFO("undistort rotation angle [x, y, z]: [%.2f, %.2f, %.2f]",
+           v_rot_pcl_.back().eulerAngles(0, 1, 2)[0] * 180.0 / M_PI,
+           v_rot_pcl_.back().eulerAngles(0, 1, 2)[1] * 180.0 / M_PI,
+           v_rot_pcl_.back().eulerAngles(0, 1, 2)[2] * 180.0 / M_PI);
+  std::cout<< "v_rot_pcl_ size: "<<v_rot_pcl_.size()<<"v_rot_kp_ size: "<< v_rot_kp_.pose6D.size()<<"v_rot_ size: "<< v_rot_.size()<< std::endl;
+}
 
 void ImuProcess::Process(const MeasureGroup &meas)
 {
@@ -460,7 +487,7 @@ void ImuProcess::Process(const MeasureGroup &meas)
 
   auto pcl_in_msg = meas.lidar;
 
-  if (b_first_frame_) 
+  if (b_first_frame_)
   {
     /// The very first lidar frame
     Need_init = true;
@@ -472,6 +499,17 @@ void ImuProcess::Process(const MeasureGroup &meas)
     last_lidar_ = pcl_in_msg;
     last_imu_   = meas.imu.back();
 
+    Eigen::Vector3d cur_acc(last_imu_->linear_acceleration.x, last_imu_->linear_acceleration.y,
+                        last_imu_->linear_acceleration.z);
+    Eigen::Vector3d cur_gyr(last_imu_->angular_velocity.x, last_imu_->angular_velocity.y,
+                      last_imu_->angular_velocity.z);
+    double cur_norm = cur_acc.norm();
+
+    init_iter_num = 1;
+    scale_gravity = cur_norm;
+    mean_acc      = cur_acc;
+    mean_gyr      = cur_gyr;
+
     ROS_WARN("The very first lidar frame");
 
     /// Do nothing more, return
@@ -482,8 +520,9 @@ void ImuProcess::Process(const MeasureGroup &meas)
 
   if (Need_init)
   {
-    /// 1.initializing the accelerameter and gyroscopes's covariance and bias
-    /// 2.normalize the acceleration measurenments to unit gravity
+    /// 1. initializing the gyro bias, acc and gyro covariance
+    /// 2. normalize the acceleration measurenments to unit gravity
+
     double cur_norm = 1.0;
     int N           = init_iter_num;
     ROS_INFO("IMU Initializing: %.1f %%", float(N) / MAX_INI_COUNT * 100);
@@ -496,24 +535,15 @@ void ImuProcess::Process(const MeasureGroup &meas)
                         imu->angular_velocity.z);
       cur_norm = cur_acc.norm();
 
-      if (init_iter_num <= 1)
-      {
-        init_iter_num = 1;
-        scale_gravity = cur_norm;
-        mean_acc      = cur_acc;
-        mean_gyr      = cur_gyr;
-      }
-      else
-      {
-        N = init_iter_num;
+      N = init_iter_num;
 
-        scale_gravity += (cur_norm - scale_gravity) / N;
-        mean_acc      += (cur_acc - mean_acc) / N;
-        mean_gyr      += (cur_gyr - mean_gyr) / N;
+      scale_gravity += (cur_norm - scale_gravity) / N;
+      mean_acc      += (cur_acc - mean_acc) / N;
+      mean_gyr      += (cur_gyr - mean_gyr) / N;
 
-        cov_acc = cov_acc * (N - 1.0) / N + (cur_acc - mean_acc).cwiseProduct(cur_acc - mean_acc) * (N - 1.0) / (N * N);
-        cov_gyr = cov_gyr * (N - 1.0) / N + (cur_gyr - mean_gyr).cwiseProduct(cur_gyr - mean_gyr) * (N - 1.0) / (N * N);
-      }
+      cov_acc = cov_acc * (N - 1.0) / N + (cur_acc - mean_acc).cwiseProduct(cur_acc - mean_acc) * (N - 1.0) / (N * N);
+      cov_gyr = cov_gyr * (N - 1.0) / N + (cur_gyr - mean_gyr).cwiseProduct(cur_gyr - mean_gyr) * (N - 1.0) / (N * N);
+
       init_iter_num ++;
       // std::cout<< imu->linear_acceleration_covariance[0] <<std::endl;
     }
@@ -535,20 +565,12 @@ void ImuProcess::Process(const MeasureGroup &meas)
     /// Integrate all input imu message
     IntegrateGyr(meas.imu);
 
-    /// Compensate lidar points with IMU rotation
-    //// Initial pose from IMU (with only rotation)
-    SE3d T_l_c(GetRot(), Eigen::Vector3d::Zero());
-    double cur_pcl_head_time = pcl_in_msg->header.stamp.toSec();
-    dt_l_c_ = cur_pcl_head_time - last_lidar_->header.stamp.toSec();
-    //// Get input pcl
-    pcl::fromROSMsg(*pcl_in_msg, *cur_pcl_in_);
-
+    /// Initial pose from IMU (with only rotation)
     t1 = clock();
 
-    /// Undistort points
-    // Sophus::SE3d T_l_be = T_i_l.inverse() * T_l_c * T_i_l;
-    // pcl::copyPointCloud(*cur_pcl_in_, *cur_pcl_un_);
-    UndistortPcl(meas, *cur_pcl_un_);
+    /// Undistort points： the first point is assummed as the base frame
+    /// Compensate lidar points with IMU rotation (with only rotation now)
+    UndistortPcl(meas, *cur_pcl_un_, BACKWARD);
 
     t2 = clock();
 
@@ -581,6 +603,12 @@ void ImuProcess::Process(const MeasureGroup &meas)
       pcl_out_msg.header = pcl_in_msg->header;
       pcl_out_msg.header.frame_id = "/livox";
       pub_UndistortPcl.publish(pcl_out_msg);
+    }
+
+    {
+      static ros::Publisher pub_KeyPointPose6D =
+          nh.advertise<livox_loam_kp::KeyPointPose>("/KeyPointPose6D", 100);
+      pub_KeyPointPose6D.publish(v_rot_kp_);
     }
 
     t3 = clock();

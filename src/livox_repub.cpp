@@ -1,6 +1,6 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <sensor_msgs/PointCloud2.h>
-#include "livox_ros_driver/CustomMsg.h"
+#include <livox_ros_driver/CustomMsg.h>
 
 typedef pcl::PointXYZINormal PointType;
 typedef pcl::PointCloud<PointType> PointCloudXYZI;
