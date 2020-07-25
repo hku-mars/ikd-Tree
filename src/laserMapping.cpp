@@ -51,9 +51,21 @@
 #include <livox_loam_kp/KeyPointPose.h>
 #include <geometry_msgs/Vector3.h>
 
+// #define USING_CORNER
+
+#define PI_M (3.14159265358)
+#define MAT_FROM_ARRAY(v)  v[0],v[1],v[2],v[3],v[4],v[5],v[6],v[7],v[8]
+
+#define CORRECR_PI(v) ((v > 1.57) ? (v - PI_M) : ((v < -1.57) ? (v + PI_M) : v))
+
 typedef pcl::PointXYZI PointType;
 typedef livox_loam_kp::KeyPointPose RotKeyPoint;
 typedef livox_loam_kp::Pose6D Pose6D;
+
+
+inline void correct_pi(double &v) {v = CORRECR_PI(v);}
+
+inline void correct_pi(Eigen::Vector3d &v) {for(int i=0;i<3;i++){v[i] = CORRECR_PI(double(v[i]));}}
 
 int kfNum = 0;
 
@@ -100,7 +112,7 @@ pcl::PointCloud<PointType>::Ptr laserCloudSurfFromMap(new pcl::PointCloud<PointT
 
 std::vector< Eigen::Matrix<float,7,1> > keyframe_pose;
 std::vector< Eigen::Matrix4f > pose_map;
-std::vector< Pose6D > rot_kp_imu;
+std::deque< livox_loam_kp::KeyPointPose > rot_kp_imu_buff;
 //all points
 pcl::PointCloud<PointType>::Ptr laserCloudFullRes(new pcl::PointCloud<PointType>());
 pcl::PointCloud<PointType>::Ptr laserCloudFullRes2(new pcl::PointCloud<PointType>());
@@ -147,35 +159,6 @@ Eigen::Matrix4f trans_euler_to_matrix(const float *trans)
     if(0) {};
     return T;
 }
-void transformAssociateToMap()
-{
-    Eigen::Matrix4f T_aft,T_last,T_predict;
-    Eigen::Matrix3f R_predict;
-    Eigen::Vector3f euler_predict,t_predict;
-
-    T_aft = trans_euler_to_matrix(transformAftMapped);
-    T_last = trans_euler_to_matrix(transformLastMapped);
-    
-    T_predict = T_aft * T_last.inverse() * T_aft;
-
-    R_predict = T_predict.block<3,3>(0,0);
-    euler_predict = R_predict.eulerAngles(1,0,2);
-
-    t_predict = T_predict.block<3,1>(0,3);
-
-    transformTobeMapped[0] = euler_predict[0];
-    transformTobeMapped[1] = euler_predict[1];
-    transformTobeMapped[2] = euler_predict[2];
-    transformTobeMapped[3] = t_predict[0];
-    transformTobeMapped[4] = t_predict[1];
-    transformTobeMapped[5] = t_predict[2];
-if (0){
-    std::cout<<"DEBUG transformAftMapped : "<<transformAftMapped[0]<<" "<<transformAftMapped[1]<<" "<<transformAftMapped[2]<<" "
-    <<transformAftMapped[3]<<" "<<transformAftMapped[4]<<" "<<transformAftMapped[5]<<std::endl;
-    std::cout<<"DEBUG transformTobeMapped : "<<transformTobeMapped[0]<<" "<<transformTobeMapped[1]<<" "<<transformTobeMapped[2]<<" "
-    <<transformTobeMapped[3]<<" "<<transformTobeMapped[4]<<" "<<transformTobeMapped[5]<<std::endl;
-}
-}
 
 void transformUpdate()
 {
@@ -207,67 +190,9 @@ void pointAssociateToMap(PointType const * const pi, PointType * const po)
             + transformTobeMapped[5];
     po->intensity = pi->intensity;
 }
-//lidar coordinate sys to world coordinate sys USE S
-void pointAssociateToMap_all(PointType const * const pi, PointType * const po)
-{
-    // Eigen::Matrix4f T_aft,T_last,delta_T;
 
-    // Eigen::Matrix3f R_aft,R_last;
-    // Eigen::Quaternionf Q_aft,Q_last;
-    // Eigen::Vector3f t_aft,t_last;
-
-    // T_aft = trans_euler_to_matrix(transformAftMapped);
-    // T_last = trans_euler_to_matrix(transformLastMapped);
-
-    // R_aft = T_aft.block<3,3>(0,0);
-    // R_last = T_last.block<3,3>(0,0);
-
-    // Q_aft = R_aft;
-    // Q_last = R_last;
-
-    double s;
-    s = pi->intensity - int(pi->intensity);
-
-    //std::cout<<"DEBUG pointAssociateToMap_all s: "<<pi->intensity<<std::endl;
-
-    // Eigen::Quaternionf Q_s = Q_last.slerp(s,Q_aft);
-    // Eigen::Matrix3f R_s = Q_s.matrix();
-
-    // Eigen::Vector3f euler_s = R_s.eulerAngles(2,0,1);
-
-    float rx = (1-s)*transformLastMapped[0] + s * transformAftMapped[0];
-    float ry = (1-s)*transformLastMapped[1] + s * transformAftMapped[1];
-    float rz = (1-s)*transformLastMapped[2] + s * transformAftMapped[2];
-    float tx = (1-s)*transformLastMapped[3] + s * transformAftMapped[3];
-    float ty = (1-s)*transformLastMapped[4] + s * transformAftMapped[4];
-    float tz = (1-s)*transformLastMapped[5] + s * transformAftMapped[5];
-
-    //rot z（transformTobeMapped[2]）
-    float x1 = cos(rz) * pi->x
-            - sin(rz) * pi->y;
-    float y1 = sin(rz) * pi->x
-            + cos(rz) * pi->y;
-    float z1 = pi->z;
-
-    //rot x（transformTobeMapped[0]）
-    float x2 = x1;
-    float y2 = cos(rx) * y1 - sin(rx) * z1;
-    float z2 = sin(rx) * y1 + cos(rx) * z1;
-
-    //rot y（transformTobeMapped[1]）then add trans
-    po->x = cos(ry) * x2 + sin(ry) * z2 + tx;
-    po->y = y2 + ty;
-    po->z = -sin(ry) * x2 + cos(ry) * z2 + tz;
-    po->intensity = pi->intensity;
-}
 void RGBpointAssociateToMap(PointType const * const pi, pcl::PointXYZRGB * const po)
 {
-    // float rx = (1-s)*transformLastMapped[0] + s * transformAftMapped[0];
-    // float ry = (1-s)*transformLastMapped[1] + s * transformAftMapped[1];
-    // float rz = (1-s)*transformLastMapped[2] + s * transformAftMapped[2];
-    // float tx = (1-s)*transformLastMapped[3] + s * transformAftMapped[3];
-    // float ty = (1-s)*transformLastMapped[4] + s * transformAftMapped[4];
-    // float tz = (1-s)*transformLastMapped[5] + s * transformAftMapped[5];
     float rx = transformAftMapped[0];
     float ry = transformAftMapped[1];
     float rz = transformAftMapped[2];
@@ -329,27 +254,6 @@ void RGBpointAssociateToMap(PointType const * const pi, pcl::PointXYZRGB * const
     }
 }
 
-void pointAssociateTobeMapped(PointType const * const pi, PointType * const po)
-{
-    //add trans then rot y
-    float x1 = cos(transformTobeMapped[1]) * (pi->x - transformTobeMapped[3])
-            - sin(transformTobeMapped[1]) * (pi->z - transformTobeMapped[5]);
-    float y1 = pi->y - transformTobeMapped[4];
-    float z1 = sin(transformTobeMapped[1]) * (pi->x - transformTobeMapped[3])
-            + cos(transformTobeMapped[1]) * (pi->z - transformTobeMapped[5]);
-    //rot x
-    float x2 = x1;
-    float y2 = cos(transformTobeMapped[0]) * y1 + sin(transformTobeMapped[0]) * z1;
-    float z2 = -sin(transformTobeMapped[0]) * y1 + cos(transformTobeMapped[0]) * z1;
-    //rot z
-    po->x = cos(transformTobeMapped[2]) * x2
-            + sin(transformTobeMapped[2]) * y2;
-    po->y = -sin(transformTobeMapped[2]) * x2
-            + cos(transformTobeMapped[2]) * y2;
-    po->z = z2;
-    po->intensity = pi->intensity;
-}
-
 void laserCloudCornerLastHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudCornerLast2)
 {
     timeLaserCloudCornerLast = laserCloudCornerLast2->header.stamp.toSec();
@@ -383,7 +287,7 @@ void laserCloudFullResHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloud
 
 void KeyPointPose6DHandler(const livox_loam_kp::KeyPointPoseConstPtr& KeyPointPose)
 {
-    std::vector<Pose6D> rot_kp_imu = KeyPointPose->pose6D;
+    rot_kp_imu_buff.push_back(*KeyPointPose);
 }
 
 int main(int argc, char** argv)
@@ -394,9 +298,14 @@ int main(int argc, char** argv)
     ros::Subscriber subLaserCloudCornerLast = nh.subscribe<sensor_msgs::PointCloud2>
             ("/laser_cloud_sharp", 100, laserCloudCornerLastHandler);
     ros::Subscriber subLaserCloudSurfLast = nh.subscribe<sensor_msgs::PointCloud2>
-            ("/laser_cloud_flat", 100, laserCloudSurfLastHandler);
+            ("/livox_undistort", 100, laserCloudSurfLastHandler);
+#ifdef USING_CORNER
     ros::Subscriber subLaserCloudFullRes = nh.subscribe<sensor_msgs::PointCloud2>
             ("/livox_cloud", 100, laserCloudFullResHandler);
+#else
+    ros::Subscriber subLaserCloudFullRes = nh.subscribe<sensor_msgs::PointCloud2>
+            ("/livox_undistort", 100, laserCloudFullResHandler);
+#endif
     ros::Subscriber KeyPointPose6D = nh.subscribe<livox_loam_kp::KeyPointPose>
             ("/KeyPointPose6D", 100, KeyPointPose6DHandler);
 
@@ -483,6 +392,33 @@ int main(int argc, char** argv)
             pointOnYAxis.y = 10.0;
             pointOnYAxis.z = 0.0;
 
+            /// initialize the transform with imu pre-integration
+            livox_loam_kp::KeyPointPose rot_kp_imu_cur;
+            livox_loam_kp::Pose6D pose6D_from_imu;
+            Eigen::Matrix3d rotmat_from_imu;
+            Eigen::Vector3d euler_incre_init(0,0,0);
+            
+            if(!rot_kp_imu_buff.empty())
+            {
+                rot_kp_imu_cur  = rot_kp_imu_buff.back();
+                pose6D_from_imu = rot_kp_imu_cur.pose6D.back();
+                rotmat_from_imu << MAT_FROM_ARRAY(pose6D_from_imu.rot);
+                euler_incre_init = rotmat_from_imu.transpose().eulerAngles(1, 0, 2);
+                correct_pi(euler_incre_init);
+
+                transformTobeMapped[0] += euler_incre_init[0];
+                transformTobeMapped[1] += euler_incre_init[1];
+                transformTobeMapped[2] += euler_incre_init[2];
+
+                // rot_kp_imu_buff.pop_front();
+
+                // std::cout<<"*******************time_pcl_last: "<<timeLaserCloudSurfLast<<std::endl;
+                // std::cout<<"time_imu_last: "<<rot_kp_imu_cur.header.stamp.toSec()<<std::endl;
+                std::cout<<"******pre-integrated euler angle: "<<euler_incre_init[0]<<" " \
+                         <<euler_incre_init[1]<<" "<<euler_incre_init[2]<<std::endl;
+                // std::cout<<rotmat_from_imu<<std::endl;
+            }
+            
             pointAssociateToMap(&pointOnYAxis, &pointOnYAxis);
 
             int centerCubeI = int((transformTobeMapped[3] + 25.0) / 50.0) + laserCloudCenWidth;
@@ -666,21 +602,28 @@ int main(int argc, char** argv)
             int laserCloudValidNum    = 0;
             int laserCloudSurroundNum = 0;
 
-            for (int i = centerCubeI - 2; i <= centerCubeI + 2; i++) {
-                for (int j = centerCubeJ - 2; j <= centerCubeJ + 2; j++) {
-                    for (int k = centerCubeK - 2; k <= centerCubeK + 2; k++) {
+            for (int i = centerCubeI - 2; i <= centerCubeI + 2; i++) 
+            {
+                for (int j = centerCubeJ - 2; j <= centerCubeJ + 2; j++) 
+                {
+                    for (int k = centerCubeK - 2; k <= centerCubeK + 2; k++) 
+                    {
                         if (i >= 0 && i < laserCloudWidth &&
                                 j >= 0 && j < laserCloudHeight &&
-                                k >= 0 && k < laserCloudDepth) {
+                                k >= 0 && k < laserCloudDepth) 
+                        {
 
                             float centerX = 50.0 * (i - laserCloudCenWidth);
                             float centerY = 50.0 * (j - laserCloudCenHeight);
                             float centerZ = 50.0 * (k - laserCloudCenDepth);
 
                             bool isInLaserFOV = false;
-                            for (int ii = -1; ii <= 1; ii += 2) {
-                                for (int jj = -1; jj <= 1; jj += 2) {
-                                    for (int kk = -1; kk <= 1; kk += 2) {
+                            for (int ii = -1; ii <= 1; ii += 2) 
+                            {
+                                for (int jj = -1; jj <= 1; jj += 2) 
+                                {
+                                    for (int kk = -1; kk <= 1; kk += 2) 
+                                    {
 
                                         float cornerX = centerX + 25.0 * ii;
                                         float cornerY = centerY + 25.0 * jj;
@@ -710,7 +653,8 @@ int main(int argc, char** argv)
                                 }
                             }
 
-                            if (isInLaserFOV) {
+                            if (isInLaserFOV)
+                            {
                                 laserCloudValidInd[laserCloudValidNum] = i + laserCloudWidth * j
                                         + laserCloudWidth * laserCloudHeight * k;
                                 laserCloudValidNum ++;
@@ -726,25 +670,29 @@ int main(int argc, char** argv)
             laserCloudCornerFromMap->clear();
             laserCloudSurfFromMap->clear();
             
-            for (int i = 0; i < laserCloudValidNum; i++) {
+            for (int i = 0; i < laserCloudValidNum; i++)
+            {
                 *laserCloudCornerFromMap += *laserCloudCornerArray[laserCloudValidInd[i]];
                 *laserCloudSurfFromMap += *laserCloudSurfArray[laserCloudValidInd[i]];
             }
+
             int laserCloudCornerFromMapNum = laserCloudCornerFromMap->points.size();
             int laserCloudSurfFromMapNum = laserCloudSurfFromMap->points.size();
 
+#ifdef USING_CORNER
             laserCloudCornerLast_down->clear();
             downSizeFilterCorner.setInputCloud(laserCloudCornerLast);
             downSizeFilterCorner.filter(*laserCloudCornerLast_down);
-            int laserCloudCornerLast_downNum = laserCloudCornerLast_down->points.size();
+#endif
 
             laserCloudSurfLast_down->clear();
             downSizeFilterSurf.setInputCloud(laserCloudSurfLast);
             downSizeFilterSurf.filter(*laserCloudSurfLast_down);
-            int laserCloudSurfLast_downNum = laserCloudSurfLast_down->points.size();
 
+#ifdef USING_CORNER
             std::cout<<"DEBUG MAPPING laserCloudCornerLast_down : "<<laserCloudCornerLast_down->points.size()<<" laserCloudSurfLast_down : "
             <<laserCloudSurfLast_down->points.size()<<std::endl;
+#endif
             std::cout<<"DEBUG MAPPING laserCloudCornerLast : "<<laserCloudCornerLast->points.size()<<" laserCloudSurfLast : "
             <<laserCloudSurfLast->points.size()<<std::endl;
             std::cout<<"DEBUG MAPPING laserCloudCornerFromMapNum : "<<laserCloudCornerFromMapNum<<" laserCloudSurfFromMapNum : "
@@ -752,30 +700,37 @@ int main(int argc, char** argv)
 
             t2 = clock();
 
-            if (laserCloudCornerFromMapNum > 10 && laserCloudSurfFromMapNum > 100) {
-            //if (laserCloudSurfFromMapNum > 100) {
+            if (laserCloudCornerFromMapNum > 10 && laserCloudSurfFromMapNum > 100)
+            {
+            // if (laserCloudSurfFromMapNum > 100) {
                 kdtreeCornerFromMap->setInputCloud(laserCloudCornerFromMap);
                 kdtreeSurfFromMap->setInputCloud(laserCloudSurfFromMap);
 
                 int num_temp = 0;
 
-                for (int iterCount = 0; iterCount < 20; iterCount++) {
+                for (int iterCount = 0; iterCount < 20; iterCount++) 
+                {
                     match_start = clock();
                     num_temp++;
                     laserCloudOri->clear();
                     coeffSel->clear();
-                    for (int i = 0; i < laserCloudCornerLast->points.size(); i++) {
+
+#ifdef USING_CORNER
+                    for (int i = 0; i < laserCloudCornerLast->points.size(); i++) 
+                    {
                         pointOri = laserCloudCornerLast->points[i];
 
                         pointAssociateToMap(&pointOri, &pointSel);
                         //find the closest 5 points
                         kdtreeCornerFromMap->nearestKSearch(pointSel, 5, pointSearchInd, pointSearchSqDis);
 
-                        if (pointSearchSqDis[4] < 1.5) {
+                        if (pointSearchSqDis[4] < 1.5)
+                        {
                             float cx = 0;
                             float cy = 0;
                             float cz = 0;
-                            for (int j = 0; j < 5; j++) {
+                            for (int j = 0; j < 5; j++)
+                            {
                                 cx += laserCloudCornerFromMap->points[pointSearchInd[j]].x;
                                 cy += laserCloudCornerFromMap->points[pointSearchInd[j]].y;
                                 cz += laserCloudCornerFromMap->points[pointSearchInd[j]].z;
@@ -790,7 +745,8 @@ int main(int argc, char** argv)
                             float a22 = 0;
                             float a23 = 0;
                             float a33 = 0;
-                            for (int j = 0; j < 5; j++) {
+                            for (int j = 0; j < 5; j++)
+                            {
                                 float ax = laserCloudCornerFromMap->points[pointSearchInd[j]].x - cx;
                                 float ay = laserCloudCornerFromMap->points[pointSearchInd[j]].y - cy;
                                 float az = laserCloudCornerFromMap->points[pointSearchInd[j]].z - cz;
@@ -821,8 +777,8 @@ int main(int argc, char** argv)
 
                             cv::eigen(matA1, matD1, matV1);
 
-                            if (matD1.at<float>(0, 0) > 3 * matD1.at<float>(0, 1)) {
-
+                            if (matD1.at<float>(0, 0) > 3 * matD1.at<float>(0, 1))
+                            {
                                 float x0 = pointSel.x;
                                 float y0 = pointSel.y;
                                 float z0 = pointSel.z;
@@ -866,25 +822,29 @@ int main(int argc, char** argv)
                                 coeff.z = s * lc;
                                 coeff.intensity = s * ld2;
 
-                                if (s > 0.1) {
+                                if (s > 0.1)
+                                {
                                     laserCloudOri->push_back(pointOri);
                                     coeffSel->push_back(coeff);
                                 }
                             }
                         }
                     }
+#endif
                     
                     // std::cout <<"DEBUG mapping select corner points : " << coeffSel->size() << std::endl;
 
-                    for (int i = 0; i < laserCloudSurfLast_down->points.size(); i++) {
+                    for (int i = 0; i < laserCloudSurfLast_down->points.size(); i++)
+                    {
                         pointOri = laserCloudSurfLast_down->points[i];
 
                         pointAssociateToMap(&pointOri, &pointSel);
                         kdtreeSurfFromMap->nearestKSearch(pointSel, 8, pointSearchInd, pointSearchSqDis);
 
-                        if (pointSearchSqDis[7] < 5.0) {
-
-                            for (int j = 0; j < 8; j++) {
+                        if (pointSearchSqDis[7] < 5.0)
+                        {
+                            for (int j = 0; j < 8; j++)
+                            {
                                 matA0.at<float>(j, 0) = laserCloudSurfFromMap->points[pointSearchInd[j]].x;
                                 matA0.at<float>(j, 1) = laserCloudSurfFromMap->points[pointSearchInd[j]].y;
                                 matA0.at<float>(j, 2) = laserCloudSurfFromMap->points[pointSearchInd[j]].z;
@@ -910,16 +870,19 @@ int main(int argc, char** argv)
                             pd /= ps;
 
                             bool planeValid = true;
-                            for (int j = 0; j < 8; j++) {
+                            for (int j = 0; j < 8; j++)
+                            {
                                 if (fabs(pa * laserCloudSurfFromMap->points[pointSearchInd[j]].x +
                                             pb * laserCloudSurfFromMap->points[pointSearchInd[j]].y +
-                                            pc * laserCloudSurfFromMap->points[pointSearchInd[j]].z + pd) > 0.2) {
+                                            pc * laserCloudSurfFromMap->points[pointSearchInd[j]].z + pd) > 0.2)
+                                {
                                     planeValid = false;
                                     break;
                                 }
                             }
 
-                            if (planeValid) {
+                            if (planeValid) 
+                            {
                                 //loss fuction
                                 float pd2 = pa * pointSel.x + pb * pointSel.y + pc * pointSel.z + pd;
 
@@ -932,7 +895,8 @@ int main(int argc, char** argv)
                                 coeff.z = s * pc;
                                 coeff.intensity = s * pd2;
 
-                                if (s > 0.1) {
+                                if (s > 0.1)
+                                {
                                     laserCloudOri->push_back(pointOri);
                                     coeffSel->push_back(coeff);
                                 }
@@ -966,8 +930,11 @@ int main(int argc, char** argv)
                     cv::Mat matB(laserCloudSelNum, 1, CV_32F, cv::Scalar::all(0));
                     cv::Mat matAtB(6, 1, CV_32F, cv::Scalar::all(0));
                     cv::Mat matX(6, 1, CV_32F, cv::Scalar::all(0));
+
                     float debug_distance = 0;
-                    for (int i = 0; i < laserCloudSelNum; i++) {
+
+                    for (int i = 0; i < laserCloudSelNum; i++)
+                    {
                         pointOri = laserCloudOri->points[i];
                         coeff = coeffSel->points[i];
 
@@ -1001,7 +968,8 @@ int main(int argc, char** argv)
                     cv::solve(matAtA, matAtB, matX, cv::DECOMP_QR);
 
                     //Deterioration judgment
-                    if (iterCount == 0) {
+                    if (iterCount == 0)
+                    {
                         cv::Mat matE(1, 6, CV_32F, cv::Scalar::all(0));
                         cv::Mat matV(6, 6, CV_32F, cv::Scalar::all(0));
                         cv::Mat matV2(6, 6, CV_32F, cv::Scalar::all(0));
@@ -1011,13 +979,18 @@ int main(int argc, char** argv)
 
                         isDegenerate = false;
                         float eignThre[6] = {1, 1, 1, 1, 1, 1};
-                        for (int i = 5; i >= 0; i--) {
-                            if (matE.at<float>(0, i) < eignThre[i]) {
-                                for (int j = 0; j < 6; j++) {
+                        for (int i = 5; i >= 0; i--)
+                        {
+                            if (matE.at<float>(0, i) < eignThre[i])
+                            {
+                                for (int j = 0; j < 6; j++)
+                                {
                                     matV2.at<float>(i, j) = 0;
                                 }
                                 isDegenerate = true;
-                            } else {
+                            }
+                            else
+                            {
                                 break;
                             }
                         }
@@ -1037,6 +1010,10 @@ int main(int argc, char** argv)
                     transformTobeMapped[4] += matX.at<float>(4, 0);
                     transformTobeMapped[5] += matX.at<float>(5, 0);
 
+                    // Eigen::Vector3f pose6d(transformTobeMapped);
+                    std::cout<<"transformTobeMapped: "<<transformTobeMapped[0] <<" "\
+                             <<transformTobeMapped[1]<<" " <<transformTobeMapped[2]<<std::endl;
+
                     float deltaR = sqrt(
                                 pow(rad2deg(matX.at<float>(0, 0)), 2) +
                                 pow(rad2deg(matX.at<float>(1, 0)), 2) +
@@ -1048,12 +1025,11 @@ int main(int argc, char** argv)
 
                     solve_time += clock() - solve_start;
                     
-                    if (deltaR < 0.05 && deltaT < 0.05) {
+                    if (deltaR < 0.05 && deltaT < 0.05)
+                    {
                         std::cout<<"iteration count:"<<iterCount<<std::endl;
                         break;
                     }
-
-                    
                 }
                 std::cout<<"DEBUG num_temp: "<<num_temp << std::endl;
 
@@ -1062,7 +1038,9 @@ int main(int argc, char** argv)
 
             t3 = clock();
 
-            for (int i = 0; i < laserCloudCornerLast->points.size(); i++) {
+#ifndef USING_CORNER
+            for (int i = 0; i < laserCloudCornerLast->points.size(); i++)
+            {
                 pointAssociateToMap(&laserCloudCornerLast->points[i], &pointSel);
 
                 int cubeI = int((pointSel.x + 25.0) / 50.0) + laserCloudCenWidth;
@@ -1075,12 +1053,14 @@ int main(int argc, char** argv)
 
                 if (cubeI >= 0 && cubeI < laserCloudWidth &&
                         cubeJ >= 0 && cubeJ < laserCloudHeight &&
-                        cubeK >= 0 && cubeK < laserCloudDepth) {
+                        cubeK >= 0 && cubeK < laserCloudDepth)
+                {
 
                     int cubeInd = cubeI + laserCloudWidth * cubeJ + laserCloudWidth * laserCloudHeight * cubeK;
                     laserCloudCornerArray[cubeInd]->push_back(pointSel);
                 }
             }
+#endif
 
             for (int i = 0; i < laserCloudSurfLast_down->points.size(); i++) {
                 pointAssociateToMap(&laserCloudSurfLast_down->points[i], &pointSel);
@@ -1199,11 +1179,12 @@ int main(int argc, char** argv)
 
             kfNum++;
 
-            if(kfNum >= 20){
-            Eigen::Matrix<float,7,1> kf_pose;
-            kf_pose << -geoQuat.y,-geoQuat.z,geoQuat.x,geoQuat.w,transformAftMapped[3],transformAftMapped[4],transformAftMapped[5];
-            keyframe_pose.push_back(kf_pose);
-            kfNum = 0;
+            if(kfNum >= 20)
+            {
+                Eigen::Matrix<float,7,1> kf_pose;
+                kf_pose << -geoQuat.y,-geoQuat.z,geoQuat.x,geoQuat.w,transformAftMapped[3],transformAftMapped[4],transformAftMapped[5];
+                keyframe_pose.push_back(kf_pose);
+                kfNum = 0;
             }
 
             t4 = clock();
