@@ -12,7 +12,7 @@
   <node pkg="livox_loam_kp" type="loam_laserMapping" name="laserMapping" output="screen">
   <param name="map_file_path" type="string" value=" " />
   <param name="filter_parameter_corner" type="double" value="0.1" />
-  <param name="filter_parameter_surf" type="double" value="0.15" />
+  <param name="filter_parameter_surf" type="double" value="0.13" />
   </node>
 
   <node pkg="livox_loam_kp" type="livox_repub" name="livox_repub" output="screen" >

@@ -346,21 +346,12 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, PointCloudXYZI &pcl_in_o
     double imu_seg_tail_time = imu_seg_tail->header.stamp.toSec();
     double imu_seg_head_time = imu_seg_head->header.stamp.toSec();
 
-    Eigen::Vector3d gyr_seg_end(imu_seg_tail->angular_velocity.x,
-                              imu_seg_tail->angular_velocity.y,
-                              imu_seg_tail->angular_velocity.z);
+    Eigen::Vector3d gyr_seg_end, acc_seg_end, gyr_seg_head, acc_seg_head;
 
-    Eigen::Vector3d gyr_seg_head(imu_seg_head->angular_velocity.x,
-                              imu_seg_head->angular_velocity.y,
-                              imu_seg_head->angular_velocity.z);
-    
-    Eigen::Vector3d acc_seg_end(imu_seg_tail->linear_acceleration.x,
-                              imu_seg_tail->linear_acceleration.y,
-                              imu_seg_tail->linear_acceleration.z);
-    
-    Eigen::Vector3d acc_seg_head(imu_seg_head->linear_acceleration.x,
-                              imu_seg_head->linear_acceleration.y,
-                              imu_seg_head->linear_acceleration.z);
+    tf::vectorMsgToEigen(imu_seg_tail->angular_velocity,    gyr_seg_end);
+    tf::vectorMsgToEigen(imu_seg_tail->linear_acceleration, acc_seg_end);
+    tf::vectorMsgToEigen(imu_seg_head->angular_velocity,    gyr_seg_head);
+    tf::vectorMsgToEigen(imu_seg_head->linear_acceleration, acc_seg_head);
     
     Eigen::Vector3d ang_vel_avr = 0.5 * (gyr_seg_end + gyr_seg_head) - zero_bias_gyr;
     Eigen::Vector3d acc_avr     = 0.5 * (acc_seg_end + acc_seg_head) * scale_gravity;
@@ -380,7 +371,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, PointCloudXYZI &pcl_in_o
       /// So if we want to compensate a point at timestamp-i to the frame-e
       /// P_compensate = Exp(omega, dt) * R_last * Pi + t_ei
 
-      Eigen::Vector3d tie(- acc_avr * dt + t_kp);
+      Eigen::Vector3d tie(0, 0, 0);// Eigen::Vector3d tie(- acc_avr * dt + t_kp);
       Eigen::Matrix3d Rie(Exp(- ang_vel_avr, dt) * R_kp);
       Eigen::Vector3d v_pt_comp_e = Rie * Eigen::Vector3d(it_pcl->x, it_pcl->y, it_pcl->z) + tie;
 
@@ -400,7 +391,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, PointCloudXYZI &pcl_in_o
     }
     double offs_t = imu_seg_tail_time - imu_seg_head_time;
     R_kp = Exp(- ang_vel_avr, offs_t) * R_kp;
-    t_kp = - acc_avr * offs_t + t_kp;
+    t_kp = Eigen::Vector3d(0, 0, 0); // t_kp = - acc_avr * 0.0 + t_kp;
     
     rot_kp = set_pose6d(offs_t, imu_seg_head->linear_acceleration, imu_seg_head->angular_velocity, \
                         Zero3d, zero_bias_gyr, t_kp, R_kp);
