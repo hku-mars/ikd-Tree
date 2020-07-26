@@ -401,7 +401,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, PointCloudXYZI &pcl_in_o
   //          v_rot_pcl_.back().eulerAngles(0, 1, 2)[0] * 180.0 / M_PI,
   //          v_rot_pcl_.back().eulerAngles(0, 1, 2)[1] * 180.0 / M_PI,
   //          v_rot_pcl_.back().eulerAngles(0, 1, 2)[2] * 180.0 / M_PI);
-  std::cout<< "v_rot_pcl_ size: "<<v_rot_pcl_.size()<<"v_rot_kp_ size: "<< v_rot_kp_.pose6D.size()<<"v_rot_ size: "<< v_rot_.size()<< std::endl;
+  // std::cout<< "v_rot_pcl_ size: "<<v_rot_pcl_.size()<<"v_rot_kp_ size: "<< v_rot_kp_.pose6D.size()<<"v_rot_ size: "<< v_rot_.size()<< std::endl;
 }
 
 void ImuProcess::Process(const MeasureGroup &meas)
@@ -495,7 +495,7 @@ void ImuProcess::Process(const MeasureGroup &meas)
   {
     ROS_INFO("Process IMU");
     /// Integrate all input imu message
-    IntegrateGyr(meas.imu);
+    // IntegrateGyr(meas.imu);
 
     /// Initial pose from IMU (with only rotation)
     t1 = clock();
@@ -545,7 +545,7 @@ void ImuProcess::Process(const MeasureGroup &meas)
 
     t3 = clock();
     
-    std::cout<<"Points number in one steps: "<<cur_pcl_un_->points.size()<<"; Time Consumption: preintegration "\
+    std::cout<<"IMU Processing Time: preintegration "\
     <<t1 - process_start<<" undistort "<<t2 - t1<<" publish "<<t3 - t2<<std::endl;
 
     /// Record last measurements
@@ -667,7 +667,7 @@ bool SyncMeasure(MeasureGroup &measgroup)
     imu_buffer.pop_front();
   }
 
-  std::cout<<"imu_cnt: "<<imu_cnt<<" imu_end_time: "<<measgroup.imu.back()->header.stamp.toSec()<<"lidar_end_time"<<lidar_end_time<<std::endl;
+  // std::cout<<"imu_cnt: "<<imu_cnt<<" imu_end_time: "<<measgroup.imu.back()->header.stamp.toSec()<<"lidar_end_time"<<lidar_end_time<<std::endl;
 
   // ROS_DEBUG("add %d imu msg", imu_cnt);
 

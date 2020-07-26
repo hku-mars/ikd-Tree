@@ -326,13 +326,13 @@ int main(int argc, char** argv)
     double filter_parameter_surf;
     ros::param::get("~filter_parameter_surf",filter_parameter_surf);
 
-    std::vector<int> pointSearchInd;
-    std::vector<float> pointSearchSqDis;
+    // std::vector<int> pointSearchInd;
+    // std::vector<float> pointSearchSqDis;
     PointType pointOri, pointSel, coeff;
 
-    cv::Mat matA0(10, 3, CV_32F, cv::Scalar::all(0));
-    cv::Mat matB0(10, 1, CV_32F, cv::Scalar::all(-1));
-    cv::Mat matX0(10, 1, CV_32F, cv::Scalar::all(0));
+    // cv::Mat matA0(10, 3, CV_32F, cv::Scalar::all(0));
+    // cv::Mat matB0(10, 1, CV_32F, cv::Scalar::all(-1));
+    // cv::Mat matX0(10, 1, CV_32F, cv::Scalar::all(0));
 
     cv::Mat matA1(3, 3, CV_32F, cv::Scalar::all(0));
     cv::Mat matD1(1, 3, CV_32F, cv::Scalar::all(0));
@@ -351,7 +351,8 @@ int main(int argc, char** argv)
     // pcl::VoxelGrid<PointType> downSizeFilterFull;
     // downSizeFilterFull.setLeafSize(0.15, 0.15, 0.15);
 
-    for (int i = 0; i < laserCloudNum; i++) {
+    for (int i = 0; i < laserCloudNum; i++)
+    {
         laserCloudCornerArray[i].reset(new pcl::PointCloud<PointType>());
         laserCloudSurfArray[i].reset(new pcl::PointCloud<PointType>());
         laserCloudCornerArray2[i].reset(new pcl::PointCloud<PointType>());
@@ -369,14 +370,14 @@ int main(int argc, char** argv)
                 fabs(timeLaserCloudSurfLast - timeLaserCloudCornerLast) < 0.005 &&
                 fabs(timeLaserCloudFullRes - timeLaserCloudCornerLast) < 0.005) 
         {
-            clock_t match_start,kd_time,kd_start,match_time,solve_start,solve_time,t1,t2,t3,t4;
-            double omp_start, opm_dur;
+            double t1,t2,t3,t4;
+            double match_start, match_time, omp_start, opm_dur, solve_start, solve_time;
 
             match_time = 0;
             solve_time = 0;
-            kd_time    = 0;
+            opm_dur    = 0;
 
-            t1 = clock();
+            t1 = omp_get_wtime();
 
             newLaserCloudCornerLast = false;
             newLaserCloudSurfLast = false;
@@ -396,22 +397,25 @@ int main(int argc, char** argv)
             Eigen::Matrix3d rotmat_from_imu;
             Eigen::Vector3d euler_incre_init(0,0,0);
             
-            if(!rot_kp_imu_buff.empty())
+            while (rot_kp_imu_buff.size() >= 1)
             {
-                rot_kp_imu_cur  = rot_kp_imu_buff.back();
+                rot_kp_imu_cur  = rot_kp_imu_buff.front();
                 pose6D_from_imu = rot_kp_imu_cur.pose6D.back();
                 rotmat_from_imu << MAT_FROM_ARRAY(pose6D_from_imu.rot);
-                euler_incre_init = rotmat_from_imu.transpose().eulerAngles(1, 0, 2);
+                euler_incre_init = rotmat_from_imu.transpose().eulerAngles(0, 1, 2);
                 correct_pi(euler_incre_init);
 
                 transformTobeMapped[0] += euler_incre_init[0];
                 transformTobeMapped[1] += euler_incre_init[1];
                 transformTobeMapped[2] += euler_incre_init[2];
 
+                rot_kp_imu_buff.pop_front();
+
                 // std::cout<<"*******************time_pcl_last: "<<timeLaserCloudSurfLast<<std::endl;
                 // std::cout<<"time_imu_last: "<<rot_kp_imu_cur.header.stamp.toSec()<<std::endl;
                 std::cout<<"******pre-integrated euler angle: "<<euler_incre_init[0]<<" " \
-                         <<euler_incre_init[1]<<" "<<euler_incre_init[2]<<std::endl;
+                        <<euler_incre_init[1]<<" "<<euler_incre_init[2]<<"rot_kp_imu_buff size:" \
+                        <<rot_kp_imu_buff.size()<<std::endl;
                 // std::cout<<rotmat_from_imu<<std::endl;
             }
             
@@ -697,7 +701,7 @@ int main(int argc, char** argv)
             std::cout<<"DEBUG MAPPING laserCloudCornerFromMapNum : "<<laserCloudCornerFromMapNum<<" laserCloudSurfFromMapNum : "
             <<laserCloudSurfFromMapNum<<std::endl;
 
-            t2 = clock();
+            t2 = omp_get_wtime();
 #ifdef USING_CORNER
             if (laserCloudCornerFromMapNum > 10 && laserCloudSurfFromMapNum > 100)
 #else
@@ -707,13 +711,17 @@ int main(int argc, char** argv)
 #ifdef USING_CORNER
                 kdtreeCornerFromMap->setInputCloud(laserCloudCornerFromMap);
 #endif
-                kdtreeSurfFromMap->setInputCloud(laserCloudSurfFromMap);
+                pcl::KdTreeFLANN<PointType> kdtreeSurfFromMap_tmpt;
+                kdtreeSurfFromMap_tmpt.setInputCloud(laserCloudSurfFromMap);
 
                 int num_temp = 0;
 
+                // pcl::PointCloud<PointType>::Ptr laserCloudOri_tmpt(laserCloudSurfLast_down);
+                pcl::PointCloud<PointType>::Ptr coeffSel_tmpt(new pcl::PointCloud<PointType>(*laserCloudSurfLast_down));
+
                 for (int iterCount = 0; iterCount < 20; iterCount++) 
                 {
-                    match_start = clock();
+                    match_start = omp_get_wtime();
                     omp_start = omp_get_wtime();
 
                     num_temp++;
@@ -836,24 +844,34 @@ int main(int argc, char** argv)
                         }
                     }
 #endif
-                    
                     // std::cout <<"DEBUG mapping select corner points : " << coeffSel->size() << std::endl;
-                    
-                    // #pragma omp parallel for
+                    // variables for the points matching
+
+                    omp_set_num_threads(4);
+                    #pragma omp parallel for
                     for (int i = 0; i < laserCloudSurfLast_down->points.size(); i++)
                     {
-                        pointOri = laserCloudSurfLast_down->points[i];
+                        std::vector<int> pointSearchInd;
+                        std::vector<float> pointSearchSqDis;
+                        PointType pointOri_tmpt, pointSel_tmpt, coeff_tmpt;
 
-                        pointAssociateToMap(&pointOri, &pointSel);
+                        pointOri_tmpt = laserCloudSurfLast_down->points[i];
+                        pointAssociateToMap(&pointOri_tmpt, &pointSel_tmpt);
 
-                        kd_start = clock();
+                        // kd_start = omp_get_wtime();
 
-                        kdtreeSurfFromMap->nearestKSearch(pointSel, 8, pointSearchInd, pointSearchSqDis);
+                        kdtreeSurfFromMap_tmpt.nearestKSearch(pointSel_tmpt, 8, pointSearchInd, pointSearchSqDis);
 
-                        kd_time += clock() - kd_start;
+                        coeffSel_tmpt->points[i].intensity = 0.0;
+
+                        // kd_time += omp_get_wtime() - kd_start;
 
                         if (pointSearchSqDis[7] < 3.0)
                         {
+                            cv::Mat matA0(10, 3, CV_32F, cv::Scalar::all(0));
+                            cv::Mat matB0(10, 1, CV_32F, cv::Scalar::all(-1));
+                            cv::Mat matX0(10, 1, CV_32F, cv::Scalar::all(0));
+
                             for (int j = 0; j < 8; j++)
                             {
                                 matA0.at<float>(j, 0) = laserCloudSurfFromMap->points[pointSearchInd[j]].x;
@@ -896,30 +914,37 @@ int main(int argc, char** argv)
                             if (planeValid) 
                             {
                                 //loss fuction
-                                float pd2 = pa * pointSel.x + pb * pointSel.y + pc * pointSel.z + pd;
-
+                                float pd2 = pa * pointSel_tmpt.x + pb * pointSel_tmpt.y + pc * pointSel_tmpt.z + pd;
                                 //if(fabs(pd2) > 0.1) continue;
-
-                                float s = 1 - 0.9 * fabs(pd2) / sqrt(sqrt(pointSel.x * pointSel.x + pointSel.y * pointSel.y + pointSel.z * pointSel.z));
-
-                                coeff.x = s * pa;
-                                coeff.y = s * pb;
-                                coeff.z = s * pc;
-                                coeff.intensity = s * pd2;
+                                float s = 1 - 0.9 * fabs(pd2) / sqrt(sqrt(pointSel_tmpt.x * pointSel_tmpt.x + pointSel_tmpt.y * pointSel_tmpt.y + pointSel_tmpt.z * pointSel_tmpt.z));
 
                                 if (s > 0.1)
                                 {
-                                    laserCloudOri->push_back(pointOri);
-                                    coeffSel->push_back(coeff);
+                                    coeff_tmpt.x = s * pa;
+                                    coeff_tmpt.y = s * pb;
+                                    coeff_tmpt.z = s * pc;
+                                    coeff_tmpt.intensity = s * pd2;
+                                    coeffSel_tmpt->points[i] = coeff_tmpt;
+                                    // laserCloudOri->push_back(pointOri_tmpt);
+                                    // coeffSel->push_back(coeff_tmpt);
                                 }
                             }
                         }
                     }
+
+                    for (int i = 0; i < coeffSel_tmpt->points.size(); i++)
+                    {
+                        if (coeffSel_tmpt->points[i].intensity < 999)
+                        {
+                            laserCloudOri->push_back(laserCloudSurfLast_down->points[i]);
+                            coeffSel->push_back(coeffSel_tmpt->points[i]);
+                        }
+                    }
                     // std::cout <<"DEBUG mapping select all points : " << coeffSel->size() << std::endl;
 
-                    match_time += clock() - match_start;
+                    match_time += omp_get_wtime() - match_start;
                     opm_dur    += omp_get_wtime() - omp_start;
-                    solve_start = clock();
+                    solve_start = omp_get_wtime();
 
                     float srx = sin(transformTobeMapped[0]);
                     float crx = cos(transformTobeMapped[0]);
@@ -1036,20 +1061,20 @@ int main(int argc, char** argv)
                                 pow(matX.at<float>(4, 0) * 100, 2) +
                                 pow(matX.at<float>(5, 0) * 100, 2));
 
-                    solve_time += clock() - solve_start;
+                    solve_time += omp_get_wtime() - solve_start;
                     
                     if (deltaR < 0.05 && deltaT < 0.05)
                     {
-                        std::cout<<"iteration count:"<<iterCount<<std::endl;
+                        std::cout<<"iteration count:"<<iterCount+1<<std::endl;
                         break;
                     }
                 }
-                std::cout<<"DEBUG num_temp: "<<num_temp << std::endl;
+                // std::cout<<"DEBUG num_temp: "<<num_temp << std::endl;
 
                 transformUpdate();
             }
 
-            t3 = clock();
+            t3 = omp_get_wtime();
 
 #ifdef USING_CORNER
             for (int i = 0; i < laserCloudCornerLast->points.size(); i++)
@@ -1075,7 +1100,8 @@ int main(int argc, char** argv)
             }
 #endif
 
-            for (int i = 0; i < laserCloudSurfLast_down->points.size(); i++) {
+            for (int i = 0; i < laserCloudSurfLast_down->points.size(); i++)
+            {
                 pointAssociateToMap(&laserCloudSurfLast_down->points[i], &pointSel);
 
                 int cubeI = int((pointSel.x + 25.0) / 50.0) + laserCloudCenWidth;
@@ -1200,10 +1226,10 @@ int main(int argc, char** argv)
                 kfNum = 0;
             }
 
-            t4 = clock();
+            t4 = omp_get_wtime();
 
             std::cout<<"mapping time : "<<t2-t1<<" "<<t3-t2<<" "<<t4-t3<<std::endl;
-            std::cout<<"match time: "<<match_time<<"kdtree time:"<<kd_time<<"  solve time: "<<solve_time<<std::endl;
+            std::cout<<"match time: "<<match_time<<" omp_dur:"<<opm_dur<<"  solve time: "<<solve_time<<std::endl;
 
         }
 
