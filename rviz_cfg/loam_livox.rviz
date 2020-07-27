@@ -7,6 +7,7 @@ Panels:
         - /Global Options1
         - /Status1
         - /Axes1
+        - /odometry1
         - /odometry1/odomPath1
         - /mapping1
         - /mapping1/mappingPath1
@@ -45,7 +46,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: surround
+    SyncSource: currPoints
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -134,7 +135,7 @@ Visualization Manager:
           Buffer Length: 1
           Class: rviz/Path
           Color: 255; 85; 0
-          Enabled: false
+          Enabled: true
           Head Diameter: 0.30000001192092896
           Head Length: 0.20000000298023224
           Length: 0.30000001192092896
@@ -152,13 +153,13 @@ Visualization Manager:
           Shaft Length: 0.10000000149011612
           Topic: /laser_odom_path
           Unreliable: false
-          Value: false
-      Enabled: false
+          Value: true
+      Enabled: true
       Name: odometry
     - Class: rviz/Group
       Displays:
         - Alpha: 1
-          Buffer Length: 1
+          Buffer Length: 10000
           Class: rviz/Path
           Color: 255; 85; 0
           Enabled: true
@@ -210,11 +211,11 @@ Visualization Manager:
           Use Fixed Frame: true
           Use rainbow: true
           Value: true
-        - Alpha: 0.30000001192092896
+        - Alpha: 0.20000000298023224
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 0.9639103412628174
-            Min Value: -2.657466411590576
+            Max Value: 0.9604664444923401
+            Min Value: -2.6464240550994873
             Value: true
           Axis: Z
           Channel Name: intensity
@@ -232,7 +233,7 @@ Visualization Manager:
           Position Transformer: XYZ
           Queue Size: 100000
           Selectable: true
-          Size (Pixels): 2
+          Size (Pixels): 1.2000000476837158
           Size (m): 0.009999999776482582
           Style: Points
           Topic: /velodyne_cloud_registered
@@ -541,25 +542,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 54.23183822631836
+      Distance: 4.69839334487915
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 8.606891632080078
-        Y: 2.9323413372039795
-        Z: -0.7991793155670166
+        X: 2.191532611846924
+        Y: -0.7396270632743835
+        Z: 0.8145826458930969
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: true
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.9447969198226929
+      Pitch: 0.6397967338562012
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 2.719597339630127
+      Yaw: 3.9046342372894287
     Saved: ~
 Window Geometry:
   Displays:
