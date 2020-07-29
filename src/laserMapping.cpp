@@ -35,6 +35,7 @@
 
 #include <omp.h>
 #include <math.h>
+#include <Python.h>
 
 #include <nav_msgs/Odometry.h>
 #include <opencv/cv.h>
@@ -52,11 +53,15 @@
 #include <tf/transform_broadcaster.h>
 #include <livox_loam_kp/KeyPointPose.h>
 #include <geometry_msgs/Vector3.h>
+#include "matplotlibcpp.h"
+
+namespace plt = matplotlibcpp;
 
 // #define USING_CORNER
 
 #define PI_M (3.14159265358)
-#define NUM_MATCH_POINTS (8)
+#define NUM_MATCH_POINTS (5)
+#define NUM_MAX_ITERATIONS (50)
 #define MAT_FROM_ARRAY(v)  v[0],v[1],v[2],v[3],v[4],v[5],v[6],v[7],v[8]
 #define CORRECR_PI(v) ((v > 1.57) ? (v - PI_M) : ((v < -1.57) ? (v + PI_M) : v))
 
@@ -290,6 +295,15 @@ void KeyPointPose6DHandler(const livox_loam_kp::KeyPointPoseConstPtr& KeyPointPo
 
 int main(int argc, char** argv)
 {
+    Py_Initialize(); /*初始化python解释器,告诉编译器要用的python编译器*/
+	PyRun_SimpleString("import matplotlib.pyplot as plt"); /*调用python文件*/
+    PyRun_SimpleString("plt.ion()");
+	// PyRun_SimpleString("plt.bar([1,2,3],[2,1,3])"); /*调用python文件*/
+	// PyRun_SimpleString("plt.show()"); /*调用python文件*/
+
+    // plt::ion();
+	
+
     ros::init(argc, argv, "laserMapping");
     ros::NodeHandle nh;
 
@@ -361,6 +375,8 @@ int main(int argc, char** argv)
         laserCloudSurfArray2[i].reset(new pcl::PointCloud<PointType>());
     }
 
+    double start_time = omp_get_wtime();
+
 //------------------------------------------------------------------------------------------------------
     ros::Rate rate(100);
     bool status = ros::ok();
@@ -398,13 +414,24 @@ int main(int argc, char** argv)
             livox_loam_kp::Pose6D pose6D_from_imu;
             Eigen::Matrix3d rotmat_from_imu;
             Eigen::Vector3d euler_incre_init(0,0,0);
+
+            std::vector<double> t, s_plot;
+            t.push_back(t1 - start_time);
+            s_plot.push_back(transformTobeMapped[2]);
+            // plt::clf();
+            // plt::plot(t, s_plot, "r-");
+            // plt::title("Sample figure");
+            // plt::draw();
+            // plt::pause(0.05);
+            PyRun_SimpleString(("plt.plot("+std::to_string(t.back())+","+std::to_string(s_plot.back())+")").c_str());
+            PyRun_SimpleString("plt.draw()");
             
             while (rot_kp_imu_buff.size() >= 1)
             {
                 rot_kp_imu_cur  = rot_kp_imu_buff.front();
                 pose6D_from_imu = rot_kp_imu_cur.pose6D.back();
                 rotmat_from_imu << MAT_FROM_ARRAY(pose6D_from_imu.rot);
-                euler_incre_init = rotmat_from_imu.transpose().eulerAngles(0, 1, 2);
+                euler_incre_init = rotmat_from_imu.transpose().eulerAngles(1, 0, 2);
                 correct_pi(euler_incre_init);
 
                 transformTobeMapped[0] += euler_incre_init[0];
@@ -726,7 +753,7 @@ int main(int argc, char** argv)
                 // pcl::PointCloud<PointType>::Ptr laserCloudOri_tmpt(laserCloudSurfLast_down);
                 pcl::PointCloud<PointType>::Ptr coeffSel_tmpt(new pcl::PointCloud<PointType>(*laserCloudSurfLast_down));
 
-                for (int iterCount = 0; iterCount < 20; iterCount++) 
+                for (int iterCount = 0; iterCount < NUM_MAX_ITERATIONS; iterCount++) 
                 {
                     match_start = omp_get_wtime();
                     omp_start = omp_get_wtime();
@@ -854,7 +881,7 @@ int main(int argc, char** argv)
                     // std::cout <<"DEBUG mapping select corner points : " << coeffSel->size() << std::endl;
                     // variables for the points matching
 
-                    omp_set_num_threads(4);
+                    omp_set_num_threads(6);
                     #pragma omp parallel for
                     for (int i = 0; i < laserCloudSurfLast_down->points.size(); i++)
                     {
@@ -1181,9 +1208,11 @@ int main(int argc, char** argv)
 
             int laserCloudFullResNum = laserCloudFullRes2->points.size();
 
+            pcl::PointXYZRGB temp_point;
+
             for (int i = 0; i < laserCloudFullResNum; i++)
             {
-                pcl::PointXYZRGB temp_point;
+                
                 RGBpointAssociateToMap(&laserCloudFullRes2->points[i], &temp_point);
                 laserCloudFullResColor->push_back(temp_point);
             }
@@ -1225,7 +1254,7 @@ int main(int argc, char** argv)
 
             kfNum++;
 
-            if(kfNum >= 20)
+            if(kfNum >= NUM_MAX_ITERATIONS)
             {
                 Eigen::Matrix<float,7,1> kf_pose;
                 kf_pose << -geoQuat.y,-geoQuat.z,geoQuat.x,geoQuat.w,transformAftMapped[3],transformAftMapped[4],transformAftMapped[5];
@@ -1269,5 +1298,6 @@ int main(int argc, char** argv)
   }
     //--------------------------
     //  loss_output.close();
+  Py_Finalize(); /*结束python解释器，释放资源*/
   return 0;
 }

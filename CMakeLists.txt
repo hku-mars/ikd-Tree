@@ -17,6 +17,11 @@ find_package(OpenMP QUIET)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}   ${OpenMP_C_FLAGS}")
 
+find_package(PythonLibs REQUIRED)
+find_path(MATPLOTLIB_CPP_INCLUDE_DIRS "matplotlibcpp.h")
+# target_include_directories(myproject PRIVATE ${PYTHON_INCLUDE_DIRS})
+# target_link_libraries(myproject ${PYTHON_LIBRARIES})
+
 set(Sophus_INCLUDE_DIRS "/usr/local/include/sophus")
 
 find_package(catkin REQUIRED COMPONENTS
@@ -31,6 +36,7 @@ find_package(catkin REQUIRED COMPONENTS
   livox_ros_driver
   message_generation
   eigen_conversions
+  # PythonLibs 3.6
   )
 
 find_package(Eigen3 REQUIRED)
@@ -44,7 +50,9 @@ include_directories(
   ${Sophus_INCLUDE_DIRS}
 	${catkin_INCLUDE_DIRS} 
   ${EIGEN3_INCLUDE_DIR}
-  ${PCL_INCLUDE_DIRS})
+  ${PCL_INCLUDE_DIRS}
+  ${PYTHON_INCLUDE_DIRS}
+  include)
   
 add_message_files(
   FILES
@@ -64,7 +72,7 @@ catkin_package(
 )
 
 add_executable(imu_process src/IMU_Processing.cpp)
-target_link_libraries(imu_process ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS} ${Sophus_LIBRARIES})
+target_link_libraries(imu_process ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS} ${Sophus_LIBRARIES} )
 
 add_executable(livox_repub src/livox_repub.cpp)
 target_link_libraries(livox_repub ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
@@ -76,5 +84,6 @@ add_executable(loam_scanRegistration_horizon src/scanRegistration_horizon.cpp)
 target_link_libraries(loam_scanRegistration_horizon ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
 
 add_executable(loam_laserMapping src/laserMapping.cpp)
-target_link_libraries(loam_laserMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
+target_link_libraries(loam_laserMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS} ${PYTHON_LIBRARIES})
+target_include_directories(loam_laserMapping PRIVATE ${PYTHON_INCLUDE_DIRS})
 
