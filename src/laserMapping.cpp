@@ -35,6 +35,7 @@
 
 #include <omp.h>
 #include <math.h>
+#include <unistd.h>
 #include <Python.h>
 
 #include <nav_msgs/Odometry.h>
@@ -295,14 +296,13 @@ void KeyPointPose6DHandler(const livox_loam_kp::KeyPointPoseConstPtr& KeyPointPo
 
 int main(int argc, char** argv)
 {
-    Py_Initialize(); /*初始化python解释器,告诉编译器要用的python编译器*/
-	PyRun_SimpleString("import matplotlib.pyplot as plt"); /*调用python文件*/
-    PyRun_SimpleString("plt.ion()");
+    // Py_Initialize(); /*初始化python解释器,告诉编译器要用的python编译器*/
+	// PyRun_SimpleString("import matplotlib.pyplot as plt"); /*调用python文件*/
+    // PyRun_SimpleString("plt.ion()");
 	// PyRun_SimpleString("plt.bar([1,2,3],[2,1,3])"); /*调用python文件*/
 	// PyRun_SimpleString("plt.show()"); /*调用python文件*/
 
     // plt::ion();
-	
 
     ros::init(argc, argv, "laserMapping");
     ros::NodeHandle nh;
@@ -376,6 +376,7 @@ int main(int argc, char** argv)
     }
 
     double start_time = omp_get_wtime();
+    std::vector<double> T, s_plot, T2, s_plot2;
 
 //------------------------------------------------------------------------------------------------------
     ros::Rate rate(100);
@@ -415,16 +416,9 @@ int main(int argc, char** argv)
             Eigen::Matrix3d rotmat_from_imu;
             Eigen::Vector3d euler_incre_init(0,0,0);
 
-            std::vector<double> t, s_plot;
-            t.push_back(t1 - start_time);
-            s_plot.push_back(transformTobeMapped[2]);
-            // plt::clf();
-            // plt::plot(t, s_plot, "r-");
-            // plt::title("Sample figure");
-            // plt::draw();
-            // plt::pause(0.05);
-            PyRun_SimpleString(("plt.plot("+std::to_string(t.back())+","+std::to_string(s_plot.back())+")").c_str());
-            PyRun_SimpleString("plt.draw()");
+            
+            
+            s_plot2.push_back(double(rot_kp_imu_buff.size()));
             
             while (rot_kp_imu_buff.size() >= 1)
             {
@@ -1263,10 +1257,11 @@ int main(int argc, char** argv)
             }
 
             t4 = omp_get_wtime();
+            T.push_back(omp_get_wtime() - start_time);
+            s_plot.push_back(t4 - t1);
 
             std::cout<<"mapping time : "<<t2-t1<<" "<<t3-t2<<" "<<t4-t3<<std::endl;
             std::cout<<"match time: "<<match_time<<" omp_dur:"<<opm_dur<<"  solve time: "<<solve_time<<std::endl;
-
         }
 
         status = ros::ok();
@@ -1294,10 +1289,16 @@ int main(int argc, char** argv)
   }
   else
   {
+    plt::plot(T,s_plot);
+    plt::plot(T,s_plot2);
+    plt::save("~/time_consumption.png");
+    plt::pause(0.5);
+    plt::show();
+    
     std::cout << "no points saved";
   }
     //--------------------------
     //  loss_output.close();
-  Py_Finalize(); /*结束python解释器，释放资源*/
+    
   return 0;
 }
