@@ -38,6 +38,7 @@
 
 #include <nav_msgs/Odometry.h>
 #include <opencv/cv.h>
+#include <visualization_msgs/Marker.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -55,6 +56,7 @@
 // #define USING_CORNER
 
 #define PI_M (3.14159265358)
+#define NUM_MATCH_POINTS (8)
 #define MAT_FROM_ARRAY(v)  v[0],v[1],v[2],v[3],v[4],v[5],v[6],v[7],v[8]
 #define CORRECR_PI(v) ((v > 1.57) ? (v - PI_M) : ((v < -1.57) ? (v + PI_M) : v))
 
@@ -574,21 +576,26 @@ int main(int argc, char** argv)
                 laserCloudCenDepth++;
             }
 
-            while (centerCubeK >= laserCloudDepth - 3) {
-                for (int i = 0; i < laserCloudWidth; i++) {
-                    for (int j = 0; j < laserCloudHeight; j++) {
+            while (centerCubeK >= laserCloudDepth - 3)
+            {
+                for (int i = 0; i < laserCloudWidth; i++)
+                {
+                    for (int j = 0; j < laserCloudHeight; j++)
+                    {
                         int k = 0;
                         pcl::PointCloud<PointType>::Ptr laserCloudCubeCornerPointer =
                                 laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
                         pcl::PointCloud<PointType>::Ptr laserCloudCubeSurfPointer =
                                 laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
-
-                        for (; k < laserCloudDepth - 1; k++) {
+                    
+                        for (; k < laserCloudDepth - 1; k++)
+                        {
                             laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                                     laserCloudCornerArray[i + laserCloudWidth*j + laserCloudWidth * laserCloudHeight*(k + 1)];
                             laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                                     laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight*(k + 1)];
                         }
+
                         laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                                 laserCloudCubeCornerPointer;
                         laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
@@ -860,19 +867,19 @@ int main(int argc, char** argv)
 
                         // kd_start = omp_get_wtime();
 
-                        kdtreeSurfFromMap_tmpt.nearestKSearch(pointSel_tmpt, 8, pointSearchInd, pointSearchSqDis);
+                        kdtreeSurfFromMap_tmpt.nearestKSearch(pointSel_tmpt, NUM_MATCH_POINTS, pointSearchInd, pointSearchSqDis);
 
                         coeffSel_tmpt->points[i].intensity = 0.0;
 
                         // kd_time += omp_get_wtime() - kd_start;
 
-                        if (pointSearchSqDis[7] < 3.0)
+                        if (pointSearchSqDis[NUM_MATCH_POINTS - 1] < 3.0)
                         {
-                            cv::Mat matA0(10, 3, CV_32F, cv::Scalar::all(0));
-                            cv::Mat matB0(10, 1, CV_32F, cv::Scalar::all(-1));
-                            cv::Mat matX0(10, 1, CV_32F, cv::Scalar::all(0));
+                            cv::Mat matA0(NUM_MATCH_POINTS, 3, CV_32F, cv::Scalar::all(0));
+                            cv::Mat matB0(NUM_MATCH_POINTS, 1, CV_32F, cv::Scalar::all(-1));
+                            cv::Mat matX0(NUM_MATCH_POINTS, 1, CV_32F, cv::Scalar::all(0));
 
-                            for (int j = 0; j < 8; j++)
+                            for (int j = 0; j < NUM_MATCH_POINTS; j++)
                             {
                                 matA0.at<float>(j, 0) = laserCloudSurfFromMap->points[pointSearchInd[j]].x;
                                 matA0.at<float>(j, 1) = laserCloudSurfFromMap->points[pointSearchInd[j]].y;
@@ -900,7 +907,7 @@ int main(int argc, char** argv)
                             pd /= ps;
 
                             bool planeValid = true;
-                            for (int j = 0; j < 8; j++)
+                            for (int j = 0; j < NUM_MATCH_POINTS; j++)
                             {
                                 if (fabs(pa * laserCloudSurfFromMap->points[pointSearchInd[j]].x +
                                          pb * laserCloudSurfFromMap->points[pointSearchInd[j]].y +
