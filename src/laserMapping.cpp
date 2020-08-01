@@ -315,16 +315,16 @@ bool sync_packages()
     {
         return false;
     }
-    while (fabs(timeIMUkpLast - timeLaserCloudSurfLast) > 0.6 * LASER_FRAME_INTEVAL)
-    {
-        (timeIMUkpLast > timeLaserCloudSurfLast) ? LaserCloudSurfaceBuff.pop_front() : rot_kp_imu_buff.pop_front();
-        std::cout<<"`````````````````````````````````````````````````````````````````````````"<<std::endl;
+    // while (fabs(timeIMUkpLast - timeLaserCloudSurfLast) > 0.6 * LASER_FRAME_INTEVAL)
+    // {
+    //     (timeIMUkpLast > timeLaserCloudSurfLast) ? LaserCloudSurfaceBuff.pop_front() : rot_kp_imu_buff.pop_front();
+    //     std::cout<<"`````````````````````````````````````````````````````````````````````````"<<std::endl;
 
-        if(rot_kp_imu_buff.empty() || LaserCloudSurfaceBuff.empty()) {return false;}
+    //     if(rot_kp_imu_buff.empty() || LaserCloudSurfaceBuff.empty()) {return false;}
 
-        timeIMUkpLast = rot_kp_imu_buff.front().header.stamp.toSec();
-        timeLaserCloudSurfLast = LaserCloudSurfaceBuff.front().header.stamp.toSec();
-    }
+    //     timeIMUkpLast = rot_kp_imu_buff.front().header.stamp.toSec();
+    //     timeLaserCloudSurfLast = LaserCloudSurfaceBuff.front().header.stamp.toSec();
+    // }
     std::cout<<"Sync TIme: "<< timeIMUkpLast << " " << timeLaserCloudSurfLast <<std::endl;
     return true;
 }
