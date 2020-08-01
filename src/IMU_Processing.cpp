@@ -67,7 +67,7 @@ typedef geometry_msgs::Vector3 Vec3;
 struct MeasureGroup
 {
   sensor_msgs::PointCloud2ConstPtr lidar;
-  std::vector<sensor_msgs::Imu::ConstPtr> imu;
+  std::deque<sensor_msgs::Imu::ConstPtr> imu;
 };
 
 const bool time_list(PointType &x, PointType &y) {return (x.curvature < y.curvature);};
@@ -128,7 +128,7 @@ class ImuProcess
   /*** For gyroscope integration ***/
   double start_timestamp_;
   /// Making sure the equal size: v_imu_ and v_rot_
-  std::vector<sensor_msgs::ImuConstPtr> v_imu_;
+  std::deque<sensor_msgs::ImuConstPtr> v_imu_;
   std::vector<Sophus::SO3d> v_rot_;
   std::vector<Eigen::Matrix3d> v_rot_pcl_;
 
@@ -307,9 +307,11 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, PointCloudXYZI &pcl_in_o
   Eigen::Matrix3d Eye3d(Eigen::Matrix3d::Identity());
   Eigen::Vector3d Zero3d(0, 0, 0);
 
-  const auto &v_imu       = meas.imu;
-  const auto &v_imu_last  = meas.imu.back();
-  const auto &v_imu_first = meas.imu.front();
+  auto v_imu = meas.imu;
+  v_imu.push_front(last_imu_);
+
+  const auto &v_imu_last  = v_imu.back();
+  const auto &v_imu_first = v_imu.front();
   const double &imu_beg_time = v_imu_first->header.stamp.toSec();
   const double &imu_end_time = v_imu_last->header.stamp.toSec();
   const double &pcl_beg_time = meas.lidar->header.stamp.toSec();
@@ -334,8 +336,8 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, PointCloudXYZI &pcl_in_o
   v_rot_pcl_.push_back(Eye3d);
 
   /// iterator definitions for imu and point clouds contatintor
-  std::vector<sensor_msgs::Imu::ConstPtr>::const_iterator it_imu = v_imu.end() - 1;
-  PointCloudXYZI::iterator it_pcl = pcl_in_out.points.end() - 1;
+  auto it_imu = v_imu.end() - 1;
+  auto it_pcl = pcl_in_out.points.end() - 1;
   
   /// undistort each point
   for (; it_imu != v_imu.begin(); it_imu--)
@@ -358,12 +360,13 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, PointCloudXYZI &pcl_in_o
 
     /// unstort the point cloud points in each IMU segment
     double pt_time_abs = it_pcl->curvature / double(1000) + pcl_beg_time;
+    double dt   = imu_seg_tail_time - pt_time_abs;
     int i = 0;
     for(; (pt_time_abs >= imu_seg_head_time) && (it_pcl != pcl_in_out.points.begin()); it_pcl --)
     {
       /// find the base tor keypoint
       pt_time_abs = it_pcl->curvature / double(1000) + pcl_beg_time;
-      double dt   = imu_seg_tail_time - pt_time_abs;
+      dt          = imu_seg_tail_time - pt_time_abs;
       // int upper_kp_index = floor((imu_end_time - pt_time_abs) / imu_seg_time);
 
       /// Transform to the 'end' frame, using only the rotation
@@ -384,11 +387,17 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, PointCloudXYZI &pcl_in_o
 
       // if ((i++) % 50 == 0)
       // {
-      //   std::cout<<i<< " current pcl time:"<< std::setprecision(8) << pt_time_abs << " and "<< it_pcl->intensity<<std::endl;
+      //   // std::cout<<i<< " current pcl time:"<< std::setprecision(8) << pt_time_abs << " and "<< it_pcl->intensity<<std::endl;
       //   // std::cout<<"rotation matrix: \n"<<v_rot_pcl_.back()<<std::endl;
       //   // std::cout<< "undistort rotation matrix:\n" << Rie <<std::endl;
+      //   std::cout<<"imu_time_section: ["<<imu_seg_head_time<<", "<<imu_seg_tail_time<<"]  dt: "<<dt<<std::endl;
+      //   ROS_INFO("undistort rotation angle [x, y, z]: [%.6f, %.6f, %.6f]",
+      //      Rie.eulerAngles(0, 1, 2)[0] * 180.0 / M_PI,
+      //      Rie.eulerAngles(0, 1, 2)[1] * 180.0 / M_PI,
+      //      Rie.eulerAngles(0, 1, 2)[2] * 180.0 / M_PI);
       // }
     }
+    
     double offs_t = imu_seg_tail_time - imu_seg_head_time;
     R_kp = Exp(- ang_vel_avr, offs_t) * R_kp;
     t_kp = Eigen::Vector3d(0, 0, 0); // t_kp = - acc_avr * 0.0 + t_kp;
@@ -625,14 +634,6 @@ bool SyncMeasure(MeasureGroup &measgroup)
     // ROS_INFO("NO IMU DATA");
     return false;
   }
-
-  /* if (imu_buffer.front()->header.stamp.toSec() <
-      lidar_buffer.back()->header.stamp.toSec()) 
-  {
-    lidar_buffer.clear();
-    ROS_ERROR("clear lidar buffer, only happen at the beginning");
-    return false;
-  } */
 
   if (imu_buffer.back()->header.stamp.toSec() <
       lidar_buffer.front()->header.stamp.toSec()) 

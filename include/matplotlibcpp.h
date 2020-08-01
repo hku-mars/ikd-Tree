@@ -2171,6 +2171,7 @@ inline void save(const std::string& filename)
 
     PyObject* args = PyTuple_New(1);
     PyTuple_SetItem(args, 0, pyfilename);
+    std::cout<<"args:"<<filename.c_str()<<std::endl;
 
     PyObject* res = PyObject_CallObject(detail::_interpreter::get().s_python_function_save, args);
     if (!res) throw std::runtime_error("Call to save() failed.");

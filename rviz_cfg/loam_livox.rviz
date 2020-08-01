@@ -5,14 +5,10 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /Status1
-        - /Axes1
-        - /odometry1
         - /odometry1/odomPath1
         - /mapping1
-        - /mapping1/mappingPath1
         - /mapping1/surround1
-        - /mapping1/currPoints1
+        - /mapping1/PointCloud21
         - /Debug1/PointCloud21
         - /Debug1/PointCloud22
         - /Debug1/PointCloud23
@@ -22,7 +18,6 @@ Panels:
         - /Odometry1/Odometry2/Shape1
         - /Odometry1/Odometry3
         - /Odometry1/Odometry3/Shape1
-        - /Features1
         - /Features1/PointCloud21
         - /Features1/PointCloud22
         - /Axes2
@@ -203,7 +198,7 @@ Visualization Manager:
           Position Transformer: XYZ
           Queue Size: 1
           Selectable: false
-          Size (Pixels): 2
+          Size (Pixels): 1.2999999523162842
           Size (m): 0.05000000074505806
           Style: Points
           Topic: /velodyne_cloud_registered
@@ -214,8 +209,8 @@ Visualization Manager:
         - Alpha: 0.20000000298023224
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 0.9604664444923401
-            Min Value: -2.6464240550994873
+            Max Value: 0.9539717435836792
+            Min Value: -2.6823666095733643
             Value: true
           Axis: Z
           Channel Name: intensity
@@ -223,7 +218,7 @@ Visualization Manager:
           Color: 255; 255; 255
           Color Transformer: AxisColor
           Decay Time: 1e+9
-          Enabled: true
+          Enabled: false
           Invert Rainbow: true
           Max Color: 255; 255; 255
           Max Intensity: 90.00662994384766
@@ -240,6 +235,36 @@ Visualization Manager:
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
+          Value: false
+        - Alpha: 1
+          Autocompute Intensity Bounds: true
+          Autocompute Value Bounds:
+            Max Value: 10
+            Min Value: -10
+            Value: true
+          Axis: Z
+          Channel Name: intensity
+          Class: rviz/PointCloud2
+          Color: 255; 255; 255
+          Color Transformer: Intensity
+          Decay Time: 0
+          Enabled: true
+          Invert Rainbow: false
+          Max Color: 255; 0; 0
+          Max Intensity: 5.015100002288818
+          Min Color: 255; 0; 0
+          Min Intensity: 0
+          Name: PointCloud2
+          Position Transformer: XYZ
+          Queue Size: 10
+          Selectable: true
+          Size (Pixels): 3
+          Size (m): 0.009999999776482582
+          Style: Flat Squares
+          Topic: /Laser_map
+          Unreliable: false
+          Use Fixed Frame: true
+          Use rainbow: false
           Value: true
       Enabled: true
       Name: mapping
@@ -445,7 +470,7 @@ Visualization Manager:
       Name: Odometry
     - Class: rviz/Group
       Displays:
-        - Alpha: 1
+        - Alpha: 0.4000000059604645
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
             Max Value: 10
@@ -542,25 +567,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 4.69839334487915
+      Distance: 13.160588264465332
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 2.191532611846924
-        Y: -0.7396270632743835
-        Z: 0.8145826458930969
+        X: 4.375720500946045
+        Y: -0.009586049243807793
+        Z: 0.6869593858718872
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: true
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.6397967338562012
+      Pitch: 0.7397968769073486
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.9046342372894287
+      Yaw: 4.129631996154785
     Saved: ~
 Window Geometry:
   Displays:
@@ -578,5 +603,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1920
-  X: 2560
+  X: 0
   Y: 394
