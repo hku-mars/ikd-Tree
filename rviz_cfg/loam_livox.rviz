@@ -41,7 +41,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: ""
+    SyncSource: surround
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -209,8 +209,8 @@ Visualization Manager:
         - Alpha: 0.20000000298023224
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 0.9539717435836792
-            Min Value: -2.6823666095733643
+            Max Value: 0.9673232436180115
+            Min Value: -2.6628355979919434
             Value: true
           Axis: Z
           Channel Name: intensity
@@ -218,7 +218,7 @@ Visualization Manager:
           Color: 255; 255; 255
           Color Transformer: AxisColor
           Decay Time: 1e+9
-          Enabled: false
+          Enabled: true
           Invert Rainbow: true
           Max Color: 255; 255; 255
           Max Intensity: 90.00662994384766
@@ -235,7 +235,7 @@ Visualization Manager:
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
-          Value: false
+          Value: true
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
@@ -604,4 +604,4 @@ Window Geometry:
     collapsed: false
   Width: 1920
   X: 0
-  Y: 394
+  Y: 23

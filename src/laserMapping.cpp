@@ -906,7 +906,7 @@ int main(int argc, char** argv)
                     // std::cout <<"DEBUG mapping select corner points : " << coeffSel->size() << std::endl;
                     // variables for the points matching
 
-                    omp_set_num_threads(6);
+                    omp_set_num_threads(4);
                     #pragma omp parallel for
                     for (int i = 0; i < laserCloudSurfLast_down->points.size(); i++)
                     {
