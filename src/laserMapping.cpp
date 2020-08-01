@@ -1255,11 +1255,11 @@ int main(int argc, char** argv)
             laserCloudFullRes3.header.frame_id = "/camera_init";
             pubLaserCloudFullRes.publish(laserCloudFullRes3);
 
-            sensor_msgs::PointCloud2 laserCloudMap;
-            pcl::toROSMsg(*laserCloudSurfFromMap, laserCloudMap);
-            laserCloudMap.header.stamp = ros::Time().fromSec(timeLaserCloudCornerLast);
-            laserCloudMap.header.frame_id = "/camera_init";
-            pubLaserCloudMap.publish(laserCloudMap);
+            // sensor_msgs::PointCloud2 laserCloudMap;
+            // pcl::toROSMsg(*laserCloudSurfFromMap, laserCloudMap);
+            // laserCloudMap.header.stamp = ros::Time().fromSec(timeLaserCloudCornerLast);
+            // laserCloudMap.header.frame_id = "/camera_init";
+            // pubLaserCloudMap.publish(laserCloudMap);
 
             *laserCloudFullResColor_pcd += *laserCloudFullResColor;
 
@@ -1320,7 +1320,7 @@ int main(int argc, char** argv)
             T.push_back(omp_get_wtime() - start_time);
             s_plot.push_back(omp_get_wtime() - t1);
 
-            std::cout<<"mapping time : "<<t2-t1<<" "<<t3-t2<<" "<<t4-t3<<std::endl;
+            std::cout<<"mapping time : "<<t2-t1<<" "<<t3-t2<<" "<<t4-t1<<std::endl;
             std::cout<<"match time: "<<match_time<<" omp_dur:"<<opm_dur<<"  solve time: "<<solve_time<<std::endl;
         }
         status = ros::ok();
