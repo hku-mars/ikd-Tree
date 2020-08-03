@@ -61,7 +61,7 @@ namespace plt = matplotlibcpp;
 // #define USING_CORNER
 
 #define PI_M (3.14159265358)
-#define NUM_MATCH_POINTS (8)
+#define NUM_MATCH_POINTS (5)
 #define NUM_MAX_ITERATIONS (50)
 #define LASER_FRAME_INTEVAL (0.1)
 #define MAT_FROM_ARRAY(v)  v[0],v[1],v[2],v[3],v[4],v[5],v[6],v[7],v[8]
@@ -146,6 +146,10 @@ float transformTobeMapped[6] = {0};
 float transformAftMapped[6] = {0};
 //last optimization states
 float transformLastMapped[6] = {0};
+
+//final iteration resdual
+float deltaR = 0.0;
+float deltaT = 0.0;
 
 double rad2deg(double radians)
 {
@@ -325,7 +329,7 @@ bool sync_packages()
     //     timeIMUkpLast = rot_kp_imu_buff.front().header.stamp.toSec();
     //     timeLaserCloudSurfLast = LaserCloudSurfaceBuff.front().header.stamp.toSec();
     // }
-    std::cout<<"Sync TIme: "<< timeIMUkpLast << " " << timeLaserCloudSurfLast <<std::endl;
+    // std::cout<<"Sync TIme: "<< timeIMUkpLast << " " << timeLaserCloudSurfLast <<std::endl;
     return true;
 }
 
@@ -369,7 +373,7 @@ int main(int argc, char** argv)
     ros::Publisher pubLaserCloudMap = nh.advertise<sensor_msgs::PointCloud2>
             ("/Laser_map", 100);
 
-    ros::Publisher pubOdomAftMapped = nh.advertise<nav_msgs::Odometry> ("/aft_mapped_to_init", 1);
+    ros::Publisher pubOdomAftMapped = nh.advertise<nav_msgs::Odometry> ("/aft_mapped_to_init", 10);
     nav_msgs::Odometry odomAftMapped;
     odomAftMapped.header.frame_id = "/camera_init";
     odomAftMapped.child_frame_id = "/aft_mapped";
@@ -396,7 +400,7 @@ int main(int argc, char** argv)
 
     downSizeFilterCorner.setLeafSize(filter_parameter_corner, filter_parameter_corner, filter_parameter_corner);
     downSizeFilterSurf.setLeafSize(filter_parameter_surf, filter_parameter_surf, filter_parameter_surf);
-    downSizeFilterMap.setLeafSize(filter_parameter_surf, filter_parameter_surf, filter_parameter_surf);
+    downSizeFilterMap.setLeafSize(0.1, 0.1, 0.1);
 
     for (int i = 0; i < laserCloudNum; i++)
     {
@@ -405,11 +409,8 @@ int main(int argc, char** argv)
         laserCloudCornerArray2[i].reset(new pcl::PointCloud<PointType>());
         laserCloudSurfArray2[i].reset(new pcl::PointCloud<PointType>());
     }
-
-    double start_time = omp_get_wtime();
-    std::vector<double> T, s_plot, T2, s_plot2;
-    T.push_back(0.0);
-    s_plot.push_back(0.0);
+    
+    std::vector<double> T1, s_plot, s_plot2, s_plot3;
 
 //------------------------------------------------------------------------------------------------------
     ros::Rate rate(100);
@@ -422,11 +423,10 @@ int main(int argc, char** argv)
         {
             // std::cout<<"~~~~~~~~~~~"<<LaserCloudSurfaceBuff.size()<<" "<<rot_kp_imu_buff.size()<<" "<<timeIMUkpLast<<" "<<timeLaserCloudSurfLast<<std::endl;
             double t1,t2,t3,t4;
-            double match_start, match_time, omp_start, opm_dur, solve_start, solve_time;
+            double match_start, match_time, solve_start, solve_time;
 
             match_time = 0;
             solve_time = 0;
-            opm_dur    = 0;
 
             t1 = omp_get_wtime();
 
@@ -447,9 +447,6 @@ int main(int argc, char** argv)
             livox_loam_kp::Pose6D pose6D_from_imu;
             Eigen::Matrix3d rotmat_from_imu;
             Eigen::Vector3d euler_incre_init(0,0,0);
-
-            T2.push_back(omp_get_wtime() - start_time);
-            s_plot2.push_back(double(rot_kp_imu_buff.size())/10.0);
             
             /// Get the rotations and translations of IMU keypoints in a frame
             rot_kp_imu_cur  = rot_kp_imu_buff.front();
@@ -780,7 +777,6 @@ int main(int argc, char** argv)
                 for (iterCount = 0; iterCount < NUM_MAX_ITERATIONS; iterCount++) 
                 {
                     match_start = omp_get_wtime();
-                    omp_start = omp_get_wtime();
 
                     num_temp++;
                     laserCloudOri->clear();
@@ -925,7 +921,7 @@ int main(int argc, char** argv)
 
                         // kd_time += omp_get_wtime() - kd_start;
 
-                        if (*max_element(pointSearchSqDis.begin(), pointSearchSqDis.end()) < 0.25)
+                        if (*max_element(pointSearchSqDis.begin(), pointSearchSqDis.end()) < 0.5)
                         {
                             cv::Mat matA0(NUM_MATCH_POINTS, 3, CV_32F, cv::Scalar::all(0));
                             cv::Mat matB0(NUM_MATCH_POINTS, 1, CV_32F, cv::Scalar::all(-1));
@@ -1002,11 +998,10 @@ int main(int argc, char** argv)
                         }
                     }
 
-                    std::cout <<"DEBUG mapping select all points : " << coeffSel->size()<< "  " << count_effect_point<< std::endl;
+                    std::cout << "DEBUG mapping select all points : " << coeffSel->size() << "  " << count_effect_point << std::endl;
                     count_effect_point = 0;
 
                     match_time += omp_get_wtime() - match_start;
-                    opm_dur    += omp_get_wtime() - omp_start;
                     solve_start = omp_get_wtime();
 
                     float srx = sin(transformTobeMapped[0]);
@@ -1111,11 +1106,11 @@ int main(int argc, char** argv)
                     transformTobeMapped[4] += matX.at<float>(4, 0);
                     transformTobeMapped[5] += matX.at<float>(5, 0);
 
-                    float deltaR = sqrt(
+                    deltaR = sqrt(
                                 pow(rad2deg(matX.at<float>(0, 0)), 2) +
                                 pow(rad2deg(matX.at<float>(1, 0)), 2) +
                                 pow(rad2deg(matX.at<float>(2, 0)), 2));
-                    float deltaT = sqrt(
+                    deltaT = sqrt(
                                 pow(matX.at<float>(3, 0) * 100, 2) +
                                 pow(matX.at<float>(4, 0) * 100, 2) +
                                 pow(matX.at<float>(5, 0) * 100, 2));
@@ -1123,13 +1118,12 @@ int main(int argc, char** argv)
                     // Eigen::Vector3f pose6d(transformTobeMapped);
                     std::cout<<"transformTobeMapped: "<<transformTobeMapped[0] <<" "\
                              <<transformTobeMapped[1]<<" " <<transformTobeMapped[2]<<" " <<transformTobeMapped[3] <<" "\
-                             <<transformTobeMapped[4]<<" " <<transformTobeMapped[5] << "delta R and T: "<<deltaR<<" "<<deltaT <<std::endl;
+                             <<transformTobeMapped[4]<<" " <<transformTobeMapped[5] << "  delta R and T: "<<deltaR<<" "<<deltaT<<std::endl;
 
                     solve_time += omp_get_wtime() - solve_start;
                     
-                    if (deltaR < 0.02 && deltaT < 0.05)
+                    if (deltaR < 0.02 && deltaT < 0.03)
                     {
-                        
                         break;
                     }
                 }
@@ -1241,7 +1235,7 @@ int main(int argc, char** argv)
             int laserCloudFullResNum = laserCloudFullRes2->points.size();
 
             pcl::PointXYZRGB temp_point;
-            std::cout<<"Points number of NewFrameAddedtoMap: "<<laserCloudFullResNum<<std::endl;
+            // std::cout<<"Points number of NewFrameAddedtoMap: "<<laserCloudFullResNum<<std::endl;
 
             for (int i = 0; i < laserCloudFullResNum; i++)
             {
@@ -1255,11 +1249,11 @@ int main(int argc, char** argv)
             laserCloudFullRes3.header.frame_id = "/camera_init";
             pubLaserCloudFullRes.publish(laserCloudFullRes3);
 
-            // sensor_msgs::PointCloud2 laserCloudMap;
-            // pcl::toROSMsg(*laserCloudSurfFromMap, laserCloudMap);
-            // laserCloudMap.header.stamp = ros::Time().fromSec(timeLaserCloudCornerLast);
-            // laserCloudMap.header.frame_id = "/camera_init";
-            // pubLaserCloudMap.publish(laserCloudMap);
+            sensor_msgs::PointCloud2 laserCloudMap;
+            pcl::toROSMsg(*laserCloudSurfFromMap, laserCloudMap);
+            laserCloudMap.header.stamp = ros::Time().fromSec(timeLaserCloudCornerLast);
+            laserCloudMap.header.frame_id = "/camera_init";
+            pubLaserCloudMap.publish(laserCloudMap);
 
             *laserCloudFullResColor_pcd += *laserCloudFullResColor;
 
@@ -1317,11 +1311,13 @@ int main(int argc, char** argv)
             // plt::show();
             // plt::pause(0.0000001);
 
-            T.push_back(omp_get_wtime() - start_time);
+            T1.push_back(timeLaserCloudSurfLast);
             s_plot.push_back(omp_get_wtime() - t1);
+            s_plot2.push_back(double(deltaR));
+            s_plot3.push_back(double(deltaT));
 
-            std::cout<<"mapping time : "<<t2-t1<<" "<<t3-t2<<" "<<t4-t1<<std::endl;
-            std::cout<<"match time: "<<match_time<<" omp_dur:"<<opm_dur<<"  solve time: "<<solve_time<<std::endl;
+            std::cout<<"mapping time : selection "<<t2-t1 <<" match time: "<<match_time<<"  solve time: "<<solve_time<<" total: "<<t4-t1<<std::endl;
+            // std::cout<<"match time: "<<match_time<<"  solve time: "<<solve_time<<std::endl;
         }
         status = ros::ok();
         rate.sleep();
@@ -1348,10 +1344,16 @@ int main(int argc, char** argv)
   }
   else
   {
-    plt::plot(T,s_plot);
-    plt::plot(T2,s_plot2);
-    plt::show();
-    plt::pause(0.5);
+      if (!T1.empty())
+      {
+        // plt::named_plot("time consumed",T1,s_plot);
+        plt::named_plot("R_residual",T1,s_plot2);
+        // plt::named_plot("T_residual",T1,s_plot3);
+        plt::legend();
+        plt::show();
+        plt::pause(0.5);
+      }
+        
     // PyRun_SimpleString("plt.save(~/time_consumption.png)");
     
     // plt::save("~/time_consumption.png");

@@ -463,7 +463,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
   }
   else
   {
-    std::cout<<"ALL point: "<<cloudSize<<" outliers: "<< debugnum1 << std::endl;
+    // std::cout<<"ALL point: "<<cloudSize<<" outliers: "<< debugnum1 << std::endl;
   }
   
 

@@ -574,9 +574,11 @@ bool b_reset = false;
 
 /// Buffers for measurements
 double last_timestamp_lidar = -1;
-std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer;
 double last_timestamp_imu = -1;
+double last_timestamp_odo = -1;
+std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer;
 std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer;
+std::deque<nav_msgs::Odometry::ConstPtr> odo_buffer;
 
 void SigHandle(int sig)
 {
@@ -627,6 +629,25 @@ void imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in)
   sig_buffer.notify_all();
 }
 
+void odo_cbk(const nav_msgs::Odometry::ConstPtr &msg_in)
+{
+  nav_msgs::Odometry::Ptr msg(new nav_msgs::Odometry(*msg_in));
+  double timestamp = msg->header.stamp.toSec();
+  // ROS_DEBUG("get imu at time: %.6f", timestamp);
+  mtx_buffer.lock();
+
+  if (timestamp < last_timestamp_odo) {
+    ROS_ERROR("odometry loop back, clear buffer");
+    odo_buffer.clear();
+  }
+  last_timestamp_odo = timestamp;
+
+  odo_buffer.push_back(msg);
+
+  mtx_buffer.unlock();
+  sig_buffer.notify_all();
+}
+
 bool SyncMeasure(MeasureGroup &measgroup) 
 {
   if (lidar_buffer.empty() || imu_buffer.empty()) {
@@ -669,7 +690,6 @@ bool SyncMeasure(MeasureGroup &measgroup)
   }
 
   // std::cout<<"imu_cnt: "<<imu_cnt<<" imu_end_time: "<<measgroup.imu.back()->header.stamp.toSec()<<"lidar_end_time"<<lidar_end_time<<std::endl;
-
   // ROS_DEBUG("add %d imu msg", imu_cnt);
 
   return true;
@@ -715,6 +735,7 @@ int main(int argc, char **argv)
 
   ros::Subscriber sub_pcl = nh.subscribe("/laser_cloud_flat", 100, pointcloud_cbk);
   ros::Subscriber sub_imu = nh.subscribe("/livox/imu", 100, imu_cbk);
+  ros::Subscriber sub_odo = nh.subscribe("/aft_mapped_to_init", 10, odo_cbk); //pubOdomAftMapped = nh.advertise<nav_msgs::Odometry> ("/aft_mapped_to_init", 10);
 
   std::shared_ptr<ImuProcess> p_imu(new ImuProcess());
 
