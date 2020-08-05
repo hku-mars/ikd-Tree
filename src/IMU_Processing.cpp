@@ -6,6 +6,7 @@
 #include <fstream>
 #include <csignal>
 #include <ros/ros.h>
+#include "Exp_mat.h"
 #include <Eigen/Eigen>
 #include <eigen_conversions/eigen_msg.h>
 #include <condition_variable>
@@ -84,7 +85,7 @@ class ImuProcess
   void Process(const MeasureGroup &meas);
   void Reset();
 
-  Eigen::Matrix3d Exp(const Eigen::Vector3d &ang_vel, const double &dt);
+  // Eigen::Matrix3d Exp(const Eigen::Vector3d &ang_vel, const double &dt);
 
   void IntegrateGyr(const std::vector<sensor_msgs::Imu::ConstPtr> &v_imu);
 
@@ -192,29 +193,29 @@ void ImuProcess::Reset()
     return (Eye3d + std::sin(-r_ang) * K + (1.0 - std::cos(-r_ang)) * K * K);
 } */
 
-Eigen::Matrix3d ImuProcess::Exp(const Eigen::Vector3d &ang_vel, const double &dt)
-{
-  double ang_vel_norm = ang_vel.norm();
-  Eigen::Matrix3d Eye3d = Eigen::Matrix3d::Identity();
-  if (ang_vel_norm > 0.0000001)
-  {
-    Eigen::Vector3d r_axis = ang_vel / ang_vel_norm;
-    Eigen::Matrix3d K;
+// Eigen::Matrix3d ImuProcess::Exp(const Eigen::Vector3d &ang_vel, const double &dt)
+// {
+//   double ang_vel_norm = ang_vel.norm();
+//   Eigen::Matrix3d Eye3d = Eigen::Matrix3d::Identity();
+//   if (ang_vel_norm > 0.0000001)
+//   {
+//     Eigen::Vector3d r_axis = ang_vel / ang_vel_norm;
+//     Eigen::Matrix3d K;
     
-    K << SKEW_SYM_MATRX(r_axis);
+//     K << SKEW_SYM_MATRX(r_axis);
 
-    double r_ang = ang_vel_norm * dt;
+//     double r_ang = ang_vel_norm * dt;
 
-    /// Roderigous Tranformation
-    Eigen::Matrix3d R = Eye3d + std::sin(r_ang) * K + (1.0 - std::cos(r_ang)) * K * K;
+//     /// Roderigous Tranformation
+//     Eigen::Matrix3d R = Eye3d + std::sin(r_ang) * K + (1.0 - std::cos(r_ang)) * K * K;
 
-    return R;
-  }
-  else
-  {
-    return Eye3d;
-  }
-}
+//     return R;
+//   }
+//   else
+//   {
+//     return Eye3d;
+//   }
+// }
 
 const Sophus::SO3d ImuProcess::GetRot() const 
 {
@@ -375,7 +376,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, PointCloudXYZI &pcl_in_o
       /// P_compensate = Exp(omega, dt) * R_last * Pi + t_ei
 
       Eigen::Vector3d tie(0, 0, 0);// Eigen::Vector3d tie(- acc_avr * dt + t_kp);
-      Eigen::Matrix3d Rie(Exp(- ang_vel_avr, dt) * R_kp);
+      Eigen::Matrix3d Rie(Exp(ang_vel_avr, - dt) * R_kp);
       Eigen::Vector3d v_pt_comp_e = Rie * Eigen::Vector3d(it_pcl->x, it_pcl->y, it_pcl->z) + tie;
 
       /// save Undistorted points and their rotation
@@ -399,7 +400,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, PointCloudXYZI &pcl_in_o
     }
     
     double offs_t = imu_seg_tail_time - imu_seg_head_time;
-    R_kp = Exp(- ang_vel_avr, offs_t) * R_kp;
+    R_kp = Exp(ang_vel_avr, - offs_t) * R_kp;
     t_kp = Eigen::Vector3d(0, 0, 0); // t_kp = - acc_avr * 0.0 + t_kp;
     
     rot_kp = set_pose6d(offs_t, imu_seg_head->linear_acceleration, imu_seg_head->angular_velocity, \

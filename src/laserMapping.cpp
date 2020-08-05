@@ -32,14 +32,14 @@
 // CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
-
 #include <omp.h>
 #include <math.h>
 #include <unistd.h>
 #include <Python.h>
-
-#include <nav_msgs/Odometry.h>
+#include <Eigen/Core>
 #include <opencv/cv.h>
+#include <nav_msgs/Odometry.h>
+#include <opencv2/core/eigen.hpp>
 #include <visualization_msgs/Marker.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
@@ -54,6 +54,7 @@
 #include <tf/transform_broadcaster.h>
 #include <livox_loam_kp/KeyPointPose.h>
 #include <geometry_msgs/Vector3.h>
+#include "Exp_mat.h"
 #include "matplotlibcpp.h"
 
 namespace plt = matplotlibcpp;
@@ -69,8 +70,11 @@ namespace plt = matplotlibcpp;
 
 typedef pcl::PointXYZI PointType;
 
-inline void correct_pi(double &v) {v = CORRECR_PI(v);}
-inline void correct_pi(Eigen::Vector3d &v) {for(int i=0;i<3;i++){v[i] = CORRECR_PI(double(v[i]));}}
+template<typename T>
+inline auto correct_pi(const T v) {return CORRECR_PI(v);}
+
+template<typename T>
+inline auto correct_pi(const Eigen::Matrix<T, 3, 1> v) {Eigen::Matrix<T, 3, 1> g; for(int i=0;i<3;i++){g[i] = CORRECR_PI(T(v[i]));}; return g;}
 
 int kfNum = 0;
 int iterCount = 0;
@@ -147,6 +151,10 @@ float transformAftMapped[6] = {0};
 //last optimization states
 float transformLastMapped[6] = {0};
 
+//estimated rotation and translation;
+Eigen::Matrix3f R_global_cur(Eigen::Matrix3f::Identity());
+Eigen::Vector3f T_global_cur(0, 0, 0);
+
 //final iteration resdual
 float deltaR = 0.0;
 float deltaT = 0.0;
@@ -159,19 +167,6 @@ double deg2rad(double degrees)
 {
   return degrees * M_PI / 180.0;
 }
-Eigen::Matrix4f trans_euler_to_matrix(const float *trans)
-{
-    Eigen::Matrix4f T = Eigen::Matrix4f::Identity();
-    Eigen::Matrix3f R;
-    Eigen::AngleAxisf rollAngle(Eigen::AngleAxisf(trans[0],Eigen::Vector3f::UnitX()));
-    Eigen::AngleAxisf pitchAngle(Eigen::AngleAxisf(trans[1],Eigen::Vector3f::UnitY()));
-    Eigen::AngleAxisf yawAngle(Eigen::AngleAxisf(trans[2],Eigen::Vector3f::UnitZ()));
-    R = pitchAngle * rollAngle * yawAngle; //zxy    
-    T.block<3,3>(0,0) = R;
-    T.block<3,1>(0,3) = Eigen::Vector3f(trans[3],trans[4],trans[5]);
-    if(0) {};
-    return T;
-}
 
 void transformUpdate()
 {
@@ -183,51 +178,23 @@ void transformUpdate()
 //lidar coordinate sys to world coordinate sys
 void pointAssociateToMap(PointType const * const pi, PointType * const po)
 {
-    //rot z（transformTobeMapped[2]）
-    float x1 = cos(transformTobeMapped[2]) * pi->x
-            - sin(transformTobeMapped[2]) * pi->y;
-    float y1 = sin(transformTobeMapped[2]) * pi->x
-            + cos(transformTobeMapped[2]) * pi->y;
-    float z1 = pi->z;
-
-    //rot x（transformTobeMapped[0]）
-    float x2 = x1;
-    float y2 = cos(transformTobeMapped[0]) * y1 - sin(transformTobeMapped[0]) * z1;
-    float z2 = sin(transformTobeMapped[0]) * y1 + cos(transformTobeMapped[0]) * z1;
-
-    //rot y（transformTobeMapped[1]）then add trans
-    po->x = cos(transformTobeMapped[1]) * x2 + sin(transformTobeMapped[1]) * z2
-            + transformTobeMapped[3];
-    po->y = y2 + transformTobeMapped[4];
-    po->z = -sin(transformTobeMapped[1]) * x2 + cos(transformTobeMapped[1]) * z2
-            + transformTobeMapped[5];
+    Eigen::Vector3f p_body(pi->x, pi->y, pi->z);
+    Eigen::Vector3f p_global(R_global_cur * p_body + T_global_cur);
+    
+    po->x = p_global(0);
+    po->y = p_global(1);
+    po->z = p_global(2);
     po->intensity = pi->intensity;
 }
 
 void RGBpointAssociateToMap(PointType const * const pi, pcl::PointXYZRGB * const po)
 {
-    float rx = transformAftMapped[0];
-    float ry = transformAftMapped[1];
-    float rz = transformAftMapped[2];
-    float tx = transformAftMapped[3];
-    float ty = transformAftMapped[4];
-    float tz = transformAftMapped[5];
-    //rot z（transformTobeMapped[2]）
-    float x1 = cos(rz) * pi->x
-            - sin(rz) * pi->y;
-    float y1 = sin(rz) * pi->x
-            + cos(rz) * pi->y;
-    float z1 = pi->z;
-
-    //rot x（transformTobeMapped[0]）
-    float x2 = x1;
-    float y2 = cos(rx) * y1 - sin(rx) * z1;
-    float z2 = sin(rx) * y1 + cos(rx) * z1;
-
-    //rot y（transformTobeMapped[1]）then add trans
-    po->x = cos(ry) * x2 + sin(ry) * z2 + tx;
-    po->y = y2 + ty;
-    po->z = -sin(ry) * x2 + cos(ry) * z2 + tz;
+    Eigen::Vector3f p_body(pi->x, pi->y, pi->z);
+    Eigen::Vector3f p_global(R_global_cur * p_body + T_global_cur);
+    
+    po->x = p_global(0);
+    po->y = p_global(1);
+    po->z = p_global(2);
     //po->intensity = pi->intensity;
 
     float intensity = pi->intensity;
@@ -281,13 +248,6 @@ void laserCloudCornerLastHandler(const sensor_msgs::PointCloud2ConstPtr& laserCl
 
 void laserCloudSurfLastHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudSurfLast2)
 {
-    // timeLaserCloudSurfLast = laserCloudSurfLast2->header.stamp.toSec();
-
-    // pcl::PointCloud<PointType> pcl_surface_tmpt;
-
-    // laserCloudSurfLast->clear();
-    // pcl::fromROSMsg(*laserCloudSurfLast2, pcl_surface_tmpt);
-
     LaserCloudSurfaceBuff.push_back(*laserCloudSurfLast2);
 
     timeLaserCloudSurfLast = LaserCloudSurfaceBuff.front().header.stamp.toSec();
@@ -372,7 +332,7 @@ int main(int argc, char** argv)
             ("/velodyne_cloud_registered", 100);
     ros::Publisher pubLaserCloudMap = nh.advertise<sensor_msgs::PointCloud2>
             ("/Laser_map", 100);
-
+    
     ros::Publisher pubOdomAftMapped = nh.advertise<nav_msgs::Odometry> ("/aft_mapped_to_init", 10);
     nav_msgs::Odometry odomAftMapped;
     odomAftMapped.header.frame_id = "/camera_init";
@@ -423,10 +383,11 @@ int main(int argc, char** argv)
         {
             // std::cout<<"~~~~~~~~~~~"<<LaserCloudSurfaceBuff.size()<<" "<<rot_kp_imu_buff.size()<<" "<<timeIMUkpLast<<" "<<timeLaserCloudSurfLast<<std::endl;
             double t1,t2,t3,t4;
-            double match_start, match_time, solve_start, solve_time;
+            double match_start, match_time, solve_start, solve_time, pca_time;
 
             match_time = 0;
             solve_time = 0;
+            pca_time   = 0;
 
             t1 = omp_get_wtime();
 
@@ -443,24 +404,21 @@ int main(int argc, char** argv)
             pointOnYAxis.z = 0.0;
 
             /// initialize the transform with imu pre-integration
-            livox_loam_kp::KeyPointPose rot_kp_imu_cur;
-            livox_loam_kp::Pose6D pose6D_from_imu;
-            Eigen::Matrix3d rotmat_from_imu;
-            Eigen::Vector3d euler_incre_init(0,0,0);
+            // cv::Mat euler_cur(3, 1, CV_32F, cv::Scalar::all(0));
+            // Eigen::Matrix3d rotmat_from_imu;
             
             /// Get the rotations and translations of IMU keypoints in a frame
-            rot_kp_imu_cur  = rot_kp_imu_buff.front();
-            pose6D_from_imu = rot_kp_imu_cur.pose6D.back();
-            rotmat_from_imu << MAT_FROM_ARRAY(pose6D_from_imu.rot);
-            euler_incre_init = rotmat_from_imu.transpose().eulerAngles(1, 0, 2);
-            correct_pi(euler_incre_init);
+            Eigen::Matrix3f d_rot_from_imu;
+            d_rot_from_imu<<MAT_FROM_ARRAY(rot_kp_imu_buff.front().pose6D.back().rot);
+            R_global_cur   = R_global_cur * d_rot_from_imu.transpose();
+            Eigen::Vector3f euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
 
-            transformTobeMapped[0] += euler_incre_init[0];
-            transformTobeMapped[1] += euler_incre_init[1];
-            transformTobeMapped[2] += euler_incre_init[2];
+            transformTobeMapped[0] = euler_cur[0];
+            transformTobeMapped[1] = euler_cur[1];
+            transformTobeMapped[2] = euler_cur[2];
 
-            std::cout<<"******pre-integrated euler angle: "<<euler_incre_init[0]<<" " \
-                    <<euler_incre_init[1]<<" "<<euler_incre_init[2]<<"rot_kp_imu_buff size:" \
+            std::cout<<"******pre-integrated euler angle: "<<euler_cur[0]<<" " \
+                    <<euler_cur[1]<<" "<<euler_cur[2]<<" rot_kp_imu_buff size:" \
                     <<rot_kp_imu_buff.size()<<std::endl;
             
             pointAssociateToMap(&pointOnYAxis, &pointOnYAxis);
@@ -920,6 +878,7 @@ int main(int argc, char** argv)
                         // coeffSel_tmpt->points[i].intensity = -1000.0;
 
                         // kd_time += omp_get_wtime() - kd_start;
+                        double pca_start = omp_get_wtime();
 
                         if (*max_element(pointSearchSqDis.begin(), pointSearchSqDis.end()) < 0.5)
                         {
@@ -974,11 +933,14 @@ int main(int argc, char** argv)
                                 float s = 1 - 0.9 * fabs(pd2) / sqrt(sqrt(pointSel_tmpt.x * pointSel_tmpt.x + pointSel_tmpt.y * pointSel_tmpt.y + pointSel_tmpt.z * pointSel_tmpt.z));
 
                                 if (s > 0.1)
-                                {
                                     coeff_tmpt.x = s * pa;
+                                {
                                     coeff_tmpt.y = s * pb;
                                     coeff_tmpt.z = s * pc;
                                     coeff_tmpt.intensity = s * pd2;
+
+                                    // static int jjj = 0; jjj ++;
+                                    // if (jjj % 100 == 0) {std::cout<<"s: "<<s<<" pd2: "<<pd2<<std::endl;}
                                     
                                     point_selected[i] = true;
                                     coeffSel_tmpt->points[i] = coeff_tmpt;
@@ -987,6 +949,8 @@ int main(int argc, char** argv)
                                 }
                             }
                         }
+
+                        pca_time += omp_get_wtime() - pca_start;
                     }
 
                     for (int i = 0; i < coeffSel_tmpt->points.size(); i++)
@@ -998,28 +962,28 @@ int main(int argc, char** argv)
                         }
                     }
 
-                    std::cout << "DEBUG mapping select all points : " << coeffSel->size() << "  " << count_effect_point << std::endl;
+                    // std::cout << "DEBUG mapping select all points : " << coeffSel->size() << "  " << count_effect_point << std::endl;
                     count_effect_point = 0;
 
                     match_time += omp_get_wtime() - match_start;
                     solve_start = omp_get_wtime();
 
-                    float srx = sin(transformTobeMapped[0]);
-                    float crx = cos(transformTobeMapped[0]);
-                    float sry = sin(transformTobeMapped[1]);
-                    float cry = cos(transformTobeMapped[1]);
-                    float srz = sin(transformTobeMapped[2]);
-                    float crz = cos(transformTobeMapped[2]);
+                    // float srx = sin(transformTobeMapped[0]);
+                    // float crx = cos(transformTobeMapped[0]);
+                    // float sry = sin(transformTobeMapped[1]);
+                    // float cry = cos(transformTobeMapped[1]);
+                    // float srz = sin(transformTobeMapped[2]);
+                    // float crz = cos(transformTobeMapped[2]);
 
                     int laserCloudSelNum = laserCloudOri->points.size();
                     if (laserCloudSelNum < 50) {
                         continue;
                     }
 
-                    //|c1c3+s1s2s3 c3s1s2-c1s3 c2s1|
-                    //|   c2s3        c2c3      -s2|
-                    //|c1s2s3-c3s1 c1c3s2+s1s3 c1c2|
-                    //AT*A*x = AT*b
+                    /// |c1c3+s1s2s3 c3s1s2-c1s3 c2s1|
+                    /// |   c2s3        c2c3      -s2|
+                    /// |c1s2s3-c3s1 c1c3s2+s1s3 c1c2|
+                    /// AT*A*x = AT*b
                     cv::Mat matA(laserCloudSelNum, 6, CV_32F, cv::Scalar::all(0));
                     cv::Mat matAt(6, laserCloudSelNum, CV_32F, cv::Scalar::all(0));
                     cv::Mat matAtA(6, 6, CV_32F, cv::Scalar::all(0));
@@ -1033,24 +997,33 @@ int main(int argc, char** argv)
                     {
                         pointOri = laserCloudOri->points[i];
                         coeff = coeffSel->points[i];
+                        float point_this[3] = {pointOri.x, pointOri.y, pointOri.z};
+                        Eigen::Matrix3f point_crossmat;
+                        point_crossmat<<SKEW_SYM_MATRX(point_this);
+                        Eigen::Vector3f vect_norm(coeff.x, coeff.y, coeff.z);
+                        Eigen::Vector3f A(point_crossmat * R_global_cur.transpose() * vect_norm);
 
-                        float arx = (crx*sry*srz*pointOri.x + crx*crz*sry*pointOri.y - srx*sry*pointOri.z) * coeff.x
-                                + (-srx*srz*pointOri.x - crz*srx*pointOri.y - crx*pointOri.z) * coeff.y
-                                + (crx*cry*srz*pointOri.x + crx*cry*crz*pointOri.y - cry*srx*pointOri.z) * coeff.z;
+                        // float arx = (crx*sry*srz*pointOri.x + crx*crz*sry*pointOri.y - srx*sry*pointOri.z) * coeff.x
+                        //         + (-srx*srz*pointOri.x - crz*srx*pointOri.y - crx*pointOri.z) * coeff.y
+                        //         + (crx*cry*srz*pointOri.x + crx*cry*crz*pointOri.y - cry*srx*pointOri.z) * coeff.z;
 
-                        float ary = ((cry*srx*srz - crz*sry)*pointOri.x
-                                        + (sry*srz + cry*crz*srx)*pointOri.y + crx*cry*pointOri.z) * coeff.x
-                                + ((-cry*crz - srx*sry*srz)*pointOri.x
-                                    + (cry*srz - crz*srx*sry)*pointOri.y - crx*sry*pointOri.z) * coeff.z;
+                        // float ary = ((cry*srx*srz - crz*sry)*pointOri.x
+                        //                 + (sry*srz + cry*crz*srx)*pointOri.y + crx*cry*pointOri.z) * coeff.x
+                        //         + ((-cry*crz - srx*sry*srz)*pointOri.x
+                        //             + (cry*srz - crz*srx*sry)*pointOri.y - crx*sry*pointOri.z) * coeff.z;
 
-                        float arz = ((crz*srx*sry - cry*srz)*pointOri.x + (-cry*crz-srx*sry*srz)*pointOri.y)*coeff.x
-                                + (crx*crz*pointOri.x - crx*srz*pointOri.y) * coeff.y
-                                + ((sry*srz + cry*crz*srx)*pointOri.x + (crz*sry-cry*srx*srz)*pointOri.y)*coeff.z;
+                        // float arz = ((crz*srx*sry - cry*srz)*pointOri.x + (-cry*crz-srx*sry*srz)*pointOri.y)*coeff.x
+                        //         + (crx*crz*pointOri.x - crx*srz*pointOri.y) * coeff.y
+                        //         + ((sry*srz + cry*crz*srx)*pointOri.x + (crz*sry-cry*srx*srz)*pointOri.y)*coeff.z;
 
-                        matA.at<float>(i, 0) = arx;
-                        matA.at<float>(i, 1) = ary;
-                        matA.at<float>(i, 2) = arz;
+                        // matA.at<float>(i, 0) = arx;
+                        // matA.at<float>(i, 1) = ary;
+                        // matA.at<float>(i, 2) = arz;
+
                         //TODO: the partial derivative
+                        matA.at<float>(i, 0) = A(0);
+                        matA.at<float>(i, 1) = A(1);
+                        matA.at<float>(i, 2) = A(2);
                         matA.at<float>(i, 3) = coeff.x;
                         matA.at<float>(i, 4) = coeff.y;
                         matA.at<float>(i, 5) = coeff.z;
@@ -1093,18 +1066,23 @@ int main(int argc, char** argv)
                         matP = matV.inv() * matV2;
                     }
 
-                    if (isDegenerate) {
+                    if (isDegenerate)
+                    {
                         cv::Mat matX2(6, 1, CV_32F, cv::Scalar::all(0));
                         matX.copyTo(matX2);
                         matX = matP * matX2;
                     }
 
-                    transformTobeMapped[0] += matX.at<float>(0, 0);
-                    transformTobeMapped[1] += matX.at<float>(1, 0);
-                    transformTobeMapped[2] += matX.at<float>(2, 0);
-                    transformTobeMapped[3] += matX.at<float>(3, 0);
-                    transformTobeMapped[4] += matX.at<float>(4, 0);
-                    transformTobeMapped[5] += matX.at<float>(5, 0);
+                    R_global_cur = R_global_cur * Exp(matX.at<float>(0, 0), matX.at<float>(1, 0), matX.at<float>(2, 0));
+                    T_global_cur = T_global_cur + Eigen::Vector3f(matX.at<float>(3, 0), matX.at<float>(4, 0), matX.at<float>(5, 0));
+                    euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
+
+                    transformTobeMapped[0] = euler_cur(0);
+                    transformTobeMapped[1] = euler_cur(1);
+                    transformTobeMapped[2] = euler_cur(2);
+                    transformTobeMapped[3] = T_global_cur(0);
+                    transformTobeMapped[4] = T_global_cur(1);
+                    transformTobeMapped[5] = T_global_cur(2);
 
                     deltaR = sqrt(
                                 pow(rad2deg(matX.at<float>(0, 0)), 2) +
@@ -1316,7 +1294,7 @@ int main(int argc, char** argv)
             s_plot2.push_back(double(deltaR));
             s_plot3.push_back(double(deltaT));
 
-            std::cout<<"mapping time : selection "<<t2-t1 <<" match time: "<<match_time<<"  solve time: "<<solve_time<<" total: "<<t4-t1<<std::endl;
+            std::cout<<"mapping time : selection "<<t2-t1 <<" match time: "<<match_time<<" pca_time: "<<pca_time<<"  solve time: "<<solve_time<<" total: "<<t4-t1<<std::endl;
             // std::cout<<"match time: "<<match_time<<"  solve time: "<<solve_time<<std::endl;
         }
         status = ros::ok();
@@ -1335,30 +1313,27 @@ int main(int argc, char** argv)
     pcl::PointCloud<pcl::PointXYZI> surf_points, corner_points;
     surf_points = *laserCloudSurfFromMap;
     corner_points = *laserCloudCornerFromMap;
-      if (surf_points.size() > 0 && corner_points.size() > 0) {
+    if (surf_points.size() > 0 && corner_points.size() > 0) 
+    {
     pcl::PCDWriter pcd_writer;
     std::cout << "saving...";
     pcd_writer.writeBinary(surf_filename, surf_points);
     pcd_writer.writeBinary(corner_filename, corner_points);
     pcd_writer.writeBinary(all_points_filename, *laserCloudFullResColor_pcd);
-  }
-  else
-  {
-      if (!T1.empty())
-      {
-        // plt::named_plot("time consumed",T1,s_plot);
-        plt::named_plot("R_residual",T1,s_plot2);
-        // plt::named_plot("T_residual",T1,s_plot3);
-        plt::legend();
-        plt::show();
-        plt::pause(0.5);
-      }
-        
-    // PyRun_SimpleString("plt.save(~/time_consumption.png)");
-    
-    // plt::save("~/time_consumption.png");
-    std::cout << "no points saved";
-  }
+    }
+    else
+    {
+        if (!T1.empty())
+        {
+            plt::named_plot("time consumed",T1,s_plot);
+            plt::named_plot("R_residual",T1,s_plot2);
+            plt::named_plot("T_residual",T1,s_plot3);
+            plt::legend();
+            plt::show();
+            plt::pause(0.5);
+        }
+        std::cout << "no points saved";
+    }
     //--------------------------
     //  loss_output.close();
   return 0;

@@ -3,15 +3,18 @@ project(livox_loam_kp)
 
 SET(CMAKE_BUILD_TYPE "Debug")
 
-ADD_COMPILE_OPTIONS(-std=c++11 )
 ADD_COMPILE_OPTIONS(-std=c++14 )
-set( CMAKE_CXX_FLAGS "-std=c++11 -O3" )
+ADD_COMPILE_OPTIONS(-std=c++14 )
+set( CMAKE_CXX_FLAGS "-std=c++14 -O3" )
 
 #set(CMAKE_CXX_COMPILER "/usr/bin/clang++")
 
 #set(CMAKE_C_COMPILER "/usr/bin/clang")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fexceptions" )
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -pthread -std=c++0x -std=c++11 -fexceptions")
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -pthread -std=c++0x -std=c++14 -fexceptions")
 
 find_package(OpenMP QUIET)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
