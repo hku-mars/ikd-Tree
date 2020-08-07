@@ -7,6 +7,25 @@
 #include <common_lib.h>
 
 template<typename T>
+auto Exp(const Eigen::Matrix<T, 3, 1> &ang)
+{
+    T ang_norm = ang.norm();
+    Eigen::Matrix<T, 3, 3> Eye3 = Eigen::Matrix<T, 3, 3>::Identity();
+    if (ang_norm > 0.0000001)
+    {
+        Eigen::Matrix<T, 3, 1> r_axis = ang / ang_norm;
+        Eigen::Matrix<T, 3, 3> K;
+        K << SKEW_SYM_MATRX(r_axis);
+        /// Roderigous Tranformation
+        return Eigen::Matrix<T, 3, 3>(Eye3 + std::sin(ang_norm) * K + (1.0 - std::cos(ang_norm)) * K * K);
+    }
+    else
+    {
+        return Eye3;
+    }
+}
+
+template<typename T>
 auto Exp(const Eigen::Matrix<T, 3, 1> &ang_vel, const T &dt)
 {
     T ang_vel_norm = ang_vel.norm();

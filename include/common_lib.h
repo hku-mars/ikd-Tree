@@ -11,9 +11,10 @@
 #define G_m_s2 (9.8099)  // Gravaty const in GuangDong/China
 #define PI_M (3.14159265358)
 
-#define SKEW_SYM_MATRX(v)  0.0,-v[2],v[1],v[2],0.0,-v[0],-v[1],v[0],0.0
-#define MAT_FROM_ARRAY(v)  v[0],v[1],v[2],v[3],v[4],v[5],v[6],v[7],v[8]
-#define CORRECR_PI(v) ((v > 1.57) ? (v - PI_M) : ((v < -1.57) ? (v + PI_M) : v))
+#define SKEW_SYM_MATRX(v) 0.0,-v[2],v[1],v[2],0.0,-v[0],-v[1],v[0],0.0
+#define MAT_FROM_ARRAY(v) v[0],v[1],v[2],v[3],v[4],v[5],v[6],v[7],v[8]
+#define VEC_FROM_ARRAY(v) v[0],v[1],v[2]
+#define CORRECR_PI(v)     ((v > 1.57) ? (v - PI_M) : ((v < -1.57) ? (v + PI_M) : v))
 
 Eigen::Matrix3d Eye3d(Eigen::Matrix3d::Identity());
 Eigen::Vector3d Zero3d(0, 0, 0);
@@ -28,15 +29,15 @@ auto set_pose6d(const double t, const Eigen::Vector3d &a, const Eigen::Vector3d 
 {
     Pose6D rot_kp;
     rot_kp.offset_time = t;
-    tf::vectorEigenToMsg(a, rot_kp.acc);
-    tf::vectorEigenToMsg(g, rot_kp.gyr);
-    tf::vectorEigenToMsg(b_a, rot_kp.bias_acc);
-    tf::vectorEigenToMsg(b_g, rot_kp.bias_gyr);
-    tf::vectorEigenToMsg(v, rot_kp.vel);
-    tf::vectorEigenToMsg(p, rot_kp.pos);
-    for (int i = 0; i < 9; i++)
+    for (int i = 0; i < 3; i++)
     {
-        rot_kp.rot[i] = R(i/3, i%3);
+        rot_kp.acc[i] = a(i);
+        rot_kp.gyr[i] = g(i);
+        rot_kp.bias_acc[i] = b_a(i);
+        rot_kp.bias_gyr[i] = b_g(i);
+        rot_kp.vel[i] = v(i);
+        rot_kp.pos[i] = p(i);
+        for (int j = 0; j < 3; j++)  rot_kp.rot[i*3+j] = R(i,j);
     }
     return rot_kp;
 }

@@ -46,7 +46,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: currPoints
+    SyncSource: ""
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -582,7 +582,7 @@ Visualization Manager:
   Global Options:
     Background Color: 0; 0; 0
     Default Light: true
-    Fixed Frame: camera_init
+    Fixed Frame: livox
     Frame Rate: 30
   Name: root
   Tools:
