@@ -1,8 +1,10 @@
+#ifndef EXP_MAT_H
+#define EXP_MAT_H
+
 #include <math.h>
 #include <Eigen/Core>
 #include <opencv/cv.h>
-
-#define SKEW_SYM_MATRX(v)  0.0,-v[2],v[1],v[2],0.0,-v[0],-v[1],v[0],0.0
+#include <common_lib.h>
 
 template<typename T>
 auto Exp(const Eigen::Matrix<T, 3, 1> &ang_vel, const T &dt)
@@ -68,3 +70,5 @@ Eigen::Matrix<T, 3, 3> Exp(const T &v1, const T &v2, const T &v3)
 //         return Eye3;
 //     }
 // }
+
+#endif

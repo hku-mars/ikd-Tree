@@ -8,8 +8,9 @@
                 "/usr/include/pcl-1.8",
                 "/usr/include/eigen3",
                 "/opt/ros/melodic/include",
-                "/home/dji/livox_ros_driver/devel/include/livox_ros_driver",
-                "/home/dji/livox_ros_driver/devel/include",
+                "~/Livox_ros_driver/devel/include/livox_ros_driver",
+                "~/Livox_ros_driver/devel/include",
+                "~/catkin_loam//devel/include",
                 "/usr/include/pcl-1.8"
             ],
             "defines": [],
