@@ -249,10 +249,10 @@ void ImuProcess::IntegrateGyr(const std::vector<sensor_msgs::Imu::ConstPtr> &v_i
                         imu->angular_velocity.z);
     assert(time >= 0);
     
-    Eigen::Vector3d ang_vel_avr = 0.5 * (gyr + gyr_last);
+    Eigen::Vector3d angvel_avr = 0.5 * (gyr + gyr_last);
 
     double dt_seg    = time - time_last;
-    auto delta_angle = dt_seg * ang_vel_avr;
+    auto delta_angle = dt_seg * angvel_avr;
     auto delta_r = SO3d::exp(delta_angle);
 
     SO3d rot = rot_last * delta_r;
@@ -277,10 +277,11 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
   const double &pcl_end_time = pcl_beg_time + pcl_in_out.points.back().curvature / double(1000);
 
   /*** initialization ***/
-  double max_offs_t = imu_end_time - imu_beg_time;
-  Eigen::Vector3d T_kp(0, 0, 0);
   v_rot_kp_.header = meas.lidar->header;
   v_rot_kp_.pose6D.clear();
+  double offs_t = v_imu.front()->header.stamp.toSec() - pcl_beg_time;
+  Pose6D rot_kp = set_pose6d(offs_t, Zero3d, Zero3d, Zero3d, Zero3d, vel_last, pos_last, R_last);
+  v_rot_kp_.pose6D.push_back(rot_kp);
   v_rot_pcl_.clear();
   v_rot_pcl_.push_back(Eye3d);
 
@@ -292,86 +293,83 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
     R_last<<MAT_FROM_ARRAY(state_last->pose6D.back().rot);
   }
 
-  Eigen::Vector3d ang_vel_avr, acc_avr, vel_kp(vel_last), vel_endpcl, pos_kp(pos_last), pos_endpcl;
+  Eigen::Vector3d acc_kp, angvel_avr, acc_avr, vel_kp(vel_last), vel_endpcl, pos_kp(pos_last), pos_endpcl;
   Eigen::Matrix3d R_kp(R_last), R_relat, R_endpcl(R_last);
   for (auto it_imu = v_imu.begin(); it_imu != (v_imu.end() - 1); it_imu++)
   {
     auto &head = *(it_imu);
     auto &tail = *(it_imu + 1);
     
-    ang_vel_avr<<0.5 * (head->angular_velocity.x + tail->angular_velocity.x),
+    angvel_avr<<0.5 * (head->angular_velocity.x + tail->angular_velocity.x),
                  0.5 * (head->angular_velocity.y + tail->angular_velocity.y),
                  0.5 * (head->angular_velocity.z + tail->angular_velocity.z);
     acc_avr    <<0.5 * (head->linear_acceleration.x + tail->linear_acceleration.x),
                  0.5 * (head->linear_acceleration.y + tail->linear_acceleration.y),
                  0.5 * (head->linear_acceleration.z + tail->linear_acceleration.z);
-    ang_vel_avr -= bias_gyr;
+    angvel_avr -= bias_gyr;
     acc_avr     *= G_m_s2 / scale_gravity;
     double dt    = tail->header.stamp.toSec() - head->header.stamp.toSec();
 
-    /* total acceleration in the place of IMU (the IMU only measures the acceleration without gravity) */
-    Eigen::Vector3d acc(R_kp * acc_avr + Gravity_acc); 
+    /* total acceleration in the place of Lidar (consider the offset of Lidar to IMU) */
+    acc_kp = R_kp * (acc_avr + angvel_avr.cross(angvel_avr.cross(Lidar_offset_to_IMU))) + Gravity_acc; 
 
     /* position of Lidar */
-    pos_kp = pos_kp + vel_kp * dt + 0.5 * acc * dt * dt;
+    pos_kp = pos_kp + vel_kp * dt + 0.5 * acc_kp * dt * dt;
 
-    /* velocity of Lidar (consider the offset from imu to lidar) */
-    vel_kp = vel_kp + acc * dt + R_kp * ang_vel_avr.cross(Lidar_offset_to_IMU);
+    /* velocity of Lidar */
+    vel_kp = vel_kp + acc_kp * dt;
 
-    /* attitude of Lidar (consider the offset from imu to lidar) */
-    R_kp   = R_kp * Exp(ang_vel_avr, dt);
-    // std::cout<<"acc measures"<< acc_avr.transpose() << "in word frame: "<<acc.transpose()<<std::endl;
+    /* attitude of Lidar */
+    R_kp   = R_kp * Exp(angvel_avr, dt);
+    // std::cout<<"acc_kp measures"<< acc_avr.transpose() << "in word frame: "<<acc_kp.transpose()<<std::endl;
 
     /* save the Lidar poses at each IMU measurements */
     double offs_t = tail->header.stamp.toSec() - pcl_beg_time;
-    Pose6D rot_kp = set_pose6d(offs_t, acc_avr, ang_vel_avr, Zero3d, bias_gyr, vel_kp, pos_kp, R_kp);
+    Pose6D rot_kp = set_pose6d(offs_t, acc_kp, angvel_avr, Zero3d, bias_gyr, vel_kp, pos_kp, R_kp);
     v_rot_kp_.pose6D.push_back(rot_kp);
   }
 
-  /*** calculated the attitude of the end of point clouds ***/
-  R_endpcl = R_kp * Exp(ang_vel_avr, pcl_end_time - imu_end_time);
+  /*** calculated the pos and attitude at the last lidar point ***/
+  // double  dt = pcl_end_time - imu_end_time;
+  // pos_endpcl = pos_kp + vel_kp * dt + 0.5 * acc_kp * dt * dt;
+  // R_endpcl   = R_kp * Exp(angvel_avr, dt);
+  pos_endpcl = pos_kp;
+  R_endpcl   = R_kp;
+  set_array(v_rot_kp_.rot_end, R_endpcl);
+  set_array(v_rot_kp_.pos_end, pos_endpcl);
+  set_array(v_rot_kp_.gravity, Gravity_acc);
 
   /*** undistort each lidar point (backward pre-integration) ***/
-  auto it_imu = v_imu.end() - 1;
   auto it_pcl = pcl_in_out.points.end() - 1;
-  R_kp = Eye3d;
-  for (; it_imu != v_imu.begin(); it_imu--)
+  auto &kps = v_rot_kp_.pose6D;
+  /* using the results of forward pre-integration */
+  for (auto it_kp = kps.end() - 1; it_kp != kps.begin(); it_kp--)
   {
-    auto &imu_seg_head = *(it_imu - 1);
-    auto &imu_seg_tail = *(it_imu);
+    R_kp<<MAT_FROM_ARRAY(it_kp->rot);
+    acc_kp<<VEC_FROM_ARRAY(it_kp->acc);
+    vel_kp<<VEC_FROM_ARRAY(it_kp->vel);
+    pos_kp<<VEC_FROM_ARRAY(it_kp->pos);
+    angvel_avr<<VEC_FROM_ARRAY(it_kp->gyr);
 
-    double imu_seg_tail_time = imu_seg_tail->header.stamp.toSec();
-    double imu_seg_head_time = imu_seg_head->header.stamp.toSec();
-
-    Eigen::Vector3d gyr_seg_end, acc_seg_end, gyr_seg_head, acc_seg_head;
-
-    tf::vectorMsgToEigen(imu_seg_tail->angular_velocity,    gyr_seg_end);
-    tf::vectorMsgToEigen(imu_seg_tail->linear_acceleration, acc_seg_end);
-    tf::vectorMsgToEigen(imu_seg_head->angular_velocity,    gyr_seg_head);
-    tf::vectorMsgToEigen(imu_seg_head->linear_acceleration, acc_seg_head);
-    
-    Eigen::Vector3d ang_vel_avr = 0.5 * (gyr_seg_end + gyr_seg_head) - bias_gyr;
-    Eigen::Vector3d acc_avr     = 0.5 * (acc_seg_end + acc_seg_head) / scale_gravity * G_m_s2;
-
-    /// unstort the point cloud points in each IMU segment
-    double pt_time_abs = it_pcl->curvature / double(1000) + pcl_beg_time;
-    double dt   = imu_seg_tail_time - pt_time_abs;
+    double cur_offst = it_pcl->curvature / double(1000);
+    double dt = it_kp->offset_time - cur_offst;
     int i = 0;
-    for(; (pt_time_abs >= imu_seg_head_time) && (it_pcl != pcl_in_out.points.begin()); it_pcl --)
+    for(; (cur_offst > (it_kp - 1)->offset_time); it_pcl --)
     {
-      /// find the base tor keypoint
-      pt_time_abs = it_pcl->curvature / double(1000) + pcl_beg_time;
-      dt          = imu_seg_tail_time - pt_time_abs;
-      // int upper_kp_index = floor((imu_end_time - pt_time_abs) / imu_seg_time);
-      
-      /// Transform to the 'end' frame, using only the rotation
-      /// Note: Compensation direction is INVERSE of Frame's moving direction
-      /// So if we want to compensate a point at timestamp-i to the frame-e
-      /// P_compensate = Exp(omega, dt) * R_last * Pi + t_ei
+      cur_offst = it_pcl->curvature / double(1000);
+      dt        = it_kp->offset_time - cur_offst;
 
+      // i++; if(i % 20 == 0)  {std::cout<<"~~~~~~~dt:  "<<dt<<std::endl;}
+      
+      /* Transform to the 'end' frame, using only the rotation
+         Note: Compensation direction is INVERSE of Frame's moving direction
+         So if we want to compensate a point at timestamp-i to the frame-e
+         P_compensate = Exp(omega, dt) * R_last * Pi + t_ei */
+
+      Eigen::Vector3d point_cur(it_pcl->x, it_pcl->y, it_pcl->z);
       Eigen::Vector3d tie(0, 0, 0);// Eigen::Vector3d tie(- acc_avr * dt + T_kp);
-      Eigen::Matrix3d Rie(Exp(ang_vel_avr, - dt) * R_kp);
-      Eigen::Vector3d v_pt_comp_e = Rie * Eigen::Vector3d(it_pcl->x, it_pcl->y, it_pcl->z) + tie;
+      Eigen::Matrix3d Rie(R_endpcl.transpose() * R_kp * Exp(angvel_avr, - dt));
+      Eigen::Vector3d v_pt_comp_e = Rie * point_cur + tie;
 
       /// save Undistorted points and their rotation
       it_pcl->x = v_pt_comp_e.x();
@@ -379,11 +377,8 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
       it_pcl->z = v_pt_comp_e.z();
 
       v_rot_pcl_.push_back(Rie);
+      if (it_pcl == pcl_in_out.points.begin()) break;
     }
-    
-    double offs_t = imu_seg_tail_time - imu_seg_head_time;
-    R_kp = Exp(ang_vel_avr, - offs_t) * R_kp;
-    T_kp = Eigen::Vector3d(0, 0, 0); // T_kp = - acc_avr * 0.0 + T_kp;
   }
   // ROS_INFO("undistort rotation angle [x, y, z]: [%.2f, %.2f, %.2f]",
   //          v_rot_pcl_.back().eulerAngles(0, 1, 2)[0] * 180.0 / M_PI,

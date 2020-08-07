@@ -46,7 +46,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: ""
+    SyncSource: currPoints
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -203,7 +203,7 @@ Visualization Manager:
           Position Transformer: XYZ
           Queue Size: 1
           Selectable: false
-          Size (Pixels): 1.2999999523162842
+          Size (Pixels): 2
           Size (m): 0.05000000074505806
           Style: Points
           Topic: /velodyne_cloud_registered
@@ -211,11 +211,11 @@ Visualization Manager:
           Use Fixed Frame: true
           Use rainbow: true
           Value: true
-        - Alpha: 0.5
+        - Alpha: 0.6000000238418579
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 0.983015239238739
-            Min Value: -2.685215473175049
+            Max Value: 0.9100265502929688
+            Min Value: -2.820070505142212
             Value: true
           Axis: Z
           Channel Name: intensity
@@ -582,7 +582,7 @@ Visualization Manager:
   Global Options:
     Background Color: 0; 0; 0
     Default Light: true
-    Fixed Frame: livox
+    Fixed Frame: camera_init
     Frame Rate: 30
   Name: root
   Tools:
@@ -606,25 +606,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 7.84970235824585
+      Distance: 12.544166564941406
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 4.728707313537598
-        Y: -5.758931636810303
-        Z: -0.5066385269165039
+        X: 4.70681619644165
+        Y: 0.25547564029693604
+        Z: 0.6027427315711975
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: true
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.1497963666915894
+      Pitch: 1.0947962999343872
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.154632568359375
+      Yaw: 4.304623126983643
     Saved: ~
 Window Geometry:
   Displays:

@@ -62,7 +62,7 @@ namespace plt = matplotlibcpp;
 
 // #define USING_CORNER
 #define NUM_MATCH_POINTS (5)
-#define NUM_MAX_ITERATIONS (20)
+#define NUM_MAX_ITERATIONS (40)
 #define LASER_FRAME_INTEVAL (0.1)
 
 typedef pcl::PointXYZI PointType;
@@ -406,7 +406,7 @@ int main(int argc, char** argv)
             
             /// Get the rotations and translations of IMU keypoints in a frame
             // Eigen::Matrix3f d_rot_from_imu;
-            R_global_cur<<MAT_FROM_ARRAY(rot_kp_imu_buff.front().pose6D.back().rot);
+            R_global_cur<<MAT_FROM_ARRAY(rot_kp_imu_buff.front().rot_end);
             // R_global_cur   = R_global_cur * d_rot_from_imu;
             Eigen::Vector3f euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
 
@@ -683,7 +683,7 @@ int main(int argc, char** argv)
             {
                 // *laserCloudCornerFromMap += *laserCloudCornerArray[laserCloudValidInd[i]];
                 *laserCloudSurfFromMap += *laserCloudSurfArray[laserCloudValidInd[i]];
-                
+
             }
 
 #ifdef USING_CORNER
