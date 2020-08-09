@@ -37,8 +37,7 @@ void set_array(boost::array<T, 3> &out, const Eigen::Matrix<T, 3, 1> in)
 
 template<typename T>
 auto set_pose6d(const T t, const Eigen::Matrix<T, 3, 1> &a, const Eigen::Matrix<T, 3, 1> &g, \
-                  const Eigen::Matrix<T, 3, 1> &b_a, const Eigen::Matrix<T, 3, 1> &b_g, \
-                  const Eigen::Matrix<T, 3, 1> &v, const Eigen::Matrix<T, 3, 1> &p, const Eigen::Matrix<T, 3, 3> &R)
+                const Eigen::Matrix<T, 3, 1> &v, const Eigen::Matrix<T, 3, 1> &p, const Eigen::Matrix<T, 3, 3> &R)
 {
     Pose6D rot_kp;
     rot_kp.offset_time = t;
@@ -46,8 +45,6 @@ auto set_pose6d(const T t, const Eigen::Matrix<T, 3, 1> &a, const Eigen::Matrix<
     {
         rot_kp.acc[i] = a(i);
         rot_kp.gyr[i] = g(i);
-        rot_kp.bias_acc[i] = b_a(i);
-        rot_kp.bias_gyr[i] = b_g(i);
         rot_kp.vel[i] = v(i);
         rot_kp.pos[i] = p(i);
         for (int j = 0; j < 3; j++)  rot_kp.rot[i*3+j] = R(i,j);

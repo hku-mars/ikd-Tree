@@ -1,9 +1,7 @@
-# the 6D pose of each point in a frame
-float64  offset_time        # ROS standard message header
-float64[3] acc  # the raw accelerator measurement with the bias
-float64[3] gyr  # the raw angular velocity measurements with the bias
-float64[3] bias_acc  # accelerator bias
-float64[3] bias_gyr  # gyroscope bias
-float64[3] vel  # the relative velocity w.r.t the end imu point
-float64[3] pos  # the relative position w.r.t the end imu point
-float64[9] rot             # the preintegrated rotation at the imu keypoint matrix w.r.t the end imu point
+# the preintegrated Lidar states at the time of IMU measurements in a frame
+float64  offset_time # the offset time of IMU measurement w.r.t the first lidar point
+float64[3] acc       # the preintegrated total acceleration (global frame) at the Lidar origin
+float64[3] gyr       # the unbiased angular velocity (body frame) at the Lidar origin
+float64[3] vel       # the preintegrated velocity (global frame) at the Lidar origin
+float64[3] pos       # the preintegrated position (global frame) at the Lidar origin
+float64[9] rot       # the preintegrated rotation (global frame) at the Lidar origin

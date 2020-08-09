@@ -406,11 +406,11 @@ int main(int argc, char** argv)
             pointOnYAxis.z = 0.0;
             
             /// Get the rotations and translations of IMU keypoints in a frame
-            // Eigen::Matrix3f rot_inframe;
-            // Eigen::Vector3f pos_inframe;
-            R_global_cur<<MAT_FROM_ARRAY(rot_kp_imu_buff.front().rot_inframe);
-            T_global_cur<<VEC_FROM_ARRAY(rot_kp_imu_buff.front().pos_inframe);
-            // R_global_cur = R_global_cur * rot_inframe;
+            // Eigen::Matrix3f rot_end;
+            // Eigen::Vector3f pos_end;
+            R_global_cur<<MAT_FROM_ARRAY(rot_kp_imu_buff.front().rot_end);
+            T_global_cur<<VEC_FROM_ARRAY(rot_kp_imu_buff.front().pos_end);
+            // R_global_cur = R_global_cur * rot_end;
             Eigen::Vector3f&& euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
 
             transformTobeMapped[0]  = euler_cur(0);
@@ -1135,7 +1135,7 @@ int main(int argc, char** argv)
             /*** save results ***/
             Pose6D_Solved.header = rot_kp_imu_buff.front().header;
             Pose6D_Solved.pose6D.clear();
-            Pose6D_Solved.pose6D.push_back(set_pose6d(0.0f, zero3f, zero3f, zero3f, zero3f, V_global_cur, T_global_cur, R_global_cur));
+            Pose6D_Solved.pose6D.push_back(set_pose6d(0.0f, zero3f, zero3f, V_global_cur, T_global_cur, R_global_cur));
             pubSolvedPose6D.publish(Pose6D_Solved);
 
             V_global_last = V_global_cur;
