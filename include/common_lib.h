@@ -24,20 +24,21 @@ typedef livox_loam_kp::Pose6D Pose6D;
 typedef geometry_msgs::Vector3 Vec3;
 
 template<typename T>
-void set_array(boost::array<T, 9> &out, const Eigen::Matrix<T, 3, 3> &in)
+void set_array(boost::array<T, 9> &out, const Eigen::Matrix<T, 3, 3> in)
 {
     for (int i = 0; i<9; i++)  out[i] = in(i/3, i%3);
 }
 
 template<typename T>
-void set_array(boost::array<T, 3> &out, const Eigen::Matrix<T, 3, 1> &in)
+void set_array(boost::array<T, 3> &out, const Eigen::Matrix<T, 3, 1> in)
 {
     for (int i = 0; i<3; i++)  out[i] = in(i);
 }
 
-auto set_pose6d(const double t, const Eigen::Vector3d &a, const Eigen::Vector3d &g, \
-                  const Eigen::Vector3d &b_a, const Eigen::Vector3d &b_g, \
-                  const Eigen::Vector3d &v, const Eigen::Vector3d &p, const Eigen::Matrix3d &R)
+template<typename T>
+auto set_pose6d(const T t, const Eigen::Matrix<T, 3, 1> &a, const Eigen::Matrix<T, 3, 1> &g, \
+                  const Eigen::Matrix<T, 3, 1> &b_a, const Eigen::Matrix<T, 3, 1> &b_g, \
+                  const Eigen::Matrix<T, 3, 1> &v, const Eigen::Matrix<T, 3, 1> &p, const Eigen::Matrix<T, 3, 3> &R)
 {
     Pose6D rot_kp;
     rot_kp.offset_time = t;
@@ -52,7 +53,7 @@ auto set_pose6d(const double t, const Eigen::Vector3d &a, const Eigen::Vector3d 
         for (int j = 0; j < 3; j++)  rot_kp.rot[i*3+j] = R(i,j);
     }
     // Eigen::Map<Eigen::Matrix3d>(rot_kp.rot, 3,3) = R;
-    return rot_kp;
+    return std::move(rot_kp);
 }
 
 // auto set_pose6d(const float t, const Eigen::Vector3f &a, const Eigen::Vector3f &g, \
@@ -83,10 +84,10 @@ auto set_pose6d(const double t, const Eigen::Vector3d &a, const Eigen::Vector3d 
 // }
 
 template<typename T>
-auto correct_pi(const T v) {return CORRECR_PI(v);}
+auto correct_pi(const T &v) {return CORRECR_PI(v);}
 
 template<typename T>
-auto correct_pi(const Eigen::Matrix<T, 3, 1> v)
+auto correct_pi(const Eigen::Matrix<T, 3, 1> &v)
 {
     Eigen::Matrix<T, 3, 1> g;
     for(int i=0;i<3;i++)

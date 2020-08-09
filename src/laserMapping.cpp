@@ -62,7 +62,7 @@ namespace plt = matplotlibcpp;
 
 // #define USING_CORNER
 #define NUM_MATCH_POINTS (5)
-#define NUM_MAX_ITERATIONS (40)
+#define NUM_MAX_ITERATIONS (20)
 #define LASER_FRAME_INTEVAL (0.1)
 
 typedef pcl::PointXYZI PointType;
@@ -74,6 +74,7 @@ float timeLaserCloudCornerLast = 0;
 float timeLaserCloudSurfLast = 0;
 float timeLaserCloudFullRes = 0;
 float timeIMUkpLast = 0;
+float timeIMUkpCur  = 0;
 
 bool newLaserCloudCornerLast = false;
 bool newLaserCloudSurfLast = false;
@@ -143,9 +144,11 @@ float transformLastMapped[6] = {0};
 
 //estimated rotation and translation;
 Eigen::Matrix3f R_global_cur(Eigen::Matrix3f::Identity());
-Eigen::Vector3f T_global_cur(0, 0, 0);
 Eigen::Matrix3f R_global_last(Eigen::Matrix3f::Identity());
+Eigen::Vector3f T_global_cur(0, 0, 0);
 Eigen::Vector3f T_global_last(0, 0, 0);
+Eigen::Vector3f V_global_cur(0, 0, 0);
+Eigen::Vector3f V_global_last(0, 0, 0);
 
 //final iteration resdual
 float deltaR = 0.0;
@@ -165,8 +168,6 @@ double deg2rad(double degrees)
 
 void transformUpdate()
 {
-    R_global_last = R_global_cur;
-    T_global_last = T_global_cur;
     for (int i = 0; i < 6; i++) {
         transformLastMapped[i] = transformAftMapped[i];
         transformAftMapped[i] = transformTobeMapped[i];
@@ -267,7 +268,7 @@ void KeyPointPose6DHandler(const livox_loam_kp::KeyPointPoseConstPtr& KeyPointPo
 {
     rot_kp_imu_buff.push_back(*KeyPointPose);
 
-    timeIMUkpLast = rot_kp_imu_buff.front().header.stamp.toSec();
+    timeIMUkpCur = rot_kp_imu_buff.front().header.stamp.toSec();
 }
 
 bool sync_packages()
@@ -405,18 +406,23 @@ int main(int argc, char** argv)
             pointOnYAxis.z = 0.0;
             
             /// Get the rotations and translations of IMU keypoints in a frame
-            // Eigen::Matrix3f d_rot_from_imu;
-            R_global_cur<<MAT_FROM_ARRAY(rot_kp_imu_buff.front().rot_end);
-            // R_global_cur   = R_global_cur * d_rot_from_imu;
-            Eigen::Vector3f euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
+            // Eigen::Matrix3f rot_inframe;
+            // Eigen::Vector3f pos_inframe;
+            R_global_cur<<MAT_FROM_ARRAY(rot_kp_imu_buff.front().rot_inframe);
+            T_global_cur<<VEC_FROM_ARRAY(rot_kp_imu_buff.front().pos_inframe);
+            // R_global_cur = R_global_cur * rot_inframe;
+            Eigen::Vector3f&& euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
 
-            transformTobeMapped[0] = euler_cur[0];
-            transformTobeMapped[1] = euler_cur[1];
-            transformTobeMapped[2] = euler_cur[2];
+            transformTobeMapped[0]  = euler_cur(0);
+            transformTobeMapped[1]  = euler_cur(1);
+            transformTobeMapped[2]  = euler_cur(2);
+            transformTobeMapped[3]  = T_global_cur(0);
+            transformTobeMapped[4]  = T_global_cur(1);
+            transformTobeMapped[5]  = T_global_cur(2);
 
             std::cout<<"******pre-integrated euler angle: "<<euler_cur[0]<<" " \
-                    <<euler_cur[1]<<" "<<euler_cur[2]<<" rot_kp_imu_buff size:" \
-                    <<rot_kp_imu_buff.size()<<std::endl;
+                    <<euler_cur[1]<<" "<<euler_cur[2]<<" pos:"<<transformTobeMapped[3]<<" " \
+                    <<transformTobeMapped[4]<<" "<<transformTobeMapped[5]<<std::endl;
             
             pointAssociateToMap(&pointOnYAxis, &pointOnYAxis);
 
@@ -1087,7 +1093,8 @@ int main(int argc, char** argv)
 
                     R_global_cur = R_global_cur * Exp(matX.at<float>(0, 0), matX.at<float>(1, 0), matX.at<float>(2, 0));
                     T_global_cur = T_global_cur + Eigen::Vector3f(matX.at<float>(3, 0), matX.at<float>(4, 0), matX.at<float>(5, 0));
-                    euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
+                    V_global_cur = (T_global_cur - T_global_last) / (timeIMUkpCur - timeIMUkpLast);
+                    Eigen::Vector3f&& euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
 
                     transformTobeMapped[0] = euler_cur(0);
                     transformTobeMapped[1] = euler_cur(1);
@@ -1119,7 +1126,7 @@ int main(int argc, char** argv)
                 }
 
                 // std::cout<<"DEBUG num_temp: "<<num_temp << std::endl;
-                std::cout<<"iteration count: "<<iterCount + 1<<std::endl;
+                std::cout<<"current time: "<<timeIMUkpCur<<" iteration count: "<<iterCount<<std::endl;
                 transformUpdate();
             }
 
@@ -1127,17 +1134,20 @@ int main(int argc, char** argv)
 
             /*** save results ***/
             Pose6D_Solved.header = rot_kp_imu_buff.front().header;
-            Eigen::Vector3d T_global_cur_double(T_global_cur.cast <double> ());
-            Eigen::Matrix3d R_global_cur_double(R_global_cur.cast <double> ());
             Pose6D_Solved.pose6D.clear();
-            Pose6D_Solved.pose6D.push_back(set_pose6d(0.0, zero3d, zero3d, zero3d, zero3d, zero3d, T_global_cur_double, R_global_cur_double));
+            Pose6D_Solved.pose6D.push_back(set_pose6d(0.0f, zero3f, zero3f, zero3f, zero3f, V_global_cur, T_global_cur, R_global_cur));
+            pubSolvedPose6D.publish(Pose6D_Solved);
+
+            V_global_last = V_global_cur;
+            T_global_last = T_global_cur;
+            R_global_last = R_global_cur;
+            timeIMUkpLast = timeIMUkpCur;
 
             LaserCloudSurfaceBuff.pop_front();
             rot_kp_imu_buff.pop_front();
-
             if (!LaserCloudSurfaceBuff.empty() && !rot_kp_imu_buff.empty())
             {
-                timeIMUkpLast = rot_kp_imu_buff.front().header.stamp.toSec();
+                timeIMUkpCur  = rot_kp_imu_buff.front().header.stamp.toSec();
                 timeLaserCloudSurfLast = LaserCloudSurfaceBuff.front().header.stamp.toSec();
             }
 
@@ -1227,8 +1237,6 @@ int main(int argc, char** argv)
             laserCloudSurround3_corner.header.stamp = ros::Time().fromSec(timeLaserCloudCornerLast);
             laserCloudSurround3_corner.header.frame_id = "/camera_init";
             pubLaserCloudSurround_corner.publish(laserCloudSurround3_corner);
-
-            pubSolvedPose6D.publish(Pose6D_Solved);
             
             laserCloudFullRes2->clear();
             // *laserCloudFullRes2 = *laserCloudFullRes;
@@ -1290,7 +1298,7 @@ int main(int argc, char** argv)
 
             if(kfNum >= NUM_MAX_ITERATIONS)
             {
-                std::cout<<"iteration count:"<<kfNum<<std::endl;
+                // std::cout<<"iteration count:"<<kfNum<<std::endl;
                 Eigen::Matrix<float,7,1> kf_pose;
                 kf_pose << -geoQuat.y,-geoQuat.z,geoQuat.x,geoQuat.w,transformAftMapped[3],transformAftMapped[4],transformAftMapped[5];
                 keyframe_pose.push_back(kf_pose);
