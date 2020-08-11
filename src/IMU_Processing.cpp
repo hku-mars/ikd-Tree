@@ -363,9 +363,10 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
 
 void ImuProcess::Process(const MeasureGroup &meas, const KPPoseConstPtr &state_last)
 {
-  clock_t process_start, t1,t2,t3;
+  double process_start, t1,t2,t3;
+  t1 = omp_get_wtime();
 
-  process_start=clock();
+  process_start = omp_get_wtime();
 
   ROS_ASSERT(!meas.imu.empty());
   ROS_ASSERT(meas.lidar != nullptr);
@@ -394,13 +395,11 @@ void ImuProcess::Process(const MeasureGroup &meas, const KPPoseConstPtr &state_l
     return;
   }
 
-  t1 = clock();
-
   /// Undistort points： the first point is assummed as the base frame
   /// Compensate lidar points with IMU rotation (with only rotation now)
   UndistortPcl(meas, state_last, *cur_pcl_un_);
 
-  t2 = clock();
+  t2 = omp_get_wtime();
 
   {
     static ros::Publisher pub_UndistortPcl =
@@ -445,7 +444,7 @@ void ImuProcess::Process(const MeasureGroup &meas, const KPPoseConstPtr &state_l
   cur_pcl_in_.reset(new PointCloudXYZI());
   cur_pcl_un_.reset(new PointCloudXYZI());
 
-  t3 = clock();
+  t3 = omp_get_wtime();
   
   std::cout<<"[ IMU Process ]: IMU Processing Time: undistort "<<t2 - t1<<" total "<<t3 - t1<<std::endl;
 }
@@ -588,7 +587,7 @@ bool SyncMeasure(MeasureGroup &measgroup, KPPoseConstPtr& state_last)
   {
     state_last = pose_buffer.back();
     pose_buffer.pop_front();
-    std::cout<<"state_last time: "<<state_last->header.stamp.toSec()<<" pos: "<<state_last->pose6D.back().pos[2]<<std::endl;
+    // std::cout<<"state_last time: "<<state_last->header.stamp.toSec()<<" pos: "<<state_last->pose6D.back().pos[2]<<std::endl;
   }
   
   return true;

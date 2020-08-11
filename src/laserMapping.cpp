@@ -718,12 +718,14 @@ int main(int argc, char** argv)
             std::cout<<"DEBUG MAPPING laserCloudValidNum : "<<laserCloudValidNum<<" laserCloudSurfFromMapNum : "
             <<laserCloudSurfFromMapNum<<std::endl;
 
-            t2 = omp_get_wtime();
+            
 
             pcl::PointCloud<PointType>::Ptr coeffSel_tmpt
                 (new pcl::PointCloud<PointType>(*laserCloudSurf_down));
             pcl::PointCloud<PointType>::Ptr laserCloudSurf_down_updated
                 (new pcl::PointCloud<PointType>(*laserCloudSurf_down));
+
+            t2 = omp_get_wtime();
 
 #ifdef USING_CORNER
             if (laserCloudCornerFromMapNum > 10 && laserCloudSurfFromMapNum > 100)
@@ -734,16 +736,15 @@ int main(int argc, char** argv)
 #ifdef USING_CORNER
                 kdtreeCornerFromMap->setInputCloud(laserCloudCornerFromMap);
 #endif
-                
+                match_start = omp_get_wtime();
+
                 pcl::KdTreeFLANN<PointType> kdtreeSurfFromMap_tmpt;
                 kdtreeSurfFromMap_tmpt.setInputCloud(laserCloudSurfFromMap);
                 
                 int num_temp = 0;
-
+                
                 for (iterCount = 0; iterCount < NUM_MAX_ITERATIONS; iterCount++) 
                 {
-                    match_start = omp_get_wtime();
-
                     num_temp++;
                     laserCloudOri->clear();
                     coeffSel->clear();
@@ -1008,6 +1009,7 @@ int main(int argc, char** argv)
                     count_effect_point = 0;
 
                     match_time += omp_get_wtime() - match_start;
+                    match_start = omp_get_wtime();
                     solve_start = omp_get_wtime();
 
                     int laserCloudSelNum = laserCloudOri->points.size();
@@ -1126,7 +1128,7 @@ int main(int argc, char** argv)
                 }
 
                 // std::cout<<"DEBUG num_temp: "<<num_temp << std::endl;
-                std::cout<<"current time: "<<timeIMUkpCur<<" iteration count: "<<iterCount<<std::endl;
+                std::cout<<"current time: "<<timeIMUkpCur<<" iteration count: "<<iterCount+1<<std::endl;
                 transformUpdate();
             }
 
@@ -1259,11 +1261,11 @@ int main(int argc, char** argv)
             laserCloudFullRes3.header.frame_id = "/camera_init";
             pubLaserCloudFullRes.publish(laserCloudFullRes3);
 
-            sensor_msgs::PointCloud2 laserCloudMap;
-            pcl::toROSMsg(*laserCloudSurfFromMap, laserCloudMap);
-            laserCloudMap.header.stamp = ros::Time().fromSec(timeLaserCloudCornerLast);
-            laserCloudMap.header.frame_id = "/camera_init";
-            pubLaserCloudMap.publish(laserCloudMap);
+            // sensor_msgs::PointCloud2 laserCloudMap;
+            // pcl::toROSMsg(*laserCloudSurfFromMap, laserCloudMap);
+            // laserCloudMap.header.stamp = ros::Time().fromSec(timeLaserCloudCornerLast);
+            // laserCloudMap.header.frame_id = "/camera_init";
+            // pubLaserCloudMap.publish(laserCloudMap);
 
             *laserCloudFullResColor_pcd += *laserCloudFullResColor;
 
@@ -1312,8 +1314,7 @@ int main(int argc, char** argv)
             s_plot2.push_back(double(deltaR));
             s_plot3.push_back(double(deltaT));
 
-            // std::cout<<"mapping time : selection "<<t2-t1 <<" match time: "<<match_time<<" svd_time: "<<svd_time<<" pca_time: "<<pca_time<<"  solve time: "<<solve_time<<" total: "<<t4-t1<<std::endl;
-            std::cout<<"mapping time : selection "<<t2-t1 <<" match time: "<<match_time<<" svd_time: "<<svd_time<<"  solve time: "<<solve_time<<" total: "<<t4-t1<<std::endl;
+            std::cout<<"mapping time : selection "<<t2-t1 <<" match time: "<<match_time<<"  solve time: "<<solve_time<<" pub time: "<<t4 - t3<<" total: "<<t4-t1<<std::endl;
             // std::cout<<"match time: "<<match_time<<"  solve time: "<<solve_time<<std::endl;
         }
         status = ros::ok();
