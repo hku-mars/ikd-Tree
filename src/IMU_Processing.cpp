@@ -259,7 +259,6 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
     std::cout<<"!!!! Got pose:"<<pos_last.transpose()<<std::endl;
   }
   v_rot_kp_.header  = meas.lidar->header;
-  v_rot_kp_.gravity = STD_VEC_FROM_EIGEN(Gravity_acc);
   v_rot_kp_.pose6D.clear();
   v_rot_kp_.pose6D.push_back(set_pose6d(0.0, Zero3d, Zero3d, vel_last, pos_last, R_last));
   v_rot_pcl_.clear();
@@ -331,13 +330,14 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
   R_e   = R_kp * Exp(angvel_avr, dt);
   // pos_e = pos_kp;
   // R_e   = R_kp;
-  v_rot_kp_.pos_end  = STD_VEC_FROM_EIGEN(pos_e);
+  v_rot_kp_.gravity  = STD_VEC_FROM_EIGEN(Gravity_acc);
   v_rot_kp_.bias_gyr = STD_VEC_FROM_EIGEN(bias_gyr);
   v_rot_kp_.bias_acc = STD_VEC_FROM_EIGEN(bias_acc);
+  v_rot_kp_.pos_end  = STD_VEC_FROM_EIGEN(pos_e);
   v_rot_kp_.vel_end  = STD_VEC_FROM_EIGEN(vel_e);
   v_rot_kp_.rot_end  = STD_VEC_FROM_EIGEN(R_e);
   v_rot_kp_.cov = STD_VEC_FROM_EIGEN(cov_state_last); // std::vector<decltype(cov_state_last)::Scalar> (cov_state_last.data(), cov_state_last.data() + DIM_OF_STATES_SQUARE);
-
+  std::cout<<"!!!! Ended pose:"<<pos_e.transpose()<<std::endl;
   /*** undistort each lidar point (backward pre-integration) ***/
   auto it_pcl = pcl_in_out.points.end() - 1;
   auto &&kps = v_rot_kp_.pose6D;

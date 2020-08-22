@@ -175,8 +175,8 @@ void transformUpdate()
 //lidar coordinate sys to world coordinate sys
 void pointAssociateToMap(PointType const * const pi, PointType * const po)
 {
-    Eigen::Vector3d p_body(pi->x, pi->y, pi->z);
-    Eigen::Vector3d p_global = R_global_cur * p_body + T_global_cur;
+    Eigen::Vector3f p_body(pi->x, pi->y, pi->z);
+    Eigen::Vector3f p_global(R_global_cur.cast<float>() * p_body + T_global_cur.cast<float>());
     
     po->x = p_global(0);
     po->y = p_global(1);
@@ -186,8 +186,8 @@ void pointAssociateToMap(PointType const * const pi, PointType * const po)
 
 void RGBpointAssociateToMap(PointType const * const pi, pcl::PointXYZRGB * const po)
 {
-    Eigen::Vector3d p_body(pi->x, pi->y, pi->z);
-    Eigen::Vector3d p_global(R_global_cur * p_body + T_global_cur);
+    Eigen::Vector3f p_body(pi->x, pi->y, pi->z);
+    Eigen::Vector3f p_global(R_global_cur.cast<float>() * p_body + T_global_cur.cast<float>());
     
     po->x = p_global(0);
     po->y = p_global(1);
