@@ -62,8 +62,9 @@ namespace plt = matplotlibcpp;
 
 // #define USING_CORNER
 #define NUM_MATCH_POINTS (5)
-#define NUM_MAX_ITERATIONS (20)
+#define NUM_MAX_ITERATIONS (15)
 #define LASER_FRAME_INTEVAL (0.1)
+#define LASER_POINT_COV (0.001)
 
 typedef pcl::PointXYZI PointType;
 
@@ -71,24 +72,24 @@ int kfNum = 0;
 int iterCount = 0;
 
 float timeLaserCloudCornerLast = 0;
-float timeLaserCloudSurfLast = 0;
-float timeLaserCloudFullRes = 0;
+float timeLaserCloudSurfLast   = 0;
+float timeLaserCloudFullRes    = 0;
 float timeIMUkpLast = 0;
 float timeIMUkpCur  = 0;
 
 bool newLaserCloudCornerLast = false;
-bool newLaserCloudSurfLast = false;
-bool newLaserCloudFullRes = false;
+bool newLaserCloudSurfLast   = false;
+bool newLaserCloudFullRes    = false;
 
-int laserCloudCenWidth = 10;
+int laserCloudCenWidth  = 10;
 int laserCloudCenHeight = 5;
-int laserCloudCenDepth = 10;
-const int laserCloudWidth = 21;
+int laserCloudCenDepth  = 10;
+const int laserCloudWidth  = 21;
 const int laserCloudHeight = 11;
-const int laserCloudDepth = 21;
+const int laserCloudDepth  = 21;
 
 const int laserCloudNum = laserCloudWidth * laserCloudHeight * laserCloudDepth;//4851
-int count_effect_point = 0;
+int count_effect_point  = 0;
 
 int laserCloudValidInd[125];
 
@@ -149,6 +150,7 @@ Eigen::Vector3f T_global_cur(0, 0, 0);
 Eigen::Vector3f T_global_last(0, 0, 0);
 Eigen::Vector3f V_global_cur(0, 0, 0);
 Eigen::Vector3f V_global_last(0, 0, 0);
+// Eigen::MatrixXf cov_stat_cur(Eigen::Matrix<float, DIM_OF_STATES, DIM_OF_STATES>::Zero());
 
 //final iteration resdual
 float deltaR = 0.0;
@@ -177,7 +179,7 @@ void transformUpdate()
 void pointAssociateToMap(PointType const * const pi, PointType * const po)
 {
     Eigen::Vector3f p_body(pi->x, pi->y, pi->z);
-    Eigen::Vector3f p_global(R_global_cur * p_body + T_global_cur);
+    Eigen::Vector3f &&p_global = R_global_cur * p_body + T_global_cur;
     
     po->x = p_global(0);
     po->y = p_global(1);
@@ -405,11 +407,17 @@ int main(int argc, char** argv)
             pointOnYAxis.y = 10.0;
             pointOnYAxis.z = 0.0;
             
-            /// Get the rotations and translations of IMU keypoints in a frame
-            // Eigen::Matrix3f rot_end;
-            // Eigen::Vector3f pos_end;
-            R_global_cur<<MAT_FROM_ARRAY(rot_kp_imu_buff.front().rot_end);
+            /** Get the rotations and translations of IMU keypoints in a frame **/
+            Eigen::Vector3f gravity, bias_g, bias_a;
+            Eigen::Matrix<float, DIM_OF_STATES, DIM_OF_STATES> cov_stat_cur;
+
+            gravity<<VEC_FROM_ARRAY(rot_kp_imu_buff.front().gravity);
+            bias_g<<VEC_FROM_ARRAY(rot_kp_imu_buff.front().bias_gyr);
+            bias_a<<VEC_FROM_ARRAY(rot_kp_imu_buff.front().bias_acc);
             T_global_cur<<VEC_FROM_ARRAY(rot_kp_imu_buff.front().pos_end);
+            V_global_cur<<VEC_FROM_ARRAY(rot_kp_imu_buff.front().vel_end);
+            R_global_cur<<MAT_FROM_ARRAY(rot_kp_imu_buff.front().rot_end);
+            cov_stat_cur=Eigen::Map<Eigen::Matrix<float, DIM_OF_STATES, DIM_OF_STATES> >(rot_kp_imu_buff.front().cov.data());
             // R_global_cur = R_global_cur * rot_end;
             Eigen::Vector3f&& euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
 
@@ -1135,9 +1143,9 @@ int main(int argc, char** argv)
             t3 = omp_get_wtime();
 
             /*** save results ***/
-            Pose6D_Solved.header = rot_kp_imu_buff.front().header;
+            set_states(Pose6D_Solved, rot_kp_imu_buff.front().header, gravity, bias_g, bias_a, \
+                       T_global_cur, V_global_cur, R_global_cur, cov_stat_cur); std::cout<<"!!!! Sent pose:"<<T_global_cur.transpose()<<std::endl;
             Pose6D_Solved.pose6D.clear();
-            Pose6D_Solved.pose6D.push_back(set_pose6d(0.0f, zero3f, zero3f, V_global_cur, T_global_cur, R_global_cur));
             pubSolvedPose6D.publish(Pose6D_Solved);
 
             V_global_last = V_global_cur;

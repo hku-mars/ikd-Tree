@@ -25,8 +25,8 @@ auto Exp(const Eigen::Matrix<T, 3, 1> &ang)
     }
 }
 
-template<typename T>
-auto Exp(const Eigen::Matrix<T, 3, 1> &ang_vel, const T &dt)
+template<typename T, typename Ts>
+auto Exp(const Eigen::Matrix<T, 3, 1> &ang_vel, const Ts &dt)
 {
     T ang_vel_norm = ang_vel.norm();
     Eigen::Matrix<T, 3, 3> Eye3 = Eigen::Matrix<T, 3, 3>::Identity();
