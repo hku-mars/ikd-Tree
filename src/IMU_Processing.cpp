@@ -69,7 +69,7 @@ class ImuProcess
   void Reset();
   void IMU_Initial(const MeasureGroup &meas, int &N);
 
-  // Eigen::Matrix3f Exp(const Eigen::Vector3f &ang_vel, const double &dt);
+  // Eigen::Matrix3d Exp(const Eigen::Vector3d &ang_vel, const double &dt);
 
   void IntegrateGyr(const std::vector<sensor_msgs::Imu::ConstPtr> &v_imu);
 
@@ -81,20 +81,20 @@ class ImuProcess
   void Reset(double start_timestamp, const sensor_msgs::ImuConstPtr &lastimu);
 
   double scale_gravity;
-  Eigen::Vector3f Lidar_offset_to_IMU;
+  Eigen::Vector3d Lidar_offset_to_IMU;
 
-  Eigen::Vector3f bias_acc;
-  Eigen::Vector3f bias_gyr;
-  Eigen::Vector3f Gravity_acc;
+  Eigen::Vector3d bias_acc;
+  Eigen::Vector3d bias_gyr;
+  Eigen::Vector3d Gravity_acc;
 
-  Eigen::Vector3f pos_last;
-  Eigen::Vector3f vel_last;
-  Eigen::Matrix3f R_last;
-  Eigen::Matrix<float,DIM_OF_STATES,DIM_OF_STATES> cov_state_last;
-  Eigen::Matrix<float,DIM_OF_PROC_N,1> cov_proc_noise;
+  Eigen::Vector3d pos_last;
+  Eigen::Vector3d vel_last;
+  Eigen::Matrix3d R_last;
+  Eigen::Matrix<double,DIM_OF_STATES,DIM_OF_STATES> cov_state_last;
+  Eigen::Matrix<double,DIM_OF_PROC_N,1> cov_proc_noise;
 
-  Eigen::Vector3f cov_acc;
-  Eigen::Vector3f cov_gyr;
+  Eigen::Vector3d cov_acc;
+  Eigen::Vector3d cov_gyr;
 
  private:
   /*** Whether is the first frame, init for first frame ***/
@@ -102,8 +102,8 @@ class ImuProcess
   bool imu_need_init_      = true;
 
   int init_iter_num = 1;
-  Eigen::Vector3f mean_acc;
-  Eigen::Vector3f mean_gyr;
+  Eigen::Vector3d mean_acc;
+  Eigen::Vector3d mean_gyr;
 
   /*** Input pointcloud ***/
   PointCloudXYZI::Ptr cur_pcl_in_;
@@ -118,7 +118,7 @@ class ImuProcess
   double start_timestamp_;
   /// Making sure the equal size: v_imu_ and v_rot_
   std::deque<sensor_msgs::ImuConstPtr> v_imu_;
-  std::vector<Eigen::Matrix3f> v_rot_pcl_;
+  std::vector<Eigen::Matrix3d> v_rot_pcl_;
 
   livox_loam_kp::KeyPointPose v_rot_kp_;
 };
@@ -127,20 +127,20 @@ ImuProcess::ImuProcess()
     : b_first_frame_(true), imu_need_init_(true), last_lidar_(nullptr), last_imu_(nullptr), start_timestamp_(-1)
 {
   Eigen::Quaterniond q(0, 1, 0, 0);
-  Eigen::Vector3f t(0, 0, 0);
+  Eigen::Vector3d t(0, 0, 0);
   init_iter_num = 1;
   scale_gravity = 1.0;
-  cov_acc       = Eigen::Vector3f(0.1, 0.1, 0.1);
-  cov_gyr       = Eigen::Vector3f(0.1, 0.1, 0.1);
-  mean_acc      = Eigen::Vector3f(0, 0, -1.0);
-  mean_gyr      = Eigen::Vector3f(0, 0, 0);
-  pos_last      = Zero3f;
-  vel_last      = Zero3f;
-  R_last        = Eye3f;
-  Gravity_acc   = Eigen::Vector3f(0, 0, G_m_s2);
-  cov_state_last = Eigen::Matrix<float,DIM_OF_STATES,DIM_OF_STATES>::Zero();
-  cov_proc_noise = Eigen::Matrix<float,DIM_OF_PROC_N,1>::Zero();
-  Lidar_offset_to_IMU = Eigen::Vector3f(0.05512, 0.02226, 0.0297);
+  cov_acc       = Eigen::Vector3d(0.1, 0.1, 0.1);
+  cov_gyr       = Eigen::Vector3d(0.1, 0.1, 0.1);
+  mean_acc      = Eigen::Vector3d(0, 0, -1.0);
+  mean_gyr      = Eigen::Vector3d(0, 0, 0);
+  pos_last      = Zero3d;
+  vel_last      = Zero3d;
+  R_last        = Eye3d;
+  Gravity_acc   = Eigen::Vector3d(0, 0, G_m_s2);
+  cov_state_last = Eigen::Matrix<double,DIM_OF_STATES,DIM_OF_STATES>::Zero();
+  cov_proc_noise = Eigen::Matrix<double,DIM_OF_PROC_N,1>::Zero();
+  Lidar_offset_to_IMU = Eigen::Vector3d(0.05512, 0.02226, 0.0297);
 }
 
 ImuProcess::~ImuProcess() {}
@@ -151,18 +151,18 @@ void ImuProcess::Reset()
 
   scale_gravity  = 1.0;
 
-  bias_acc  = Eigen::Vector3f(0, 0, 0);
+  bias_acc  = Eigen::Vector3d(0, 0, 0);
   bias_gyr  = bias_acc;
-  pos_last  = Zero3f;
-  vel_last  = Zero3f;
-  R_last    = Eye3f;
-  cov_state_last = Eigen::Matrix<float,DIM_OF_STATES,DIM_OF_STATES>::Zero();
-  cov_proc_noise = Eigen::Matrix<float,DIM_OF_PROC_N,1>::Zero();
+  pos_last  = Zero3d;
+  vel_last  = Zero3d;
+  R_last    = Eye3d;
+  cov_state_last = Eigen::Matrix<double,DIM_OF_STATES,DIM_OF_STATES>::Zero();
+  cov_proc_noise = Eigen::Matrix<double,DIM_OF_PROC_N,1>::Zero();
 
-  cov_acc   = Eigen::Vector3f(0.1, 0.1, 0.1);
-  cov_gyr   = Eigen::Vector3f(0.1, 0.1, 0.1);
-  mean_acc  = Eigen::Vector3f(0, 0, -1.0);
-  mean_gyr  = Eigen::Vector3f(0, 0, 0);
+  cov_acc   = Eigen::Vector3d(0.1, 0.1, 0.1);
+  cov_gyr   = Eigen::Vector3d(0.1, 0.1, 0.1);
+  mean_acc  = Eigen::Vector3d(0, 0, -1.0);
+  mean_gyr  = Eigen::Vector3d(0, 0, 0);
 
   imu_need_init_ = true;
   b_first_frame_ = true;
@@ -185,8 +185,8 @@ void ImuProcess::IMU_Initial(const MeasureGroup &meas, int &N)
 {
   /** 1. initializing the gravity, gyro bias, acc and gyro covariance
    ** 2. normalize the acceleration measurenments to unit gravity **/
-  ROS_INFO("IMU Initializing: %.1f %%", float(N) / MAX_INI_COUNT * 100);
-  Eigen::Vector3f cur_acc, cur_gyr;
+  ROS_INFO("IMU Initializing: %.1f %%", double(N) / MAX_INI_COUNT * 100);
+  Eigen::Vector3d cur_acc, cur_gyr;
   
   if (b_first_frame_)
   {
@@ -224,7 +224,7 @@ void ImuProcess::IMU_Initial(const MeasureGroup &meas, int &N)
   }
 
   Gravity_acc = - mean_acc /scale_gravity * G_m_s2;
-  R_last      = Eye3f;// Exp(mean_acc.cross(Eigen::Vector3f(0,0,-1/scale_gravity)));
+  R_last      = Eye3d;// Exp(mean_acc.cross(Eigen::Vector3d(0,0,-1/scale_gravity)));
   bias_gyr    = mean_gyr;
 }
 
@@ -254,22 +254,22 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
     pos_last<<VEC_FROM_ARRAY(state_in->pos_end);
     vel_last<<VEC_FROM_ARRAY(state_in->vel_end);
     R_last  <<MAT_FROM_ARRAY(state_in->rot_end);
-    std::vector<float> cov(state_in->cov);
-    cov_state_last = Eigen::Map<Eigen::Matrix<float, DIM_OF_STATES, DIM_OF_STATES> >(cov.data());
+    std::vector<double> cov(state_in->cov);
+    cov_state_last = Eigen::Map<Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> >(cov.data());
     std::cout<<"!!!! Got pose:"<<pos_last.transpose()<<std::endl;
   }
   v_rot_kp_.header  = meas.lidar->header;
   v_rot_kp_.gravity = STD_VEC_FROM_EIGEN(Gravity_acc);
   v_rot_kp_.pose6D.clear();
-  v_rot_kp_.pose6D.push_back(set_pose6d(0.0, Zero3f, Zero3f, vel_last, pos_last, R_last));
+  v_rot_kp_.pose6D.push_back(set_pose6d(0.0, Zero3d, Zero3d, vel_last, pos_last, R_last));
   v_rot_pcl_.clear();
-  v_rot_pcl_.push_back(Eye3f);
+  v_rot_pcl_.push_back(Eye3d);
 
   /*** forward pre-integration at each imu point ***/
-  Eigen::Vector3f acc_kp, angvel_avr, acc_avr, vel_kp(vel_last), vel_e, pos_kp(pos_last), pos_e, pos_relat;
-  Eigen::Matrix3f R_kp(R_last), R_relat, R_e;
-  Eigen::MatrixXf F_x(Eigen::Matrix<float, DIM_OF_STATES, DIM_OF_STATES>::Identity());
-  Eigen::MatrixXf cov_w(Eigen::Matrix<float, DIM_OF_STATES, DIM_OF_STATES>::Zero());
+  Eigen::Vector3d acc_kp, angvel_avr, acc_avr, vel_kp(vel_last), vel_e, pos_kp(pos_last), pos_e, pos_relat;
+  Eigen::Matrix3d R_kp(R_last), R_relat, R_e;
+  Eigen::MatrixXd F_x(Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES>::Identity());
+  Eigen::MatrixXd cov_w(Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES>::Zero());
   double dt = 0;
   for (auto it_imu = v_imu.begin(); it_imu != (v_imu.end() - 1); it_imu++)
   {
@@ -288,21 +288,21 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
     dt = tail->header.stamp.toSec() - head->header.stamp.toSec();
     
     /* covariance propagation */
-    Eigen::Matrix3f acc_avr_skew;
+    Eigen::Matrix3d acc_avr_skew;
     auto Exp_f = Exp(angvel_avr, dt);
     acc_avr_skew<<SKEW_SYM_MATRX(angvel_avr);
 
     F_x.block<3,3>(0,0)  = Exp_f;
-    F_x.block<3,3>(0,9)  = - Eye3f * dt;
-    F_x.block<3,3>(3,6)  = Eye3f * dt;
+    F_x.block<3,3>(0,9)  = - Eye3d * dt;
+    F_x.block<3,3>(3,6)  = Eye3d * dt;
     F_x.block<3,3>(6,0)  = R_kp * acc_avr_skew * dt;
     F_x.block<3,3>(6,12) = - R_kp * dt;
-    F_x.block<3,3>(6,15) = - Eye3f * dt;
+    F_x.block<3,3>(6,15) = - Eye3d * dt;
 
     cov_w.block<3,3>(0,0).diagonal()   = cov_gyr * dt * dt;
     cov_w.block<3,3>(6,6).diagonal()   = cov_acc * dt * dt;
-    cov_w.block<3,3>(9,9).diagonal()   = Eigen::Vector3f(BIAS_COV, BIAS_COV, BIAS_COV) * dt * dt;
-    cov_w.block<3,3>(12,12).diagonal() = Eigen::Vector3f(BIAS_COV, BIAS_COV, BIAS_COV) * dt * dt;
+    cov_w.block<3,3>(9,9).diagonal()   = Eigen::Vector3d(BIAS_COV, BIAS_COV, BIAS_COV) * dt * dt;
+    cov_w.block<3,3>(12,12).diagonal() = Eigen::Vector3d(BIAS_COV, BIAS_COV, BIAS_COV) * dt * dt;
 
     cov_state_last = F_x * cov_state_last * F_x.transpose() + cov_w;
 
@@ -361,10 +361,10 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
        * Note: Compensation direction is INVERSE of Frame's moving direction
        * So if we want to compensate a point at timestamp-i to the frame-e
        * P_compensate = R_e ^ T * (R_i * P_i + T_ei) where T_ei is represented in global frame */
-      Eigen::Vector3f P_i(it_pcl->x, it_pcl->y, it_pcl->z);
-      Eigen::Vector3f T_ei(pos_kp + vel_kp * dt + 0.5 * acc_kp * dt * dt - pos_e);
-      Eigen::Matrix3f R_i(R_kp * Exp(angvel_avr, dt));
-      Eigen::Vector3f P_compensate = R_e.transpose() * (R_i * P_i + T_ei);
+      Eigen::Vector3d P_i(it_pcl->x, it_pcl->y, it_pcl->z);
+      Eigen::Vector3d T_ei(pos_kp + vel_kp * dt + 0.5 * acc_kp * dt * dt - pos_e);
+      Eigen::Matrix3d R_i(R_kp * Exp(angvel_avr, dt));
+      Eigen::Vector3d P_compensate = R_e.transpose() * (R_i * P_i + T_ei);
 
       /// save Undistorted points and their rotation
       it_pcl->x = P_compensate(0);

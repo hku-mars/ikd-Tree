@@ -74,8 +74,8 @@ int iterCount = 0;
 float timeLaserCloudCornerLast = 0;
 float timeLaserCloudSurfLast   = 0;
 float timeLaserCloudFullRes    = 0;
-float timeIMUkpLast = 0;
-float timeIMUkpCur  = 0;
+double timeIMUkpLast = 0;
+double timeIMUkpCur  = 0;
 
 bool newLaserCloudCornerLast = false;
 bool newLaserCloudSurfLast   = false;
@@ -144,20 +144,17 @@ float transformAftMapped[6] = {0};
 float transformLastMapped[6] = {0};
 
 //estimated rotation and translation;
-Eigen::Matrix3f R_global_cur(Eigen::Matrix3f::Identity());
-Eigen::Matrix3f R_global_last(Eigen::Matrix3f::Identity());
-Eigen::Vector3f T_global_cur(0, 0, 0);
-Eigen::Vector3f T_global_last(0, 0, 0);
-Eigen::Vector3f V_global_cur(0, 0, 0);
-Eigen::Vector3f V_global_last(0, 0, 0);
+Eigen::Matrix3d R_global_cur(Eigen::Matrix3d::Identity());
+Eigen::Matrix3d R_global_last(Eigen::Matrix3d::Identity());
+Eigen::Vector3d T_global_cur(0, 0, 0);
+Eigen::Vector3d T_global_last(0, 0, 0);
+Eigen::Vector3d V_global_cur(0, 0, 0);
+Eigen::Vector3d V_global_last(0, 0, 0);
 // Eigen::MatrixXf cov_stat_cur(Eigen::Matrix<float, DIM_OF_STATES, DIM_OF_STATES>::Zero());
 
 //final iteration resdual
 float deltaR = 0.0;
 float deltaT = 0.0;
-
-const Eigen::Vector3d zero3d(0, 0, 0);
-const Eigen::Vector3f zero3f(0, 0, 0);
 
 double rad2deg(double radians)
 {
@@ -178,8 +175,8 @@ void transformUpdate()
 //lidar coordinate sys to world coordinate sys
 void pointAssociateToMap(PointType const * const pi, PointType * const po)
 {
-    Eigen::Vector3f p_body(pi->x, pi->y, pi->z);
-    Eigen::Vector3f &&p_global = R_global_cur * p_body + T_global_cur;
+    Eigen::Vector3d p_body(pi->x, pi->y, pi->z);
+    Eigen::Vector3d p_global = R_global_cur * p_body + T_global_cur;
     
     po->x = p_global(0);
     po->y = p_global(1);
@@ -189,8 +186,8 @@ void pointAssociateToMap(PointType const * const pi, PointType * const po)
 
 void RGBpointAssociateToMap(PointType const * const pi, pcl::PointXYZRGB * const po)
 {
-    Eigen::Vector3f p_body(pi->x, pi->y, pi->z);
-    Eigen::Vector3f p_global(R_global_cur * p_body + T_global_cur);
+    Eigen::Vector3d p_body(pi->x, pi->y, pi->z);
+    Eigen::Vector3d p_global(R_global_cur * p_body + T_global_cur);
     
     po->x = p_global(0);
     po->y = p_global(1);
@@ -408,8 +405,8 @@ int main(int argc, char** argv)
             pointOnYAxis.z = 0.0;
             
             /** Get the rotations and translations of IMU keypoints in a frame **/
-            Eigen::Vector3f gravity, bias_g, bias_a;
-            Eigen::Matrix<float, DIM_OF_STATES, DIM_OF_STATES> cov_stat_cur;
+            Eigen::Vector3d gravity, bias_g, bias_a;
+            Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> cov_stat_cur;
 
             gravity<<VEC_FROM_ARRAY(rot_kp_imu_buff.front().gravity);
             bias_g<<VEC_FROM_ARRAY(rot_kp_imu_buff.front().bias_gyr);
@@ -417,9 +414,10 @@ int main(int argc, char** argv)
             T_global_cur<<VEC_FROM_ARRAY(rot_kp_imu_buff.front().pos_end);
             V_global_cur<<VEC_FROM_ARRAY(rot_kp_imu_buff.front().vel_end);
             R_global_cur<<MAT_FROM_ARRAY(rot_kp_imu_buff.front().rot_end);
-            cov_stat_cur=Eigen::Map<Eigen::Matrix<float, DIM_OF_STATES, DIM_OF_STATES> >(rot_kp_imu_buff.front().cov.data());
-            // R_global_cur = R_global_cur * rot_end;
-            Eigen::Vector3f&& euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
+            cov_stat_cur=Eigen::Map<Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> >(rot_kp_imu_buff.front().cov.data());
+
+            Eigen::Matrix3f R_global_f(R_global_cur.cast <float> ());
+            Eigen::Vector3f euler_cur = correct_pi(R_global_f.eulerAngles(1, 0, 2));
 
             transformTobeMapped[0]  = euler_cur(0);
             transformTobeMapped[1]  = euler_cur(1);
@@ -1037,6 +1035,7 @@ int main(int argc, char** argv)
                     cv::Mat matX(6, 1, CV_32F, cv::Scalar::all(0));
 
                     float debug_distance = 0;
+                    R_global_f = R_global_cur.cast<float> ();
 
                     for (int i = 0; i < laserCloudSelNum; i++)
                     {
@@ -1046,7 +1045,7 @@ int main(int argc, char** argv)
                         Eigen::Matrix3f point_crossmat;
                         point_crossmat<<SKEW_SYM_MATRX(point_this);
                         Eigen::Vector3f vect_norm(coeff.x, coeff.y, coeff.z);
-                        Eigen::Vector3f A(point_crossmat * R_global_cur.transpose() * vect_norm);
+                        Eigen::Vector3f A(point_crossmat * R_global_f.transpose() * vect_norm);
 
                         //TODO: the partial derivative
                         matA.at<float>(i, 0) = A(0);
@@ -1101,10 +1100,17 @@ int main(int argc, char** argv)
                         matX = matP * matX2;
                     }
 
-                    R_global_cur = R_global_cur * Exp(matX.at<float>(0, 0), matX.at<float>(1, 0), matX.at<float>(2, 0));
-                    T_global_cur = T_global_cur + Eigen::Vector3f(matX.at<float>(3, 0), matX.at<float>(4, 0), matX.at<float>(5, 0));
+                    Eigen::Vector3d rot_add, t_add;
+                    for (int ind = 0; ind < 3; ind ++)
+                    {
+                        rot_add[ind] = matX.at<float>(ind, 0);
+                        t_add[ind]   = matX.at<float>(ind+3, 0);
+                    }
+
+                    R_global_cur = R_global_cur * Exp(rot_add);
+                    T_global_cur = T_global_cur + t_add;
                     V_global_cur = (T_global_cur - T_global_last) / (timeIMUkpCur - timeIMUkpLast);
-                    Eigen::Vector3f&& euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
+                    Eigen::Vector3d euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
 
                     transformTobeMapped[0] = euler_cur(0);
                     transformTobeMapped[1] = euler_cur(1);

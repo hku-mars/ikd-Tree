@@ -59,6 +59,7 @@ void set_states(KPPose &states, const std_msgs::Header &header, \
                 const Eigen::Matrix<T, DIM_OF_STATES, DIM_OF_STATES> &cov)
 {
     states.header   = header;
+    
     states.gravity  = std::vector<T> (ARRAY_FROM_EIGEN(gravity));
     states.bias_gyr = std::vector<T> (ARRAY_FROM_EIGEN(bg));
     states.bias_acc = std::vector<T> (ARRAY_FROM_EIGEN(ba));
@@ -72,7 +73,7 @@ template<typename T>
 auto correct_pi(const T &v) {return CORRECR_PI(v);}
 
 template<typename T>
-auto correct_pi(const Eigen::Matrix<T, 3, 1> &v)
+Eigen::Matrix<T, 3, 1> correct_pi(const Eigen::Matrix<T, 3, 1> &v)
 {
     Eigen::Matrix<T, 3, 1> g;
     for(int i=0;i<3;i++)
