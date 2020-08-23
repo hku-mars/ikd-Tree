@@ -381,6 +381,7 @@ int main(int argc, char** argv)
 
         while(!LaserCloudSurfaceBuff.empty() && !rot_kp_imu_buff.empty() && sync_packages()) 
         {
+            static int degenerate_count = 0;
             // std::cout<<"~~~~~~~~~~~"<<LaserCloudSurfaceBuff.size()<<" "<<rot_kp_imu_buff.size()<<" "<<timeIMUkpLast<<" "<<timeLaserCloudSurfLast<<std::endl;
             double t1,t2,t3,t4;
             double match_start, match_time, solve_start, solve_time, pca_time, svd_time;
@@ -1034,34 +1035,46 @@ int main(int argc, char** argv)
                     cv::Mat matAtB(6, 1, CV_32F, cv::Scalar::all(0));
                     cv::Mat matX(6, 1, CV_32F, cv::Scalar::all(0));
 
-                    float debug_distance = 0;
                     R_global_f = R_global_cur.cast<float> ();
+                    Eigen::MatrixXf H(laserCloudSelNum, 6);
+                    Eigen::VectorXf res(laserCloudSelNum);
 
+                    omp_set_num_threads(4);
+                    #pragma omp parallel for
                     for (int i = 0; i < laserCloudSelNum; i++)
                     {
-                        pointOri = laserCloudOri->points[i];
-                        coeff = coeffSel->points[i];
-                        float point_this[3] = {pointOri.x, pointOri.y, pointOri.z};
-                        Eigen::Matrix3f point_crossmat;
-                        point_crossmat<<SKEW_SYM_MATRX(point_this);
-                        Eigen::Vector3f vect_norm(coeff.x, coeff.y, coeff.z);
-                        Eigen::Vector3f A(point_crossmat * R_global_f.transpose() * vect_norm);
+                        const PointType &laser_p = laserCloudOri->points[i];
+                        const PointType &nor_vec = coeffSel->points[i];
 
+                        Eigen::Matrix3f point_crossmat;
+                        float point_this[3] = {laser_p.x, laser_p.y, laser_p.z};
+                        point_crossmat<<SKEW_SYM_MATRX(point_this);
+                        Eigen::Vector3f vect_norm(nor_vec.x, nor_vec.y, nor_vec.z);
+                        Eigen::Vector3f A(point_crossmat * R_global_f.transpose() * vect_norm);
+                        
                         //TODO: the partial derivative
                         matA.at<float>(i, 0) = A(0);
                         matA.at<float>(i, 1) = A(1);
                         matA.at<float>(i, 2) = A(2);
-                        matA.at<float>(i, 3) = coeff.x;
-                        matA.at<float>(i, 4) = coeff.y;
-                        matA.at<float>(i, 5) = coeff.z;
-                        matB.at<float>(i, 0) = -coeff.intensity;
+                        matA.at<float>(i, 3) = nor_vec.x;
+                        matA.at<float>(i, 4) = nor_vec.y;
+                        matA.at<float>(i, 5) = nor_vec.z;
+                        matB.at<float>(i, 0) = - nor_vec.intensity;
 
-                        debug_distance += fabs(coeff.intensity);
+                        H.row(i)<<VEC_FROM_ARRAY(A),nor_vec.x,nor_vec.y, nor_vec.z;
+                        res(i) = - nor_vec.intensity;
                     }
+                    
                     cv::transpose(matA, matAt);
                     matAtA = matAt * matA;
                     matAtB = matAt * matB;
+                    #ifdef USE_OPENCV_SOLVER
                     cv::solve(matAtA, matAtB, matX, cv::DECOMP_QR);
+                    #else
+                    auto &&H_T = H.transpose();
+                    Eigen::Matrix<float, 6, 1> solution = (H_T * H).inverse() * H_T * res;
+                    std::cout<<"***solution: "<<solution.transpose()<<" H size: "<<laserCloudSelNum<<std::endl;
+                    #endif
 
                     //Deterioration judgment
                     if (iterCount == 0)
@@ -1095,16 +1108,28 @@ int main(int argc, char** argv)
 
                     if (isDegenerate)
                     {
+                        degenerate_count ++;
+                        #ifdef USE_OPENCV_SOLVER
                         cv::Mat matX2(6, 1, CV_32F, cv::Scalar::all(0));
                         matX.copyTo(matX2);
                         matX = matP * matX2;
+                        #else
+                        solution = Eigen::VectorXf::Zero(6);
+                        #endif
                     }
 
                     Eigen::Vector3d rot_add, t_add;
+                    
                     for (int ind = 0; ind < 3; ind ++)
                     {
+                        #ifdef USE_OPENCV_SOLVER
                         rot_add[ind] = matX.at<float>(ind, 0);
                         t_add[ind]   = matX.at<float>(ind+3, 0);
+                        #else
+                        rot_add[ind] = solution(ind);
+                        t_add[ind] = solution(ind+3);
+                        #endif
+                        
                     }
 
                     R_global_cur = R_global_cur * Exp(rot_add);
@@ -1119,14 +1144,8 @@ int main(int argc, char** argv)
                     transformTobeMapped[4] = T_global_cur(1);
                     transformTobeMapped[5] = T_global_cur(2);
 
-                    deltaR = sqrt(
-                                pow(rad2deg(matX.at<float>(0, 0)), 2) +
-                                pow(rad2deg(matX.at<float>(1, 0)), 2) +
-                                pow(rad2deg(matX.at<float>(2, 0)), 2));
-                    deltaT = sqrt(
-                                pow(matX.at<float>(3, 0) * 100, 2) +
-                                pow(matX.at<float>(4, 0) * 100, 2) +
-                                pow(matX.at<float>(5, 0) * 100, 2));
+                    deltaR = rot_add.norm() * 57.3;
+                    deltaT = t_add.norm() * 100;
                     
                     // Eigen::Vector3f pose6d(transformTobeMapped);
                     std::cout<<"transformTobeMapped: "<<transformTobeMapped[0] <<" " \
@@ -1142,7 +1161,7 @@ int main(int argc, char** argv)
                 }
 
                 // std::cout<<"DEBUG num_temp: "<<num_temp << std::endl;
-                std::cout<<"current time: "<<timeIMUkpCur<<" iteration count: "<<iterCount+1<<std::endl;
+                std::cout<<"current time: "<<timeIMUkpCur<<" iteration count: "<<iterCount+1<<" Number of Degeneration: "<<degenerate_count<<std::endl;
                 transformUpdate();
             }
 
@@ -1150,7 +1169,7 @@ int main(int argc, char** argv)
 
             /*** save results ***/
             set_states(Pose6D_Solved, rot_kp_imu_buff.front().header, gravity, bias_g, bias_a, \
-                       T_global_cur, V_global_cur, R_global_cur, cov_stat_cur); std::cout<<"!!!! Sent pose:"<<T_global_cur.transpose()<<std::endl;
+                       T_global_cur, V_global_cur, R_global_cur, cov_stat_cur); //std::cout<<"!!!! Sent pose:"<<T_global_cur.transpose()<<std::endl;
             Pose6D_Solved.pose6D.clear();
             pubSolvedPose6D.publish(Pose6D_Solved);
 

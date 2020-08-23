@@ -258,7 +258,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
     cov_state_last = Eigen::Map<Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> >(state.cov.data());
     
     Eigen::Vector3d euler_cur = correct_pi(R_last.eulerAngles(1, 0, 2));
-    std::cout<<"!!!! Got pose: R: "<<euler_cur.transpose()<<" T: "<<pos_last.transpose()<<std::endl;
+    // std::cout<<"!!!! Got pose: R: "<<euler_cur.transpose()<<" T: "<<pos_last.transpose()<<std::endl;
   }
   v_rot_kp_.header  = meas.lidar->header;
   v_rot_kp_.pose6D.clear();
@@ -341,7 +341,8 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
   v_rot_kp_.cov = STD_VEC_FROM_EIGEN(cov_state_last); // std::vector<decltype(cov_state_last)::Scalar> (cov_state_last.data(), cov_state_last.data() + DIM_OF_STATES_SQUARE);
   
   Eigen::Vector3d euler_cur = correct_pi(R_e.eulerAngles(1, 0, 2));
-  std::cout<<"!!!! Ended pose: R: "<<euler_cur.transpose()<<" T: "<<pos_e.transpose()<<std::endl;
+  // std::cout<<"!!!! Ended pose: R: "<<euler_cur.transpose()<<" T: "<<pos_e.transpose()<<std::endl;
+  
   /*** undistort each lidar point (backward pre-integration) ***/
   auto it_pcl = pcl_in_out.points.end() - 1;
   auto &&kps = v_rot_kp_.pose6D;
