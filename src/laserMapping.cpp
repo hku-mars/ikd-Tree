@@ -413,7 +413,7 @@ int main(int argc, char** argv)
             bias_a<<VEC_FROM_ARRAY(rot_kp_imu_buff.front().bias_acc);
             T_global_cur<<VEC_FROM_ARRAY(rot_kp_imu_buff.front().pos_end);
             V_global_cur<<VEC_FROM_ARRAY(rot_kp_imu_buff.front().vel_end);
-            R_global_cur<<MAT_FROM_ARRAY(rot_kp_imu_buff.front().rot_end);
+            R_global_cur=Eigen::Map<Eigen::Matrix3d>(rot_kp_imu_buff.front().rot_end.data());
             cov_stat_cur=Eigen::Map<Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> >(rot_kp_imu_buff.front().cov.data());
 
             Eigen::Matrix3f R_global_f(R_global_cur.cast <float> ());
