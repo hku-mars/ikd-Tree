@@ -1083,7 +1083,7 @@ int main(int argc, char** argv)
                     auto &&K   = K_1 * H_T;
                     // auto &&K   = (H_T * H *10000.0 + (cov_stat_cur_f).inverse()).inverse() * H_T * 10000.0;
                     Eigen::Matrix<float, DIM_OF_STATES, 1> solution = K * res;
-                    std::cout<<"***Sigma: \n"<<cov_stat_cur_f<<std::endl;
+                    // std::cout<<"***Sigma: \n"<<cov_stat_cur_f<<std::endl;
                     std::cout<<"***solution: "<<solution.transpose()<<std::endl;
                     
                     #endif

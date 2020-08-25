@@ -32,7 +32,7 @@
 
 #define MAX_INI_COUNT (50)
 #define BIAS_COV (0.01)
-#define INIT_COV (0.01)
+#define INIT_COV (0.00001)
 
 inline double rad2deg(double radians) { return radians * 180.0 / M_PI; }
 inline double deg2rad(double degrees) { return degrees * M_PI / 180.0; }
@@ -296,8 +296,10 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
     F_x.block<3,3>(6,12) = - R_kp * dt;
     F_x.block<3,3>(6,15) = - Eye3d * dt;
 
+    Eigen::Matrix3d cov_acc_diag;
+    cov_acc_diag.diagonal() << cov_acc;
     cov_w.block<3,3>(0,0).diagonal()   = cov_gyr * dt * dt;
-    cov_w.block<3,3>(6,6).diagonal()   = cov_acc * dt * dt;
+    cov_w.block<3,3>(6,6)              = R_kp * cov_acc_diag * R_kp.transpose() * dt * dt;
     cov_w.block<3,3>(9,9).diagonal()   = Eigen::Vector3d(BIAS_COV, BIAS_COV, BIAS_COV) * dt * dt;
     cov_w.block<3,3>(12,12).diagonal() = Eigen::Vector3d(BIAS_COV, BIAS_COV, BIAS_COV) * dt * dt;
 
@@ -337,7 +339,8 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
   v_rot_kp_.cov = STD_VEC_FROM_EIGEN(cov_state_last); // std::vector<decltype(cov_state_last)::Scalar> (cov_state_last.data(), cov_state_last.data() + DIM_OF_STATES_SQUARE);
   
   Eigen::Vector3d euler_cur = correct_pi(R_e.eulerAngles(1, 0, 2));
-  std::cout<<"!!!! propagated states: bg "<<cov_gyr.transpose()<<std::endl;
+  std::cout<<"!!!! propagated states: cov_w \n "<<cov_state_last<<std::endl;
+  std::cout<<"!!!! propagated states: gravity\n "<<Gravity_acc.transpose()<<std::endl;
 
   /*** undistort each lidar point (backward pre-integration) ***/
   auto it_pcl = pcl_in_out.points.end() - 1;
@@ -373,8 +376,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
       it_pcl->z = P_compensate(2);
 
       v_rot_pcl_.push_back(R_i);
-      if (it_pcl == pcl_in_out.points.begin())
-      {break;}
+      if (it_pcl == pcl_in_out.points.begin()) break;
     }
   }
 }
