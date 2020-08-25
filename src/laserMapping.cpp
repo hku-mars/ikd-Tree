@@ -360,7 +360,7 @@ int main(int argc, char** argv)
 
     downSizeFilterCorner.setLeafSize(filter_parameter_corner, filter_parameter_corner, filter_parameter_corner);
     downSizeFilterSurf.setLeafSize(filter_parameter_surf, filter_parameter_surf, filter_parameter_surf);
-    downSizeFilterMap.setLeafSize(0.1, 0.1, 0.1);
+    downSizeFilterMap.setLeafSize(0.2, 0.2, 0.2);
 
     for (int i = 0; i < laserCloudNum; i++)
     {
@@ -1003,14 +1003,19 @@ int main(int argc, char** argv)
                         pca_time += omp_get_wtime() - pca_start;
                     }
 
+                    double total_residual = 0.0;
                     for (int i = 0; i < coeffSel_tmpt->points.size(); i++)
                     {
-                        if (point_selected[i])
+                        float error_abs = std::abs(coeffSel_tmpt->points[i].intensity);
+                        if (point_selected[i] && (error_abs < 0.5))
                         {
                             laserCloudOri->push_back(laserCloudSurf_down->points[i]);
                             coeffSel->push_back(coeffSel_tmpt->points[i]);
+                            total_residual += error_abs;
                         }
                     }
+                    int laserCloudSelNum = laserCloudOri->points.size();
+                    double ave_residual = total_residual / laserCloudSelNum;
 
                     // std::cout << "DEBUG mapping select all points : " << coeffSel->size() << "  " << count_effect_point << std::endl;
                     count_effect_point = 0;
@@ -1019,7 +1024,6 @@ int main(int argc, char** argv)
                     match_start = omp_get_wtime();
                     solve_start = omp_get_wtime();
 
-                    int laserCloudSelNum = laserCloudOri->points.size();
                     if (laserCloudSelNum < 50) {
                         continue;
                     }
@@ -1036,7 +1040,7 @@ int main(int argc, char** argv)
                     cv::Mat matX(6, 1, CV_32F, cv::Scalar::all(0));
 
                     R_global_f = R_global_cur.cast<float> ();
-                    Eigen::MatrixXf H(laserCloudSelNum, 6);
+                    Eigen::MatrixXf H(laserCloudSelNum, DIM_OF_STATES) ;
                     Eigen::VectorXf res(laserCloudSelNum);
 
                     omp_set_num_threads(4);
@@ -1061,19 +1065,27 @@ int main(int argc, char** argv)
                         matA.at<float>(i, 5) = nor_vec.z;
                         matB.at<float>(i, 0) = - nor_vec.intensity;
 
-                        H.row(i)<<VEC_FROM_ARRAY(A),nor_vec.x,nor_vec.y, nor_vec.z;
+                        H.row(i) = Eigen::Matrix<float, 1, DIM_OF_STATES>::Zero();
+                        H.block<1,6>(i,0) << VEC_FROM_ARRAY(A), nor_vec.x, nor_vec.y, nor_vec.z;
                         res(i) = - nor_vec.intensity;
                     }
                     
                     cv::transpose(matA, matAt);
                     matAtA = matAt * matA;
                     matAtB = matAt * matB;
+
                     #ifdef USE_OPENCV_SOLVER
                     cv::solve(matAtA, matAtB, matX, cv::DECOMP_QR);
                     #else
+                    Eigen::Matrix<float, DIM_OF_STATES, DIM_OF_STATES> &&cov_stat_cur_f = (cov_stat_cur / LASER_POINT_COV).cast<float> ();
                     auto &&H_T = H.transpose();
-                    Eigen::Matrix<float, 6, 1> solution = (H_T * H).inverse() * H_T * res;
-                    std::cout<<"***solution: "<<solution.transpose()<<" H size: "<<laserCloudSelNum<<std::endl;
+                    auto &&K_1 = (H_T * H + (cov_stat_cur_f).inverse()).inverse();
+                    auto &&K   = K_1 * H_T;
+                    // auto &&K   = (H_T * H *10000.0 + (cov_stat_cur_f).inverse()).inverse() * H_T * 10000.0;
+                    Eigen::Matrix<float, DIM_OF_STATES, 1> solution = K * res;
+                    std::cout<<"***Sigma: \n"<<cov_stat_cur_f<<std::endl;
+                    std::cout<<"***solution: "<<solution.transpose()<<std::endl;
+                    
                     #endif
 
                     //Deterioration judgment
@@ -1114,11 +1126,11 @@ int main(int argc, char** argv)
                         matX.copyTo(matX2);
                         matX = matP * matX2;
                         #else
-                        solution = Eigen::VectorXf::Zero(6);
+                        solution = Eigen::VectorXf::Zero(DIM_OF_STATES);
                         #endif
                     }
 
-                    Eigen::Vector3d rot_add, t_add;
+                    Eigen::Vector3d rot_add, t_add, v_add, bg_add, ba_add, g_add;
                     
                     for (int ind = 0; ind < 3; ind ++)
                     {
@@ -1127,15 +1139,30 @@ int main(int argc, char** argv)
                         t_add[ind]   = matX.at<float>(ind+3, 0);
                         #else
                         rot_add[ind] = solution(ind);
-                        t_add[ind] = solution(ind+3);
+                        t_add[ind]   = solution(ind+3);
+                        v_add[ind]   = solution(ind+6);
+                        bg_add[ind]  = solution(ind+9);
+                        ba_add[ind]  = solution(ind+12);
+                        g_add[ind]   = solution(ind+15);
                         #endif
-                        
                     }
 
                     R_global_cur = R_global_cur * Exp(rot_add);
                     T_global_cur = T_global_cur + t_add;
-                    V_global_cur = (T_global_cur - T_global_last) / (timeIMUkpCur - timeIMUkpLast);
+                    V_global_cur = V_global_cur + v_add;
+                    bias_g  += bg_add;
+                    bias_a  += ba_add;
+                    gravity += g_add;
+
+                    deltaR = rot_add.norm() * 57.3;
+                    deltaT = t_add.norm() * 100;
+
+                    cov_stat_cur_f = (Eigen::MatrixXf::Identity(DIM_OF_STATES, DIM_OF_STATES) - K * H) * cov_stat_cur_f;
+                    cov_stat_cur   = cov_stat_cur_f.cast<double>() * LASER_POINT_COV;
+
+                    // V_global_cur = (T_global_cur - T_global_last) / (timeIMUkpCur - timeIMUkpLast);
                     Eigen::Vector3d euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
+                    std::cout<<"transformTobeMapped: "<<euler_cur.transpose()<<" "<<T_global_cur.transpose()<<"delta R and T: "<<deltaR<<" "<<deltaT<<" average res: "<<total_residual/laserCloudSelNum<<" total points: "<<laserCloudSelNum<<std::endl;
 
                     transformTobeMapped[0] = euler_cur(0);
                     transformTobeMapped[1] = euler_cur(1);
@@ -1144,17 +1171,9 @@ int main(int argc, char** argv)
                     transformTobeMapped[4] = T_global_cur(1);
                     transformTobeMapped[5] = T_global_cur(2);
 
-                    deltaR = rot_add.norm() * 57.3;
-                    deltaT = t_add.norm() * 100;
-                    
-                    // Eigen::Vector3f pose6d(transformTobeMapped);
-                    std::cout<<"transformTobeMapped: "<<transformTobeMapped[0] <<" " \
-                             <<transformTobeMapped[1]<<" " <<transformTobeMapped[2]<<" " <<transformTobeMapped[3] <<" " \
-                             <<transformTobeMapped[4]<<" " <<transformTobeMapped[5] << " delta R and T: "<<deltaR<<" "<<deltaT<<std::endl;
-
                     solve_time += omp_get_wtime() - solve_start;
                     
-                    if (deltaR < 0.02 && deltaT < 0.03)
+                    if (deltaR < 0.02 && deltaT < 0.03 || ave_residual <= 0.003)
                     {
                         break;
                     }
@@ -1168,8 +1187,8 @@ int main(int argc, char** argv)
             t3 = omp_get_wtime();
 
             /*** save results ***/
-            set_states(Pose6D_Solved, rot_kp_imu_buff.front().header, gravity, bias_g, bias_a, \
-                       T_global_cur, V_global_cur, R_global_cur, cov_stat_cur); //std::cout<<"!!!! Sent pose:"<<T_global_cur.transpose()<<std::endl;
+            save_states(Pose6D_Solved, rot_kp_imu_buff.front().header, gravity, bias_g, bias_a, \
+                        T_global_cur, V_global_cur, R_global_cur, cov_stat_cur); //std::cout<<"!!!! Sent pose:"<<T_global_cur.transpose()<<std::endl;
             Pose6D_Solved.pose6D.clear();
             pubSolvedPose6D.publish(Pose6D_Solved);
 

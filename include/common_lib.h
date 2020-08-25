@@ -52,20 +52,34 @@ auto set_pose6d(const double t, const Eigen::Matrix<T, 3, 1> &a, const Eigen::Ma
 }
 
 template<typename T>
-void set_states(KPPose &states, const std_msgs::Header &header, \
+void save_states(KPPose &states, const std_msgs::Header &header, \
                 const Eigen::Matrix<T, 3, 1> &gravity, const Eigen::Matrix<T, 3, 1> &bg, \
                 const Eigen::Matrix<T, 3, 1> &ba, const Eigen::Matrix<T, 3, 1> &p, \
                 const Eigen::Matrix<T, 3, 1> &v,  const Eigen::Matrix<T, 3, 3> &R, \
                 const Eigen::Matrix<T, DIM_OF_STATES, DIM_OF_STATES> &cov)
 {
     states.header   = header;
-    
     states.gravity  = std::vector<T> (ARRAY_FROM_EIGEN(gravity));
     states.bias_gyr = std::vector<T> (ARRAY_FROM_EIGEN(bg));
     states.bias_acc = std::vector<T> (ARRAY_FROM_EIGEN(ba));
     states.pos_end  = std::vector<T> (ARRAY_FROM_EIGEN(p));
     states.vel_end  = std::vector<T> (ARRAY_FROM_EIGEN(v));
     states.rot_end  = std::vector<T> (ARRAY_FROM_EIGEN(R));
+    states.cov      = std::vector<T> (ARRAY_FROM_EIGEN(cov));
+}
+
+template<typename T>
+void save_states(KPPose &states, const std_msgs::Header &header, \
+                const Eigen::Matrix<T, DIM_OF_STATES, 1> &state_vec, \
+                const Eigen::Matrix<T, DIM_OF_STATES, DIM_OF_STATES> &cov)
+{
+    states.header   = header;
+    states.gravity  = std::vector<T> (state_vec.data(), state_vec.data() + 3);
+    states.bias_gyr = std::vector<T> (state_vec.data() + 3, state_vec.data() + 6);
+    states.bias_acc = std::vector<T> (state_vec.data() + 6, state_vec.data() + 9);
+    states.pos_end  = std::vector<T> (state_vec.data() + 9, state_vec.data() + 12);
+    states.vel_end  = std::vector<T> (state_vec.data() + 12, state_vec.data() + 15);
+    states.rot_end  = std::vector<T> (state_vec.data() + 15, state_vec.data() + 18);
     states.cov      = std::vector<T> (ARRAY_FROM_EIGEN(cov));
 }
 
