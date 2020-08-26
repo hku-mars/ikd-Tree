@@ -52,10 +52,9 @@ auto Exp(const Eigen::Matrix<T, 3, 1> &ang_vel, const Ts &dt)
 template<typename T>
 Eigen::Matrix<T, 3, 3> Exp(const T &v1, const T &v2, const T &v3)
 {
-    
-    T norm = sqrt(v1 * v1 + v2 * v2 + v3 * v3);
+    T &&norm = sqrt(v1 * v1 + v2 * v2 + v3 * v3);
     Eigen::Matrix<T, 3, 3> Eye3 = Eigen::Matrix<T, 3, 3>::Identity();
-    if (norm > 0.0000001)
+    if (norm > 0.001)
     {
         T r_ang[3] = {v1 / norm, v2 / norm, v3 / norm};
         Eigen::Matrix<T, 3, 3> K;
@@ -68,6 +67,15 @@ Eigen::Matrix<T, 3, 3> Exp(const T &v1, const T &v2, const T &v3)
     {
         return Eye3;
     }
+}
+
+/* Logrithm of a Rotation Matrix */
+template<typename T>
+Eigen::Matrix<T,3,1> Log(const Eigen::Matrix<T, 3, 3> &R)
+{
+    T &&theta = std::acos(0.5 * (R.trace() - 1));
+    Eigen::Matrix<T,3,1> K(R(2,1) - R(1,2), R(0,2) - R(2,0), R(1,0) - R(0,1));
+    return (std::abs(theta) < 0.001) ? (0.5 * K) : (0.5 * theta / std::sin(theta) * K);
 }
 
 // template<typename T>

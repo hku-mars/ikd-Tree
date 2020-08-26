@@ -61,10 +61,11 @@
 namespace plt = matplotlibcpp;
 
 // #define USING_CORNER
+#define INIT_TIME (8)
 #define NUM_MATCH_POINTS (5)
 #define NUM_MAX_ITERATIONS (15)
 #define LASER_FRAME_INTEVAL (0.1)
-#define LASER_POINT_COV (0.001)
+#define LASER_POINT_COV (0.0001)
 
 typedef pcl::PointXYZI PointType;
 
@@ -382,6 +383,9 @@ int main(int argc, char** argv)
         while(!LaserCloudSurfaceBuff.empty() && !rot_kp_imu_buff.empty() && sync_packages()) 
         {
             static int degenerate_count = 0;
+            static double first_lidar_time = LaserCloudSurfaceBuff.front().header.stamp.toSec();
+            bool Need_Init = (timeLaserCloudSurfLast - first_lidar_time < 3.0) ? true : false;
+            if(Need_Init) {std::cout<<"||||||||||Initiallizing LiDar||||||||||"<<std::endl;}
             // std::cout<<"~~~~~~~~~~~"<<LaserCloudSurfaceBuff.size()<<" "<<rot_kp_imu_buff.size()<<" "<<timeIMUkpLast<<" "<<timeLaserCloudSurfLast<<std::endl;
             double t1,t2,t3,t4;
             double match_start, match_time, solve_start, solve_time, pca_time, svd_time;
@@ -1084,8 +1088,7 @@ int main(int argc, char** argv)
                     // auto &&K   = (H_T * H *10000.0 + (cov_stat_cur_f).inverse()).inverse() * H_T * 10000.0;
                     Eigen::Matrix<float, DIM_OF_STATES, 1> solution = K * res;
                     // std::cout<<"***Sigma: \n"<<cov_stat_cur_f<<std::endl;
-                    std::cout<<"***solution: "<<solution.transpose()<<std::endl;
-                    
+                    // std::cout<<"***solution: "<<solution.transpose()<<std::endl;
                     #endif
 
                     //Deterioration judgment
@@ -1131,38 +1134,72 @@ int main(int argc, char** argv)
                     }
 
                     Eigen::Vector3d rot_add, t_add, v_add, bg_add, ba_add, g_add;
-                    
-                    for (int ind = 0; ind < 3; ind ++)
+
+                    if (Need_Init)
                     {
-                        #ifdef USE_OPENCV_SOLVER
-                        rot_add[ind] = matX.at<float>(ind, 0);
-                        t_add[ind]   = matX.at<float>(ind+3, 0);
-                        #else
-                        rot_add[ind] = solution(ind);
-                        t_add[ind]   = solution(ind+3);
-                        v_add[ind]   = solution(ind+6);
-                        bg_add[ind]  = solution(ind+9);
-                        ba_add[ind]  = solution(ind+12);
-                        g_add[ind]   = solution(ind+15);
-                        #endif
+                        Eigen::MatrixXd H_init(Eigen::Matrix<double, 9, DIM_OF_STATES>::Zero());
+                        Eigen::MatrixXd z_init(Eigen::Matrix<double, 9, 1>::Zero());
+                        H_init.block<3,3>(0,0)  = Eigen::Matrix3d::Identity();
+                        H_init.block<3,3>(3,3)  = Eigen::Matrix3d::Identity();
+                        H_init.block<3,3>(6,15) = Eigen::Matrix3d::Identity();
+                        z_init.block<3,1>(0,0)  = - Log(R_global_cur);
+                        z_init.block<3,1>(0,0)  = - T_global_cur;
+
+                        auto H_init_T = H_init.transpose();
+                        auto &&K_init = cov_stat_cur * H_init_T * (H_init * cov_stat_cur * H_init_T + 0.00001 * Eigen::Matrix<double,9,9>::Identity()).inverse();
+                        auto solution_init = K_init * z_init;
+                        for (int ind = 0; ind < 3; ind ++)
+                        {
+                            rot_add[ind] = solution_init(ind);
+                            t_add[ind]   = solution_init(ind+3);
+                            v_add[ind]   = solution_init(ind+6);
+                            bg_add[ind]  = solution_init(ind+9);
+                            ba_add[ind]  = solution_init(ind+12);
+                            g_add[ind]   = solution_init(ind+15);
+                        }
+
+                        R_global_cur.setIdentity();
+                        T_global_cur.setZero();
+                        V_global_cur.setZero();
+                        bias_g      += bg_add;
+                        bias_a      += ba_add;
+                        cov_stat_cur = (Eigen::MatrixXd::Identity(DIM_OF_STATES, DIM_OF_STATES) - K_init * H_init) * cov_stat_cur;
                     }
+                    else
+                    {
+                        for (int ind = 0; ind < 3; ind ++)
+                        {
+                            #ifdef USE_OPENCV_SOLVER
+                            rot_add[ind] = matX.at<float>(ind, 0);
+                            t_add[ind]   = matX.at<float>(ind+3, 0);
+                            #else
+                            rot_add[ind] = solution(ind);
+                            t_add[ind]   = solution(ind+3);
+                            v_add[ind]   = solution(ind+6);
+                            bg_add[ind]  = solution(ind+9);
+                            ba_add[ind]  = solution(ind+12);
+                            g_add[ind]   = solution(ind+15);
+                            #endif
+                        }
 
-                    R_global_cur = R_global_cur * Exp(rot_add);
-                    T_global_cur = T_global_cur + t_add;
-                    V_global_cur = V_global_cur + v_add;
-                    bias_g  += bg_add;
-                    bias_a  += ba_add;
-                    gravity += g_add;
+                        R_global_cur = R_global_cur * Exp(rot_add);
+                        T_global_cur = T_global_cur + t_add;
+                        V_global_cur = V_global_cur + v_add;
+                        bias_g  += bg_add;
+                        bias_a  += ba_add;
+                        gravity += g_add;
 
-                    deltaR = rot_add.norm() * 57.3;
-                    deltaT = t_add.norm() * 100;
+                        deltaR = rot_add.norm() * 57.3;
+                        deltaT = t_add.norm() * 100;
 
-                    cov_stat_cur_f = (Eigen::MatrixXf::Identity(DIM_OF_STATES, DIM_OF_STATES) - K * H) * cov_stat_cur_f;
-                    cov_stat_cur   = cov_stat_cur_f.cast<double>() * LASER_POINT_COV;
+                        cov_stat_cur_f = (Eigen::MatrixXf::Identity(DIM_OF_STATES, DIM_OF_STATES) - K * H) * cov_stat_cur_f;
+                        cov_stat_cur   = cov_stat_cur_f.cast<double>() * LASER_POINT_COV;
+                    }
 
                     // V_global_cur = (T_global_cur - T_global_last) / (timeIMUkpCur - timeIMUkpLast);
                     Eigen::Vector3d euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
                     std::cout<<"transformTobeMapped: "<<euler_cur.transpose()<<" "<<T_global_cur.transpose()<<"delta R and T: "<<deltaR<<" "<<deltaT<<" average res: "<<total_residual/laserCloudSelNum<<" total points: "<<laserCloudSelNum<<std::endl;
+                    std::cout<<"***states: bg "<<bias_g.transpose()<<" ba "<<bias_a.transpose()<<std::endl;
 
                     transformTobeMapped[0] = euler_cur(0);
                     transformTobeMapped[1] = euler_cur(1);

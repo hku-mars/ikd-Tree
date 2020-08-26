@@ -44,7 +44,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: currPoints
+    SyncSource: ""
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -212,8 +212,8 @@ Visualization Manager:
         - Alpha: 0.4000000059604645
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 0.9719569087028503
-            Min Value: -2.6434242725372314
+            Max Value: 0.969338059425354
+            Min Value: -2.661465883255005
             Value: true
           Axis: Z
           Channel Name: intensity

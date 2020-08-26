@@ -31,8 +31,7 @@
 /// *************Preconfiguration
 
 #define MAX_INI_COUNT (50)
-#define BIAS_COV (0.01)
-#define INIT_COV (0.00001)
+#define INIT_COV (0.000001)
 
 inline double rad2deg(double radians) { return radians * 180.0 / M_PI; }
 inline double deg2rad(double degrees) { return degrees * M_PI / 180.0; }
@@ -280,7 +279,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
                 0.5 * (head->linear_acceleration.y + tail->linear_acceleration.y),
                 0.5 * (head->linear_acceleration.z + tail->linear_acceleration.z);
     angvel_avr -= bias_gyr;
-    acc_avr     = acc_avr * G_m_s2 / scale_gravity;
+    acc_avr     = acc_avr * G_m_s2 / scale_gravity - bias_acc;
     /* we propagate from the first lidar point to the last imu point */
     dt = tail->header.stamp.toSec() - head->header.stamp.toSec();
     
@@ -298,10 +297,10 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
 
     Eigen::Matrix3d cov_acc_diag;
     cov_acc_diag.diagonal() << cov_acc;
-    cov_w.block<3,3>(0,0).diagonal()   = cov_gyr * dt * dt;
-    cov_w.block<3,3>(6,6)              = R_kp * cov_acc_diag * R_kp.transpose() * dt * dt;
-    cov_w.block<3,3>(9,9).diagonal()   = Eigen::Vector3d(BIAS_COV, BIAS_COV, BIAS_COV) * dt * dt;
-    cov_w.block<3,3>(12,12).diagonal() = Eigen::Vector3d(BIAS_COV, BIAS_COV, BIAS_COV) * dt * dt;
+    cov_w.block<3,3>(0,0).diagonal()   = cov_gyr * dt * dt * 10000;
+    cov_w.block<3,3>(6,6)              = R_kp * cov_acc_diag * R_kp.transpose() * dt * dt * 10000;
+    cov_w.block<3,3>(9,9).diagonal()   = Eigen::Vector3d(0.01, 0.01, 0.01) * dt * dt; // bias gyro covariance
+    cov_w.block<3,3>(12,12).diagonal() = Eigen::Vector3d(0.001, 0.001, 0.001) * dt * dt; // bias acc covariance
 
     cov_state_last = F_x * cov_state_last * F_x.transpose() + cov_w;
 
@@ -339,8 +338,8 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
   v_rot_kp_.cov = STD_VEC_FROM_EIGEN(cov_state_last); // std::vector<decltype(cov_state_last)::Scalar> (cov_state_last.data(), cov_state_last.data() + DIM_OF_STATES_SQUARE);
   
   Eigen::Vector3d euler_cur = correct_pi(R_e.eulerAngles(1, 0, 2));
-  std::cout<<"!!!! propagated states: cov_w \n "<<cov_state_last<<std::endl;
-  std::cout<<"!!!! propagated states: gravity\n "<<Gravity_acc.transpose()<<std::endl;
+  // std::cout<<"!!!! propagated states: cov_state_last \n "<<cov_state_last<<std::endl;
+  std::cout<<"!!!! propagated states: gravity "<<Gravity_acc.transpose()<<std::endl;
 
   /*** undistort each lidar point (backward pre-integration) ***/
   auto it_pcl = pcl_in_out.points.end() - 1;
