@@ -61,11 +61,11 @@
 namespace plt = matplotlibcpp;
 
 // #define USING_CORNER
-#define INIT_TIME (8)
+#define INIT_TIME (2.0)
 #define NUM_MATCH_POINTS (5)
 #define NUM_MAX_ITERATIONS (15)
 #define LASER_FRAME_INTEVAL (0.1)
-#define LASER_POINT_COV (0.0001)
+#define LASER_POINT_COV (0.00001)
 
 typedef pcl::PointXYZI PointType;
 
@@ -154,8 +154,8 @@ Eigen::Vector3d V_global_last(0, 0, 0);
 // Eigen::MatrixXf cov_stat_cur(Eigen::Matrix<float, DIM_OF_STATES, DIM_OF_STATES>::Zero());
 
 //final iteration resdual
-float deltaR = 0.0;
-float deltaT = 0.0;
+double deltaR = 0.0;
+double deltaT = 0.0;
 
 double rad2deg(double radians)
 {
@@ -384,7 +384,7 @@ int main(int argc, char** argv)
         {
             static int degenerate_count = 0;
             static double first_lidar_time = LaserCloudSurfaceBuff.front().header.stamp.toSec();
-            bool Need_Init = (timeLaserCloudSurfLast - first_lidar_time < 3.0) ? true : false;
+            bool Need_Init = (timeLaserCloudSurfLast - first_lidar_time < INIT_TIME) ? true : false;
             if(Need_Init) {std::cout<<"||||||||||Initiallizing LiDar||||||||||"<<std::endl;}
             // std::cout<<"~~~~~~~~~~~"<<LaserCloudSurfaceBuff.size()<<" "<<rot_kp_imu_buff.size()<<" "<<timeIMUkpLast<<" "<<timeLaserCloudSurfLast<<std::endl;
             double t1,t2,t3,t4;
@@ -431,9 +431,7 @@ int main(int argc, char** argv)
             transformTobeMapped[4]  = T_global_cur(1);
             transformTobeMapped[5]  = T_global_cur(2);
 
-            std::cout<<"******pre-integrated euler angle: "<<euler_cur[0]<<" " \
-                    <<euler_cur[1]<<" "<<euler_cur[2]<<" pos:"<<transformTobeMapped[3]<<" " \
-                    <<transformTobeMapped[4]<<" "<<transformTobeMapped[5]<<std::endl;
+            std::cout<<"******pre-integrated states: "<<euler_cur.transpose()<<" "<<T_global_cur.transpose()<<" "<<V_global_cur.transpose()<<" "<<bias_g.transpose()<<" "<<bias_a.transpose()<<std::endl;
             
             pointAssociateToMap(&pointOnYAxis, &pointOnYAxis);
 
@@ -1044,8 +1042,8 @@ int main(int argc, char** argv)
                     cv::Mat matX(6, 1, CV_32F, cv::Scalar::all(0));
 
                     R_global_f = R_global_cur.cast<float> ();
-                    Eigen::MatrixXf H(laserCloudSelNum, DIM_OF_STATES) ;
-                    Eigen::VectorXf res(laserCloudSelNum);
+                    Eigen::MatrixXd H(laserCloudSelNum, DIM_OF_STATES) ;
+                    Eigen::VectorXd res(laserCloudSelNum);
 
                     omp_set_num_threads(4);
                     #pragma omp parallel for
@@ -1053,23 +1051,25 @@ int main(int argc, char** argv)
                     {
                         const PointType &laser_p = laserCloudOri->points[i];
                         const PointType &nor_vec = coeffSel->points[i];
-
-                        Eigen::Matrix3f point_crossmat;
-                        float point_this[3] = {laser_p.x, laser_p.y, laser_p.z};
+                        
+                        Eigen::Vector3d point_this(laser_p.x, laser_p.y, laser_p.z);
+                        Eigen::Vector3d vect_norm(nor_vec.x, nor_vec.y, nor_vec.z);
+                        Eigen::Matrix3d point_crossmat;
                         point_crossmat<<SKEW_SYM_MATRX(point_this);
-                        Eigen::Vector3f vect_norm(nor_vec.x, nor_vec.y, nor_vec.z);
-                        Eigen::Vector3f A(point_crossmat * R_global_f.transpose() * vect_norm);
+                        
+                        Eigen::Vector3d A(point_crossmat * R_global_cur.transpose() * vect_norm);
+                        auto &&A_f = A.cast<float> ();
                         
                         //TODO: the partial derivative
-                        matA.at<float>(i, 0) = A(0);
-                        matA.at<float>(i, 1) = A(1);
-                        matA.at<float>(i, 2) = A(2);
+                        matA.at<float>(i, 0) = A_f(0);
+                        matA.at<float>(i, 1) = A_f(1);
+                        matA.at<float>(i, 2) = A_f(2);
                         matA.at<float>(i, 3) = nor_vec.x;
                         matA.at<float>(i, 4) = nor_vec.y;
                         matA.at<float>(i, 5) = nor_vec.z;
                         matB.at<float>(i, 0) = - nor_vec.intensity;
 
-                        H.row(i) = Eigen::Matrix<float, 1, DIM_OF_STATES>::Zero();
+                        H.row(i) = Eigen::Matrix<double, 1, DIM_OF_STATES>::Zero();
                         H.block<1,6>(i,0) << VEC_FROM_ARRAY(A), nor_vec.x, nor_vec.y, nor_vec.z;
                         res(i) = - nor_vec.intensity;
                     }
@@ -1080,15 +1080,6 @@ int main(int argc, char** argv)
 
                     #ifdef USE_OPENCV_SOLVER
                     cv::solve(matAtA, matAtB, matX, cv::DECOMP_QR);
-                    #else
-                    Eigen::Matrix<float, DIM_OF_STATES, DIM_OF_STATES> &&cov_stat_cur_f = (cov_stat_cur / LASER_POINT_COV).cast<float> ();
-                    auto &&H_T = H.transpose();
-                    auto &&K_1 = (H_T * H + (cov_stat_cur_f).inverse()).inverse();
-                    auto &&K   = K_1 * H_T;
-                    // auto &&K   = (H_T * H *10000.0 + (cov_stat_cur_f).inverse()).inverse() * H_T * 10000.0;
-                    Eigen::Matrix<float, DIM_OF_STATES, 1> solution = K * res;
-                    // std::cout<<"***Sigma: \n"<<cov_stat_cur_f<<std::endl;
-                    // std::cout<<"***solution: "<<solution.transpose()<<std::endl;
                     #endif
 
                     //Deterioration judgment
@@ -1121,19 +1112,8 @@ int main(int argc, char** argv)
                         matP = matV.inv() * matV2;
                     }
 
-                    if (isDegenerate)
-                    {
-                        degenerate_count ++;
-                        #ifdef USE_OPENCV_SOLVER
-                        cv::Mat matX2(6, 1, CV_32F, cv::Scalar::all(0));
-                        matX.copyTo(matX2);
-                        matX = matP * matX2;
-                        #else
-                        solution = Eigen::VectorXf::Zero(DIM_OF_STATES);
-                        #endif
-                    }
-
                     Eigen::Vector3d rot_add, t_add, v_add, bg_add, ba_add, g_add;
+                    Eigen::VectorXd solution(DIM_OF_STATES);
 
                     if (Need_Init)
                     {
@@ -1147,15 +1127,15 @@ int main(int argc, char** argv)
 
                         auto H_init_T = H_init.transpose();
                         auto &&K_init = cov_stat_cur * H_init_T * (H_init * cov_stat_cur * H_init_T + 0.00001 * Eigen::Matrix<double,9,9>::Identity()).inverse();
-                        auto solution_init = K_init * z_init;
+                        solution      = K_init * z_init;
                         for (int ind = 0; ind < 3; ind ++)
                         {
-                            rot_add[ind] = solution_init(ind);
-                            t_add[ind]   = solution_init(ind+3);
-                            v_add[ind]   = solution_init(ind+6);
-                            bg_add[ind]  = solution_init(ind+9);
-                            ba_add[ind]  = solution_init(ind+12);
-                            g_add[ind]   = solution_init(ind+15);
+                            rot_add[ind] = solution(ind);
+                            t_add[ind]   = solution(ind+3);
+                            v_add[ind]   = solution(ind+6);
+                            bg_add[ind]  = solution(ind+9);
+                            ba_add[ind]  = solution(ind+12);
+                            g_add[ind]   = solution(ind+15);
                         }
 
                         R_global_cur.setIdentity();
@@ -1167,6 +1147,14 @@ int main(int argc, char** argv)
                     }
                     else
                     {
+                        cov_stat_cur = cov_stat_cur / LASER_POINT_COV;
+                        std::cout<<"***Sigma:"<<cov_stat_cur.diagonal().transpose()<<std::endl;
+                        auto &&H_T = H.transpose();
+                        auto &&K_1 = (H_T * H + (cov_stat_cur).inverse()).inverse();
+                        auto &&K   = K_1 * H_T;
+                        solution   = K * res;
+                        // std::cout<<"***Sigma: \n"<<cov_stat_cur_f<<std::endl;
+                        // std::cout<<"***solution: "<<solution.transpose()<<std::endl;
                         for (int ind = 0; ind < 3; ind ++)
                         {
                             #ifdef USE_OPENCV_SOLVER
@@ -1190,16 +1178,26 @@ int main(int argc, char** argv)
                         gravity += g_add;
 
                         deltaR = rot_add.norm() * 57.3;
-                        deltaT = t_add.norm() * 100;
+                        deltaT = t_add.norm() * 100.0;
 
-                        cov_stat_cur_f = (Eigen::MatrixXf::Identity(DIM_OF_STATES, DIM_OF_STATES) - K * H) * cov_stat_cur_f;
-                        cov_stat_cur   = cov_stat_cur_f.cast<double>() * LASER_POINT_COV;
+                        cov_stat_cur = (Eigen::MatrixXd::Identity(DIM_OF_STATES, DIM_OF_STATES) - K * H) * cov_stat_cur * LASER_POINT_COV;
+                        // cov_stat_cur   = cov_stat_cur_f.cast<double>() * LASER_POINT_COV;
+                    }
+
+                    if (isDegenerate)
+                    {
+                        degenerate_count ++;
+                        #ifdef USE_OPENCV_SOLVER
+                        cv::Mat matX2(6, 1, CV_32F, cv::Scalar::all(0));
+                        matX.copyTo(matX2);
+                        matX = matP * matX2;
+                        #endif
                     }
 
                     // V_global_cur = (T_global_cur - T_global_last) / (timeIMUkpCur - timeIMUkpLast);
                     Eigen::Vector3d euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
                     std::cout<<"transformTobeMapped: "<<euler_cur.transpose()<<" "<<T_global_cur.transpose()<<"delta R and T: "<<deltaR<<" "<<deltaT<<" average res: "<<total_residual/laserCloudSelNum<<" total points: "<<laserCloudSelNum<<std::endl;
-                    std::cout<<"***states: bg "<<bias_g.transpose()<<" ba "<<bias_a.transpose()<<std::endl;
+                    std::cout<<"***solution: "<<solution.transpose()<<std::endl;
 
                     transformTobeMapped[0] = euler_cur(0);
                     transformTobeMapped[1] = euler_cur(1);
