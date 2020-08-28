@@ -65,7 +65,7 @@ namespace plt = matplotlibcpp;
 #define NUM_MATCH_POINTS (5)
 #define NUM_MAX_ITERATIONS (15)
 #define LASER_FRAME_INTEVAL (0.1)
-#define LASER_POINT_COV (0.00001)
+#define LASER_POINT_COV (0.0001)
 
 typedef pcl::PointXYZI PointType;
 
@@ -1061,7 +1061,10 @@ int main(int argc, char** argv)
                     {
                         rematch_en = true;
                         rematch_num ++;
+<<<<<<< HEAD
                         std::cout<<"``````ReMatch!!!``````"<<std::endl;
+=======
+>>>>>>> d792a17dba2d04c9cddec5908ef99471ed92356f
                     }
                     else
                     {
