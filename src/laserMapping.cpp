@@ -750,134 +750,17 @@ int main(int argc, char** argv)
                 pcl::KdTreeFLANN<PointType> kdtreeSurfFromMap_tmpt;
                 kdtreeSurfFromMap_tmpt.setInputCloud(laserCloudSurfFromMap);
                 
-                int num_temp = 0;
+                int  rematch_num = 0;
+                bool rematch_en = 0;
+
+                std::vector<bool> point_selected(laserCloudSurf_down_size, true);
+                std::vector<std::vector<int>> pointSearchInd(laserCloudSurf_down_size);
                 
                 for (iterCount = 0; iterCount < NUM_MAX_ITERATIONS; iterCount++) 
                 {
-                    num_temp++;
                     laserCloudOri->clear();
                     coeffSel->clear();
-                    std::vector<bool> point_selected(laserCloudSurf_down_size, false);
-
-#ifdef USING_CORNER
-                    for (int i = 0; i < laserCloudCornerLast->points.size(); i++) 
-                    {
-                        pointOri = laserCloudCornerLast->points[i];
-
-                        pointAssociateToMap(&pointOri, &pointSel);
-                        //find the closest 5 points
-                        kdtreeCornerFromMap->nearestKSearch(pointSel, 5, pointSearchInd, pointSearchSqDis);
-
-                        if (pointSearchSqDis[4] < 1.5)
-                        {
-                            float cx = 0;
-                            float cy = 0;
-                            float cz = 0;
-                            for (int j = 0; j < 5; j++)
-                            {
-                                cx += laserCloudCornerFromMap->points[pointSearchInd[j]].x;
-                                cy += laserCloudCornerFromMap->points[pointSearchInd[j]].y;
-                                cz += laserCloudCornerFromMap->points[pointSearchInd[j]].z;
-                            }
-                            cx /= 5;
-                            cy /= 5;
-                            cz /= 5;
-                            //mean square error
-                            float a11 = 0;
-                            float a12 = 0;
-                            float a13 = 0;
-                            float a22 = 0;
-                            float a23 = 0;
-                            float a33 = 0;
-                            for (int j = 0; j < 5; j++)
-                            {
-                                float ax = laserCloudCornerFromMap->points[pointSearchInd[j]].x - cx;
-                                float ay = laserCloudCornerFromMap->points[pointSearchInd[j]].y - cy;
-                                float az = laserCloudCornerFromMap->points[pointSearchInd[j]].z - cz;
-
-                                a11 += ax * ax;
-                                a12 += ax * ay;
-                                a13 += ax * az;
-                                a22 += ay * ay;
-                                a23 += ay * az;
-                                a33 += az * az;
-                            }
-                            a11 /= 5;
-                            a12 /= 5;
-                            a13 /= 5;
-                            a22 /= 5;
-                            a23 /= 5;
-                            a33 /= 5;
-
-                            matA1.at<float>(0, 0) = a11;
-                            matA1.at<float>(0, 1) = a12;
-                            matA1.at<float>(0, 2) = a13;
-                            matA1.at<float>(1, 0) = a12;
-                            matA1.at<float>(1, 1) = a22;
-                            matA1.at<float>(1, 2) = a23;
-                            matA1.at<float>(2, 0) = a13;
-                            matA1.at<float>(2, 1) = a23;
-                            matA1.at<float>(2, 2) = a33;
-
-                            cv::eigen(matA1, matD1, matV1);
-
-                            if (matD1.at<float>(0, 0) > 3 * matD1.at<float>(0, 1))
-                            {
-                                float x0 = pointSel.x;
-                                float y0 = pointSel.y;
-                                float z0 = pointSel.z;
-                                float x1 = cx + 0.1 * matV1.at<float>(0, 0);
-                                float y1 = cy + 0.1 * matV1.at<float>(0, 1);
-                                float z1 = cz + 0.1 * matV1.at<float>(0, 2);
-                                float x2 = cx - 0.1 * matV1.at<float>(0, 0);
-                                float y2 = cy - 0.1 * matV1.at<float>(0, 1);
-                                float z2 = cz - 0.1 * matV1.at<float>(0, 2);
-
-                                //OA = (x0 - x1, y0 - y1, z0 - z1),OB = (x0 - x2, y0 - y2, z0 - z2)，AB = （x1 - x2, y1 - y2, z1 - z2）
-                                //cross:
-                                //|  i      j      k  |
-                                //|x0-x1  y0-y1  z0-z1|
-                                //|x0-x2  y0-y2  z0-z2|
-                                float a012 = sqrt(((x0 - x1)*(y0 - y2) - (x0 - x2)*(y0 - y1))
-                                                    * ((x0 - x1)*(y0 - y2) - (x0 - x2)*(y0 - y1))
-                                                    + ((x0 - x1)*(z0 - z2) - (x0 - x2)*(z0 - z1))
-                                                    * ((x0 - x1)*(z0 - z2) - (x0 - x2)*(z0 - z1))
-                                                    + ((y0 - y1)*(z0 - z2) - (y0 - y2)*(z0 - z1))
-                                                    * ((y0 - y1)*(z0 - z2) - (y0 - y2)*(z0 - z1)));
-
-                                float l12 = sqrt((x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2) + (z1 - z2)*(z1 - z2));
-
-                                float la = ((y1 - y2)*((x0 - x1)*(y0 - y2) - (x0 - x2)*(y0 - y1))
-                                            + (z1 - z2)*((x0 - x1)*(z0 - z2) - (x0 - x2)*(z0 - z1))) / a012 / l12;
-
-                                float lb = -((x1 - x2)*((x0 - x1)*(y0 - y2) - (x0 - x2)*(y0 - y1))
-                                                - (z1 - z2)*((y0 - y1)*(z0 - z2) - (y0 - y2)*(z0 - z1))) / a012 / l12;
-
-                                float lc = -((x1 - x2)*((x0 - x1)*(z0 - z2) - (x0 - x2)*(z0 - z1))
-                                                + (y1 - y2)*((y0 - y1)*(z0 - z2) - (y0 - y2)*(z0 - z1))) / a012 / l12;
-
-                                float ld2 = a012 / l12;
-                                //if(fabs(ld2) > 1) continue;
-
-                                float s = 1 - 0.9 * fabs(ld2);
-
-                                coeff.x = s * la;
-                                coeff.y = s * lb;
-                                coeff.z = s * lc;
-                                coeff.intensity = s * ld2;
-
-                                if (s > 0.1)
-                                {
-                                    laserCloudOri->push_back(pointOri);
-                                    coeffSel->push_back(coeff);
-                                }
-                            }
-                        }
-                    }
-#endif
-                    // std::cout <<"DEBUG mapping select corner points : " << coeffSel->size() << std::endl;
                     // variables for the points matching
-
                     omp_set_num_threads(4);
                     #pragma omp parallel for
                     for (int i = 0; i < laserCloudSurf_down_size; i++)
@@ -886,119 +769,85 @@ int main(int argc, char** argv)
                         PointType &pointSel_tmpt = laserCloudSurf_down_updated->points[i];
                         pointAssociateToMap(&pointOri_tmpt, &pointSel_tmpt);
 
-                        std::vector<int> pointSearchInd;
                         std::vector<float> pointSearchSqDis;
-                        kdtreeSurfFromMap_tmpt.nearestKSearch(pointSel_tmpt, NUM_MATCH_POINTS, pointSearchInd, pointSearchSqDis);
+                        auto &points_near = pointSearchInd[i];
+                        if (iterCount == 0 || rematch_en)
+                        {
+                            /** Rematch (Reprojection) **/
+                            kdtreeSurfFromMap_tmpt.nearestKSearch(pointSel_tmpt, NUM_MATCH_POINTS, points_near, pointSearchSqDis);
+                            if (*max_element(pointSearchSqDis.begin(), pointSearchSqDis.end()) < 0.5)
+                            {
+                                point_selected[i] = true;
+                            }
+                        }
+                        
+                        if (! point_selected[i]) continue;
 
-                        double svd_start = omp_get_wtime();
-
-                        // Eigen::Vector3f mass_center(0,0,0);
-                        // Eigen::Matrix<float,NUM_MATCH_POINTS,3> pointSearched;
-
-                        // for (int j = 0; j < NUM_MATCH_POINTS; j++)
-                        // {
-                        //     auto &p_searched = laserCloudSurfFromMap->points[pointSearchInd[j]];
-                        //     mass_center[0] += p_searched.x;
-                        //     mass_center[1] += p_searched.y;
-                        //     mass_center[2] += p_searched.z;
-                        //     pointSearched.row(j) << p_searched.x, p_searched.y, p_searched.z;
-                        // }
-
-                        // mass_center = mass_center / NUM_MATCH_POINTS;
-
-                        // for (int j = 0; j < NUM_MATCH_POINTS; j++)
-                        // {
-                        //     pointSearched.row(j) -= mass_center;
-                        // }
-
-                        // Eigen::JacobiSVD<Eigen::MatrixXf> svd(pointSearched, Eigen::ComputeThinV );
-                        // const auto &E = svd.singularValues();
-                        // const auto &V = svd.matrixV();
-                        // // const auto &U = svd.matrixU();
-
-                        // float res = 0;
-                        // if (E[0] > 3.0 * E[2])
-                        // {
-                        //     auto &p = pointSel_tmpt;
-                        //     res = (mass_center - Eigen::Vector3f(p.x, p.y, p.z)).transpose() * V.col(2);
-
-                        //     coeff_tmpt.x = -1 * V(0,2);
-                        //     coeff_tmpt.y = -1 * V(1,2);
-                        //     coeff_tmpt.z = -1 * V(2,2);
-                        //     coeff_tmpt.intensity = res;
-
-                        //     // point_selected[i] = true;
-                        //     coeffSel_tmpt->points[i] = coeff_tmpt;
-
-                        //     // static int jjj = 0; jjj ++; if (jjj % 1000 == 0) {std::cout<<"!!!!!!SVD eigens: "<<E<<" V: "<<V <<" res: "<<res<<std::endl;
-                        //     //         std::cout<<coeff_tmpt.x<<" "<<coeff_tmpt.y<<" "<<coeff_tmpt.z<<" "<<coeff_tmpt.intensity<<std::endl;}
-                        // }
-
-                        svd_time += omp_get_wtime() - svd_start;
                         double pca_start = omp_get_wtime();
 
                         /// using minimum square method
-                        
-                        if (*max_element(pointSearchSqDis.begin(), pointSearchSqDis.end()) < 0.5)
+                        cv::Mat matA0(NUM_MATCH_POINTS, 3, CV_32F, cv::Scalar::all(0));
+                        cv::Mat matB0(NUM_MATCH_POINTS, 1, CV_32F, cv::Scalar::all(-1));
+                        cv::Mat matX0(NUM_MATCH_POINTS, 1, CV_32F, cv::Scalar::all(0));
+
+                        for (int j = 0; j < NUM_MATCH_POINTS; j++)
                         {
-                            cv::Mat matA0(NUM_MATCH_POINTS, 3, CV_32F, cv::Scalar::all(0));
-                            cv::Mat matB0(NUM_MATCH_POINTS, 1, CV_32F, cv::Scalar::all(-1));
-                            cv::Mat matX0(NUM_MATCH_POINTS, 1, CV_32F, cv::Scalar::all(0));
+                            matA0.at<float>(j, 0) = laserCloudSurfFromMap->points[points_near[j]].x;
+                            matA0.at<float>(j, 1) = laserCloudSurfFromMap->points[points_near[j]].y;
+                            matA0.at<float>(j, 2) = laserCloudSurfFromMap->points[points_near[j]].z;
+                        }
 
-                            for (int j = 0; j < NUM_MATCH_POINTS; j++)
+                        //matA0*matX0=matB0
+                        //AX+BY+CZ+D = 0 <=> AX+BY+CZ=-D <=> (A/D)X+(B/D)Y+(C/D)Z = -1
+                        //(X,Y,Z)<=>mat_a0
+                        //A/D, B/D, C/D <=> mat_x0
+            
+                        cv::solve(matA0, matB0, matX0, cv::DECOMP_QR);  //TODO
+
+                        float pa = matX0.at<float>(0, 0);
+                        float pb = matX0.at<float>(1, 0);
+                        float pc = matX0.at<float>(2, 0);
+                        float pd = 1;
+
+                        //ps is the norm of the plane normal vector
+                        //pd is the distance from point to plane
+                        float ps = sqrt(pa * pa + pb * pb + pc * pc);
+                        pa /= ps;
+                        pb /= ps;
+                        pc /= ps;
+                        pd /= ps;
+
+                        bool planeValid = true;
+                        for (int j = 0; j < NUM_MATCH_POINTS; j++)
+                        {
+                            if (fabs(pa * laserCloudSurfFromMap->points[points_near[j]].x +
+                                        pb * laserCloudSurfFromMap->points[points_near[j]].y +
+                                        pc * laserCloudSurfFromMap->points[points_near[j]].z + pd) > 0.05)
                             {
-                                matA0.at<float>(j, 0) = laserCloudSurfFromMap->points[pointSearchInd[j]].x;
-                                matA0.at<float>(j, 1) = laserCloudSurfFromMap->points[pointSearchInd[j]].y;
-                                matA0.at<float>(j, 2) = laserCloudSurfFromMap->points[pointSearchInd[j]].z;
+                                planeValid = false;
+                                point_selected[i] = false;
+                                break;
                             }
+                        }
 
-                            //matA0*matX0=matB0
-                            //AX+BY+CZ+D = 0 <=> AX+BY+CZ=-D <=> (A/D)X+(B/D)Y+(C/D)Z = -1
-                            //(X,Y,Z)<=>mat_a0
-                            //A/D, B/D, C/D <=> mat_x0
-                
-                            cv::solve(matA0, matB0, matX0, cv::DECOMP_QR);  //TODO
+                        if (planeValid) 
+                        {
+                            //loss fuction
+                            float pd2 = pa * pointSel_tmpt.x + pb * pointSel_tmpt.y + pc * pointSel_tmpt.z + pd;
+                            //if(fabs(pd2) > 0.1) continue;
+                            float s = 1 - 0.9 * fabs(pd2) / sqrt(sqrt(pointSel_tmpt.x * pointSel_tmpt.x + pointSel_tmpt.y * pointSel_tmpt.y + pointSel_tmpt.z * pointSel_tmpt.z));
 
-                            float pa = matX0.at<float>(0, 0);
-                            float pb = matX0.at<float>(1, 0);
-                            float pc = matX0.at<float>(2, 0);
-                            float pd = 1;
-
-                            //ps is the norm of the plane normal vector
-                            //pd is the distance from point to plane
-                            float ps = sqrt(pa * pa + pb * pb + pc * pc);
-                            pa /= ps;
-                            pb /= ps;
-                            pc /= ps;
-                            pd /= ps;
-
-                            bool planeValid = true;
-                            for (int j = 0; j < NUM_MATCH_POINTS; j++)
+                            if (s > 0.1)
                             {
-                                if (fabs(pa * laserCloudSurfFromMap->points[pointSearchInd[j]].x +
-                                         pb * laserCloudSurfFromMap->points[pointSearchInd[j]].y +
-                                         pc * laserCloudSurfFromMap->points[pointSearchInd[j]].z + pd) > 0.05)
-                                {
-                                    planeValid = false;
-                                    break;
-                                }
+                                point_selected[i] = true;
+                                coeffSel_tmpt->points[i].x = s * pa;
+                                coeffSel_tmpt->points[i].y = s * pb;
+                                coeffSel_tmpt->points[i].z = s * pc;
+                                coeffSel_tmpt->points[i].intensity = s * pd2;
                             }
-
-                            if (planeValid) 
+                            else
                             {
-                                //loss fuction
-                                float pd2 = pa * pointSel_tmpt.x + pb * pointSel_tmpt.y + pc * pointSel_tmpt.z + pd;
-                                //if(fabs(pd2) > 0.1) continue;
-                                float s = 1 - 0.9 * fabs(pd2) / sqrt(sqrt(pointSel_tmpt.x * pointSel_tmpt.x + pointSel_tmpt.y * pointSel_tmpt.y + pointSel_tmpt.z * pointSel_tmpt.z));
-
-                                if (s > 0.1)
-                                {
-                                    point_selected[i] = true;
-                                    coeffSel_tmpt->points[i].x = s * pa;
-                                    coeffSel_tmpt->points[i].y = s * pb;
-                                    coeffSel_tmpt->points[i].z = s * pc;
-                                    coeffSel_tmpt->points[i].intensity = s * pd2;
-                                }
+                                point_selected[i] = false;
                             }
                         }
 
@@ -1148,7 +997,7 @@ int main(int argc, char** argv)
                     else
                     {
                         cov_stat_cur = cov_stat_cur / LASER_POINT_COV;
-                        std::cout<<"***Sigma:"<<cov_stat_cur.diagonal().transpose()<<std::endl;
+                        std::cout<<"***Sigma  :"<<cov_stat_cur.diagonal().transpose()<<std::endl;
                         auto &&H_T = H.transpose();
                         auto &&K_1 = (H_T * H + (cov_stat_cur).inverse()).inverse();
                         auto &&K   = K_1 * H_T;
@@ -1196,7 +1045,7 @@ int main(int argc, char** argv)
 
                     // V_global_cur = (T_global_cur - T_global_last) / (timeIMUkpCur - timeIMUkpLast);
                     Eigen::Vector3d euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
-                    std::cout<<"transformTobeMapped: "<<euler_cur.transpose()<<" "<<T_global_cur.transpose()<<"delta R and T: "<<deltaR<<" "<<deltaT<<" average res: "<<total_residual/laserCloudSelNum<<" total points: "<<laserCloudSelNum<<std::endl;
+                    std::cout<<"***new stat: "<<euler_cur.transpose()<<" "<<T_global_cur.transpose()<<"dR & dT: "<<deltaR<<" "<<deltaT<<" bias: "<<bias_a.transpose()<<" G: "<<gravity.transpose()<<" average res: "<<total_residual/laserCloudSelNum<<std::endl;
                     std::cout<<"***solution: "<<solution.transpose()<<std::endl;
 
                     transformTobeMapped[0] = euler_cur(0);
@@ -1208,13 +1057,20 @@ int main(int argc, char** argv)
 
                     solve_time += omp_get_wtime() - solve_start;
                     
-                    if (deltaR < 0.02 && deltaT < 0.03 || ave_residual <= 0.003)
+                    if ((deltaR < 0.02 && deltaT < 0.03) || ave_residual <= 0.003)
                     {
-                        break;
+                        rematch_en = true;
+                        rematch_num ++;
+                        std::cout<<"``````ReMatch!!!``````"<<std::endl;
                     }
+                    else
+                    {
+                        rematch_en = false;
+                    }
+
+                    if (rematch_num >= 2)  {rematch_num = 0; break;}
                 }
 
-                // std::cout<<"DEBUG num_temp: "<<num_temp << std::endl;
                 std::cout<<"current time: "<<timeIMUkpCur<<" iteration count: "<<iterCount+1<<" Number of Degeneration: "<<degenerate_count<<std::endl;
                 transformUpdate();
             }

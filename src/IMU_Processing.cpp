@@ -31,7 +31,7 @@
 /// *************Preconfiguration
 
 #define MAX_INI_COUNT (50)
-#define INIT_COV (0.00001)
+#define INIT_COV (0.0001)
 
 inline double rad2deg(double radians) { return radians * 180.0 / M_PI; }
 inline double deg2rad(double degrees) { return degrees * M_PI / 180.0; }
@@ -339,8 +339,8 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
   v_rot_kp_.cov = STD_VEC_FROM_EIGEN(cov_state_last); // std::vector<decltype(cov_state_last)::Scalar> (cov_state_last.data(), cov_state_last.data() + DIM_OF_STATES_SQUARE);
   
   Eigen::Vector3d euler_cur = correct_pi(R_e.eulerAngles(1, 0, 2));
-  // std::cout<<"!!!! propagated states: cov_state_last \n "<<cov_state_last*10000<<std::endl;
   std::cout<<"!!!! propagated states: gravity "<<Gravity_acc.transpose()<<std::endl;
+  std::cout<<"!!!! propagated states: cov_state_last "<<cov_state_last.diagonal().transpose()*100000<<std::endl;
 
   /*** undistort each lidar point (backward pre-integration) ***/
   auto it_pcl = pcl_in_out.points.end() - 1;
