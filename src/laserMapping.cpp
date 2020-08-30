@@ -1061,10 +1061,8 @@ int main(int argc, char** argv)
                     {
                         rematch_en = true;
                         rematch_num ++;
-<<<<<<< HEAD
                         std::cout<<"``````ReMatch!!!``````"<<std::endl;
-=======
->>>>>>> d792a17dba2d04c9cddec5908ef99471ed92356f
+
                     }
                     else
                     {
@@ -1180,11 +1178,11 @@ int main(int argc, char** argv)
             laserCloudSurround3.header.frame_id = "/camera_init";
             pubLaserCloudSurround.publish(laserCloudSurround3);
 
-            sensor_msgs::PointCloud2 laserCloudSurround3_corner;
-            pcl::toROSMsg(*laserCloudSurround2_corner, laserCloudSurround3_corner);
-            laserCloudSurround3_corner.header.stamp = ros::Time().fromSec(timeLaserCloudCornerLast);
-            laserCloudSurround3_corner.header.frame_id = "/camera_init";
-            pubLaserCloudSurround_corner.publish(laserCloudSurround3_corner);
+            // sensor_msgs::PointCloud2 laserCloudSurround3_corner;
+            // pcl::toROSMsg(*laserCloudSurround2_corner, laserCloudSurround3_corner);
+            // laserCloudSurround3_corner.header.stamp = ros::Time().fromSec(timeLaserCloudCornerLast);
+            // laserCloudSurround3_corner.header.frame_id = "/camera_init";
+            // pubLaserCloudSurround_corner.publish(laserCloudSurround3_corner);
             
             laserCloudFullRes2->clear();
             // *laserCloudFullRes2 = *laserCloudFullRes;
