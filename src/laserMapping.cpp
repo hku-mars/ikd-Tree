@@ -65,7 +65,7 @@ namespace plt = matplotlibcpp;
 #define NUM_MATCH_POINTS (5)
 #define NUM_MAX_ITERATIONS (15)
 #define LASER_FRAME_INTEVAL (0.1)
-#define LASER_POINT_COV (0.0001)
+#define LASER_POINT_COV (0.001)
 
 typedef pcl::PointXYZI PointType;
 
@@ -975,7 +975,7 @@ int main(int argc, char** argv)
                         z_init.block<3,1>(0,0)  = - T_global_cur;
 
                         auto H_init_T = H_init.transpose();
-                        auto &&K_init = cov_stat_cur * H_init_T * (H_init * cov_stat_cur * H_init_T + 0.00001 * Eigen::Matrix<double,9,9>::Identity()).inverse();
+                        auto &&K_init = cov_stat_cur * H_init_T * (H_init * cov_stat_cur * H_init_T + 0.0001 * Eigen::Matrix<double,9,9>::Identity()).inverse();
                         solution      = K_init * z_init;
                         for (int ind = 0; ind < 3; ind ++)
                         {
@@ -1062,7 +1062,6 @@ int main(int argc, char** argv)
                         rematch_en = true;
                         rematch_num ++;
                         std::cout<<"``````ReMatch!!!``````"<<std::endl;
-
                     }
                     else
                     {

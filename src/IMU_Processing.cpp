@@ -244,9 +244,9 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
   if (state_in != NULL)
   {
     KPPose state(*state_in);
-    Gravity_acc<<VEC_FROM_ARRAY(state_in->gravity);
-    bias_gyr<<VEC_FROM_ARRAY(state_in->bias_gyr);
-    bias_acc<<VEC_FROM_ARRAY(state_in->bias_acc);
+    Gravity_acc<<VEC_FROM_ARRAY(state.gravity);
+    bias_gyr<<VEC_FROM_ARRAY(state.bias_gyr);
+    bias_acc<<VEC_FROM_ARRAY(state.bias_acc);
     pos_last<<VEC_FROM_ARRAY(state.pos_end);
     vel_last<<VEC_FROM_ARRAY(state.vel_end);
     R_last  =Eigen::Map<Eigen::Matrix3d>(state.rot_end.data());
@@ -285,21 +285,26 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
     dt = tail->header.stamp.toSec() - head->header.stamp.toSec();
     
     /* covariance propagation */
-    Eigen::Matrix3d acc_avr_skew;
-    auto Exp_f = Exp(angvel_avr, dt);
+    Eigen::Matrix3d acc_avr_skew, off_vel_skew;
+    Eigen::Matrix3d Exp_f   = Exp(angvel_avr, dt);
+    Eigen::Vector3d off_vel = angvel_avr.cross(Lidar_offset_to_IMU);
     acc_avr_skew<<SKEW_SYM_MATRX(angvel_avr);
+    off_vel_skew<<SKEW_SYM_MATRX(off_vel);
 
     F_x.block<3,3>(0,0)  = Exp_f;
     F_x.block<3,3>(0,9)  = - Eye3d * dt;
+    F_x.block<3,3>(3,0)  = R_kp * off_vel_skew * dt;
     F_x.block<3,3>(3,6)  = Eye3d * dt;
     F_x.block<3,3>(6,0)  = R_kp * acc_avr_skew * dt;
     F_x.block<3,3>(6,12) = - R_kp * dt;
     F_x.block<3,3>(6,15) = Eye3d * dt;
 
-    Eigen::Matrix3d cov_acc_diag;
-    cov_acc_diag.diagonal() << cov_acc;
+    Eigen::Matrix3d cov_acc_diag(Eye3d), cov_gyr_diag(Eye3d);
+    cov_acc_diag.diagonal() = cov_acc;
+    cov_gyr_diag.diagonal() = cov_gyr;
     cov_w.block<3,3>(0,0).diagonal()   = cov_gyr * dt * dt * 10000;
-    cov_w.block<3,3>(6,6)              = R_kp * cov_acc_diag * R_kp.transpose() * dt * dt * 10;
+    cov_w.block<3,3>(3,3)              = R_kp * cov_gyr_diag * R_kp.transpose() * dt * dt * 10000;
+    cov_w.block<3,3>(6,6)              = R_kp * cov_acc_diag * R_kp.transpose() * dt * dt * 10000;
     cov_w.block<3,3>(9,9).diagonal()   = Eigen::Vector3d(0.01, 0.01, 0.01) * dt * dt; // bias gyro covariance
     cov_w.block<3,3>(12,12).diagonal() = Eigen::Vector3d(0.01, 0.01, 0.01) * dt * dt; // bias acc covariance
 
@@ -321,6 +326,8 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
     /* save the Lidar poses at each IMU measurements */
     double &&offs_t = tail->header.stamp.toSec() - pcl_beg_time;
     v_rot_kp_.pose6D.push_back(set_pose6d(offs_t, acc_kp, angvel_avr, vel_kp, pos_kp, R_kp));
+
+    // std::cout<<acc_kp<< angvel_avr<< vel_kp<< pos_kp<< R_kp<<std::endl;
   }
 
   /*** calculated the pos and attitude at the end lidar point ***/
@@ -340,7 +347,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
   
   Eigen::Vector3d euler_cur = correct_pi(R_e.eulerAngles(1, 0, 2));
   std::cout<<"!!!! propagated states: gravity "<<Gravity_acc.transpose()<<std::endl;
-  std::cout<<"!!!! propagated states: cov_state_last "<<cov_state_last.diagonal().transpose()*100000<<std::endl;
+  std::cout<<"!!!! propagated states: sta_cov "<<cov_state_last.diagonal().transpose()<<std::endl;
 
   /*** undistort each lidar point (backward pre-integration) ***/
   auto it_pcl = pcl_in_out.points.end() - 1;
@@ -555,7 +562,7 @@ void odo_cbk(const nav_msgs::Odometry::ConstPtr &msg_in)
   sig_buffer.notify_all();
 }
 
-void pose_cbk(const livox_loam_kp::KeyPointPoseConstPtr& KeyPointPose)
+void pose_cbk(const KPPoseConstPtr& KeyPointPose)
 {
     pose_buffer.push_back(KeyPointPose);
     last_timestamp_pose = pose_buffer.front()->header.stamp.toSec();
@@ -607,7 +614,6 @@ bool SyncMeasure(MeasureGroup &measgroup, KPPoseConstPtr& state_in)
   {
     state_in = pose_buffer.back();
     pose_buffer.pop_front();
-    // std::cout<<"state_in time: "<<state_in->header.stamp.toSec()<<" pos: "<<state_in->pose6D.back().pos[2]<<std::endl;
   }
   
   return true;
