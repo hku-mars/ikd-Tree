@@ -219,7 +219,7 @@ void ImuProcess::IMU_Initial(const MeasureGroup &meas, int &N)
   }
 
   Gravity_acc = - mean_acc /scale_gravity * G_m_s2;
-  R_last      = Eye3d;// Exp(mean_acc.cross(Eigen::Vector3d(0,0,-1/scale_gravity)));
+  R_last      = Eye3d; // Exp(mean_acc.cross(Eigen::Vector3d(0, 0, -1 / scale_gravity)));
   bias_gyr    = mean_gyr;
 }
 
@@ -346,8 +346,8 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
   v_rot_kp_.cov = STD_VEC_FROM_EIGEN(cov_state_last); // std::vector<decltype(cov_state_last)::Scalar> (cov_state_last.data(), cov_state_last.data() + DIM_OF_STATES_SQUARE);
   
   Eigen::Vector3d euler_cur = correct_pi(R_e.eulerAngles(1, 0, 2));
-  std::cout<<"!!!! propagated states: gravity "<<Gravity_acc.transpose()<<std::endl;
-  std::cout<<"!!!! propagated states: sta_cov "<<cov_state_last.diagonal().transpose()<<std::endl;
+  // std::cout<<"!!!! propagated states: gravity "<<Gravity_acc.transpose()<<std::endl;
+  // std::cout<<"!!!! propagated states: sta_cov "<<cov_state_last.diagonal().transpose()<<std::endl;
 
   /*** undistort each lidar point (backward pre-integration) ***/
   auto it_pcl = pcl_in_out.points.end() - 1;

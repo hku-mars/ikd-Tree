@@ -372,6 +372,8 @@ int main(int argc, char** argv)
     }
     
     std::vector<double> T1, s_plot, s_plot2, s_plot3;
+    double aver_time_consu = 0;
+    double frame_num = 0;
 
 //------------------------------------------------------------------------------------------------------
     ros::Rate rate(100);
@@ -431,7 +433,7 @@ int main(int argc, char** argv)
             transformTobeMapped[4]  = T_global_cur(1);
             transformTobeMapped[5]  = T_global_cur(2);
 
-            std::cout<<"******pre-integrated states: "<<euler_cur.transpose()<<" "<<T_global_cur.transpose()<<" "<<V_global_cur.transpose()<<" "<<bias_g.transpose()<<" "<<bias_a.transpose()<<std::endl;
+            // std::cout<<"******pre-integrated states: "<<euler_cur.transpose()<<" "<<T_global_cur.transpose()<<" "<<V_global_cur.transpose()<<" "<<bias_g.transpose()<<" "<<bias_a.transpose()<<std::endl;
             
             pointAssociateToMap(&pointOnYAxis, &pointOnYAxis);
 
@@ -997,7 +999,7 @@ int main(int argc, char** argv)
                     else
                     {
                         cov_stat_cur = cov_stat_cur / LASER_POINT_COV;
-                        std::cout<<"***Sigma  :"<<cov_stat_cur.diagonal().transpose()<<std::endl;
+                        // std::cout<<"***Sigma  :"<<cov_stat_cur.diagonal().transpose()<<std::endl;
                         auto &&H_T = H.transpose();
                         auto &&K_1 = (H_T * H + (cov_stat_cur).inverse()).inverse();
                         auto &&K   = K_1 * H_T;
@@ -1045,8 +1047,8 @@ int main(int argc, char** argv)
 
                     // V_global_cur = (T_global_cur - T_global_last) / (timeIMUkpCur - timeIMUkpLast);
                     Eigen::Vector3d euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
-                    std::cout<<"***new stat: "<<euler_cur.transpose()<<" "<<T_global_cur.transpose()<<"dR & dT: "<<deltaR<<" "<<deltaT<<" bias: "<<bias_a.transpose()<<" G: "<<gravity.transpose()<<" average res: "<<total_residual/laserCloudSelNum<<std::endl;
-                    std::cout<<"***solution: "<<solution.transpose()<<std::endl;
+                    // std::cout<<"***new stat: "<<euler_cur.transpose()<<" "<<T_global_cur.transpose()<<"dR & dT: "<<deltaR<<" "<<deltaT<<" bias: "<<bias_a.transpose()<<" G: "<<gravity.transpose()<<" average res: "<<total_residual/laserCloudSelNum<<std::endl;
+                    // std::cout<<"***solution: "<<solution.transpose()<<std::endl;
 
                     transformTobeMapped[0] = euler_cur(0);
                     transformTobeMapped[1] = euler_cur(1);
@@ -1061,7 +1063,7 @@ int main(int argc, char** argv)
                     {
                         rematch_en = true;
                         rematch_num ++;
-                        std::cout<<"``````ReMatch!!!``````"<<std::endl;
+                        // std::cout<<"``````ReMatch!!!``````"<<std::endl;
                     }
                     else
                     {
@@ -1252,12 +1254,16 @@ int main(int argc, char** argv)
 
             /*** plot variables ***/
             t4 = omp_get_wtime();
+            frame_num ++;
+            aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t3 - t1) / frame_num;
             T1.push_back(timeLaserCloudSurfLast);
-            s_plot.push_back(omp_get_wtime() - t1);
+            s_plot.push_back(aver_time_consu);
             s_plot2.push_back(double(deltaR));
             s_plot3.push_back(double(deltaT));
 
-            std::cout<<"mapping time : selection "<<t2-t1 <<" match time: "<<match_time<<"  solve time: "<<solve_time<<" pub time: "<<t4 - t3<<" total: "<<t4-t1<<std::endl;
+            
+
+            std::cout<<"mapping time : selection "<<t2-t1 <<" match time: "<<match_time<<"  solve time: "<<solve_time<<" pub time: "<<t4 - t3<<" total: "<<t3-t1<<std::endl;
             // std::cout<<"match time: "<<match_time<<"  solve time: "<<solve_time<<std::endl;
         }
         status = ros::ok();
