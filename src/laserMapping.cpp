@@ -965,6 +965,7 @@ int main(int argc, char** argv)
 
                     Eigen::Vector3d rot_add, t_add, v_add, bg_add, ba_add, g_add;
                     Eigen::VectorXd solution(DIM_OF_STATES);
+                    Eigen::MatrixXd K(DIM_OF_STATES, DIM_OF_STATES);
 
                     if (Need_Init)
                     {
@@ -998,13 +999,10 @@ int main(int argc, char** argv)
                     }
                     else
                     {
-                        cov_stat_cur = cov_stat_cur / LASER_POINT_COV;
-                        // std::cout<<"***Sigma  :"<<cov_stat_cur.diagonal().transpose()<<std::endl;
                         auto &&H_T = H.transpose();
-                        auto &&K_1 = (H_T * H + (cov_stat_cur).inverse()).inverse();
-                        auto &&K   = K_1 * H_T;
-                        solution   = K * res;
-                        // std::cout<<"***Sigma: \n"<<cov_stat_cur_f<<std::endl;
+                        Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 = (H_T * H + (cov_stat_cur / LASER_POINT_COV).inverse()).inverse();
+                        K = K_1 * H_T;
+                        solution = K * res;
                         // std::cout<<"***solution: "<<solution.transpose()<<std::endl;
                         for (int ind = 0; ind < 3; ind ++)
                         {
@@ -1030,9 +1028,6 @@ int main(int argc, char** argv)
 
                         deltaR = rot_add.norm() * 57.3;
                         deltaT = t_add.norm() * 100.0;
-
-                        cov_stat_cur = (Eigen::MatrixXd::Identity(DIM_OF_STATES, DIM_OF_STATES) - K * H) * cov_stat_cur * LASER_POINT_COV;
-                        // cov_stat_cur   = cov_stat_cur_f.cast<double>() * LASER_POINT_COV;
                     }
 
                     if (isDegenerate)
@@ -1070,7 +1065,16 @@ int main(int argc, char** argv)
                         rematch_en = false;
                     }
 
-                    if (rematch_num >= 2)  {rematch_num = 0; break;}
+                    if (rematch_num >= 2)
+                    {
+                        if (!Need_Init)
+                        {
+                            cov_stat_cur = (Eigen::MatrixXd::Identity(DIM_OF_STATES, DIM_OF_STATES) - K * H) * cov_stat_cur;
+                            std::cout<<"***Sigma: "<<cov_stat_cur.diagonal().transpose()<<std::endl;
+                        }
+                        rematch_num  = 0;
+                        break;
+                    }
                 }
 
                 std::cout<<"current time: "<<timeIMUkpCur<<" iteration count: "<<iterCount+1<<" Number of Degeneration: "<<degenerate_count<<std::endl;
