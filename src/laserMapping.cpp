@@ -1070,7 +1070,7 @@ int main(int argc, char** argv)
                         if (!Need_Init)
                         {
                             cov_stat_cur = (Eigen::MatrixXd::Identity(DIM_OF_STATES, DIM_OF_STATES) - K * H) * cov_stat_cur;
-                            std::cout<<"***Sigma: "<<cov_stat_cur.diagonal().transpose()<<std::endl;
+                            // std::cout<<"***Sigma: "<<cov_stat_cur.diagonal().transpose()<<std::endl;
                         }
                         rematch_num  = 0;
                         break;
