@@ -63,9 +63,9 @@ namespace plt = matplotlibcpp;
 // #define USING_CORNER
 #define INIT_TIME (2.0)
 #define NUM_MATCH_POINTS (5)
-#define NUM_MAX_ITERATIONS (15)
+#define NUM_MAX_ITERATIONS (10)
 #define LASER_FRAME_INTEVAL (0.1)
-#define LASER_POINT_COV (0.001)
+#define LASER_POINT_COV (0.0001)
 
 typedef pcl::PointXYZI PointType;
 
@@ -1054,7 +1054,7 @@ int main(int argc, char** argv)
 
                     solve_time += omp_get_wtime() - solve_start;
                     
-                    if ((deltaR < 0.02 && deltaT < 0.03) || ave_residual <= 0.003)
+                    if ((deltaR < 0.01 && deltaT < 0.02) || ave_residual <= 0.003)
                     {
                         rematch_en = true;
                         rematch_num ++;
@@ -1261,13 +1261,11 @@ int main(int argc, char** argv)
             frame_num ++;
             aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t3 - t1) / frame_num;
             T1.push_back(timeLaserCloudSurfLast);
-            s_plot.push_back(aver_time_consu);
+            s_plot.push_back((t3 - t1));
             s_plot2.push_back(double(deltaR));
             s_plot3.push_back(double(deltaT));
 
-            
-
-            std::cout<<"mapping time : selection "<<t2-t1 <<" match time: "<<match_time<<"  solve time: "<<solve_time<<" pub time: "<<t4 - t3<<" total: "<<t3-t1<<std::endl;
+            std::cout<<"mapping time : selection "<<t2-t1 <<" match time: "<<match_time<<"  solve time: "<<solve_time<<" with pub time: "<<t4 - t1<<" total: "<<t3-t1<<std::endl;
             // std::cout<<"match time: "<<match_time<<"  solve time: "<<solve_time<<std::endl;
         }
         status = ros::ok();

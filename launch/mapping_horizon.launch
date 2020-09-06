@@ -19,8 +19,8 @@
   <remap from="/livox/lidar" to="/livox/lidar" />
   </node>
 
-  <!-- <group if="$(arg rviz)">
+  <group if="$(arg rviz)">
     <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find livox_loam_kp)/rviz_cfg/loam_livox.rviz" />
-  </group> -->
+  </group>
 
 </launch>

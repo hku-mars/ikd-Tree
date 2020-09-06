@@ -395,7 +395,7 @@ void ImuProcess::Process(const MeasureGroup &meas, const KPPoseConstPtr &state_i
 
   process_start = omp_get_wtime();
 
-  ROS_ASSERT(!meas.imu.empty());
+  if(meas.imu.empty()) {return;};
   ROS_ASSERT(meas.lidar != nullptr);
 
   auto pcl_in_msg = meas.lidar;
