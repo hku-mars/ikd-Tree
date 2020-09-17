@@ -63,9 +63,9 @@ namespace plt = matplotlibcpp;
 // #define USING_CORNER
 #define INIT_TIME (2.0)
 #define NUM_MATCH_POINTS (5)
-#define NUM_MAX_ITERATIONS (10)
+#define NUM_MAX_ITERATIONS (15)
 #define LASER_FRAME_INTEVAL (0.1)
-#define LASER_POINT_COV (0.0001)
+#define LASER_POINT_COV (0.0014)
 
 typedef pcl::PointXYZI PointType;
 
@@ -293,14 +293,6 @@ bool sync_packages()
 
 int main(int argc, char** argv)
 {
-    // Py_Initialize(); /*初始化python解释器,告诉编译器要用的python编译器*/
-	// PyRun_SimpleString("import matplotlib.pyplot as plt"); /*调用python文件*/
-    // PyRun_SimpleString("plt.ion()");
-	// PyRun_SimpleString("plt.bar([1,2,3],[2,1,3])"); /*调用python文件*/
-	// PyRun_SimpleString("plt.show()"); /*调用python文件*/
-
-    // plt::ion();
-
     ros::init(argc, argv, "laserMapping");
     ros::NodeHandle nh;
 
@@ -312,7 +304,7 @@ int main(int argc, char** argv)
             ("/livox_cloud", 100, laserCloudFullResHandler);
 #else
     ros::Subscriber subLaserCloudFullRes = nh.subscribe<sensor_msgs::PointCloud2>
-            ("/livox_undistort", 100, laserCloudFullResHandler);
+            ("/livox_cloud", 100, laserCloudFullResHandler);
 #endif
 
     ros::Subscriber subLaserCloudSurfLast = nh.subscribe<sensor_msgs::PointCloud2>
@@ -327,7 +319,7 @@ int main(int argc, char** argv)
     ros::Publisher pubLaserCloudSurround_corner = nh.advertise<sensor_msgs::PointCloud2>
             ("/laser_cloud_surround_corner", 100);
     ros::Publisher pubLaserCloudFullRes = nh.advertise<sensor_msgs::PointCloud2>
-            ("/velodyne_cloud_registered", 100);
+            ("/cloud_registered", 100);
     ros::Publisher pubLaserCloudMap = nh.advertise<sensor_msgs::PointCloud2>
             ("/Laser_map", 100);
     ros::Publisher pubSolvedPose6D = nh.advertise<livox_loam_kp::KeyPointPose>
@@ -340,10 +332,11 @@ int main(int argc, char** argv)
     livox_loam_kp::KeyPointPose Pose6D_Solved;
 
     std::string map_file_path;
+    bool dense_map_en;
+    double filter_parameter_corner, filter_parameter_surf;
+    ros::param::get("~dense_map_enable",dense_map_en);
     ros::param::get("~map_file_path",map_file_path);
-    double filter_parameter_corner;
     ros::param::get("~filter_parameter_corner",filter_parameter_corner);
-    double filter_parameter_surf;
     ros::param::get("~filter_parameter_surf",filter_parameter_surf);
 
     PointType pointOri, pointSel, coeff;
@@ -361,7 +354,7 @@ int main(int argc, char** argv)
 
     downSizeFilterCorner.setLeafSize(filter_parameter_corner, filter_parameter_corner, filter_parameter_corner);
     downSizeFilterSurf.setLeafSize(filter_parameter_surf, filter_parameter_surf, filter_parameter_surf);
-    downSizeFilterMap.setLeafSize(0.2, 0.2, 0.2);
+    downSizeFilterMap.setLeafSize(0.3, 0.3, 0.3);
 
     for (int i = 0; i < laserCloudNum; i++)
     {
@@ -1191,7 +1184,8 @@ int main(int argc, char** argv)
             
             laserCloudFullRes2->clear();
             // *laserCloudFullRes2 = *laserCloudFullRes;
-            *laserCloudFullRes2 = *laserCloudSurf_down;
+            // *laserCloudFullRes2 = dense_map_en ? (*laserCloudSurfLast) : (* laserCloudSurf_down);
+            *laserCloudFullRes2 = dense_map_en ? (*laserCloudFullRes) : (* laserCloudSurf_down);
 
             int laserCloudFullResNum = laserCloudFullRes2->points.size();
 
