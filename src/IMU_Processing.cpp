@@ -572,13 +572,14 @@ bool SyncMeasure(MeasureGroup &measgroup, KPPoseConstPtr& state_in)
 {
   if (lidar_buffer.empty() || imu_buffer.empty()) {
     /// Note: this will happen
-    // ROS_INFO("NO IMU DATA");
+    ROS_INFO("NO IMU DATA");
     return false;
   }
 
   if (imu_buffer.back()->header.stamp.toSec() <
       lidar_buffer.front()->header.stamp.toSec()) 
   {
+    std::cout<<"LIDAR TIME WRONG: "<<imu_buffer.back()->header.stamp.toSec()<<" "<<lidar_buffer.front()->header.stamp.toSec();
     return false;
   }
 

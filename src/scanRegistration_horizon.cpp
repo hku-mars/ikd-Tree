@@ -122,6 +122,7 @@ bool plane_judge(const std::vector<PointType>& point_list,const int plane_thresh
 
 void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
 {
+  double t0 = omp_get_wtime();
   pcl::PointCloud<PointType> laserCloudIn;
   pcl::fromROSMsg(*laserCloudMsg, laserCloudIn);
 
@@ -466,6 +467,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
     // std::cout<<"ALL point: "<<cloudSize<<" outliers: "<< debugnum1 << std::endl;
   }
   
+  std::cout<<"+++++feature time: "<< omp_get_wtime() - t0 <<std::endl;
 
   sensor_msgs::PointCloud2 laserCloudOutMsg;
   pcl::toROSMsg(*laserCloud, laserCloudOutMsg);

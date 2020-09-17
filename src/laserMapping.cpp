@@ -304,7 +304,7 @@ int main(int argc, char** argv)
             ("/livox_cloud", 100, laserCloudFullResHandler);
 #else
     ros::Subscriber subLaserCloudFullRes = nh.subscribe<sensor_msgs::PointCloud2>
-            ("/livox_cloud", 100, laserCloudFullResHandler);
+            ("/livox_undistort", 100, laserCloudFullResHandler);
 #endif
 
     ros::Subscriber subLaserCloudSurfLast = nh.subscribe<sensor_msgs::PointCloud2>

@@ -17,7 +17,6 @@ void LivoxMsgCbk1(const livox_ros_driver::CustomMsgConstPtr& livox_msg_in) {
 
   for (size_t j = 0; j < livox_data.size(); j++) {
     auto& livox_msg = livox_data[j];
-    auto time_end = livox_msg->points.back().offset_time;
     for (unsigned int i = 0; i < livox_msg->point_num; ++i) {
       PointType pt;
       pt.x = livox_msg->points[i].x;

@@ -86,6 +86,9 @@ target_link_libraries(loam_scanRegistration ${catkin_LIBRARIES} ${PCL_LIBRARIES}
 add_executable(loam_scanRegistration_horizon src/scanRegistration_horizon.cpp)
 target_link_libraries(loam_scanRegistration_horizon ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
 
+add_executable(loam_feat_extract src/unity_feature.cpp)
+target_link_libraries(loam_feat_extract ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
 add_executable(loam_laserMapping src/laserMapping.cpp)
 target_link_libraries(loam_laserMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS} ${PYTHON_LIBRARIES})
 target_include_directories(loam_laserMapping PRIVATE ${PYTHON_INCLUDE_DIRS})
