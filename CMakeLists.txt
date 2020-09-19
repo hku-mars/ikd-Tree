@@ -25,7 +25,7 @@ find_path(MATPLOTLIB_CPP_INCLUDE_DIRS "matplotlibcpp.h")
 # target_include_directories(myproject PRIVATE ${PYTHON_INCLUDE_DIRS})
 # target_link_libraries(myproject ${PYTHON_LIBRARIES})
 
-set(Sophus_INCLUDE_DIRS "/usr/local/include/sophus")
+# set(Sophus_INCLUDE_DIRS "/usr/local/include/sophus")
 
 find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
@@ -45,12 +45,11 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(Eigen3 REQUIRED)
 find_package(PCL REQUIRED)
 find_package(OpenCV REQUIRED)
-find_package(Sophus REQUIRED)
+# find_package(Sophus REQUIRED)
 
 message(Eigen: ${EIGEN3_INCLUDE_DIR})
 
 include_directories(
-  ${Sophus_INCLUDE_DIRS}
 	${catkin_INCLUDE_DIRS} 
   ${EIGEN3_INCLUDE_DIR}
   ${PCL_INCLUDE_DIRS}
@@ -70,12 +69,12 @@ generate_messages(
 
 catkin_package(
   CATKIN_DEPENDS geometry_msgs nav_msgs roscpp rospy std_msgs message_runtime
-  DEPENDS EIGEN3 PCL OpenCV Sophus
+  DEPENDS EIGEN3 PCL OpenCV
   INCLUDE_DIRS
 )
 
 add_executable(imu_process src/IMU_Processing.cpp)
-target_link_libraries(imu_process ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS} ${Sophus_LIBRARIES} )
+target_link_libraries(imu_process ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
 
 add_executable(livox_repub src/livox_repub.cpp)
 target_link_libraries(livox_repub ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})

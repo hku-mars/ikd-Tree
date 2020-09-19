@@ -22,14 +22,14 @@
 	<param name="edgeb" type="double" value="0.1"/>
 	<param name="smallp_intersect" type="double" value="172.5"/>
 	<param name="smallp_ratio" type="double" value="1.2"/>
-	<param name="point_filter_num" type="int" value="4"/>
+	<param name="point_filter_num" type="int" value="3"/>
   <node pkg="livox_loam_kp" type="loam_feat_extract" name="unity_feature" output="screen"/>
 
   <node pkg="livox_loam_kp" type="loam_laserMapping" name="laserMapping" output="screen">
   <param name="map_file_path" type="string" value=" " />
   <param name="dense_map_enable" type="bool" value="true" />
   <param name="filter_parameter_corner" type="double" value="0.3" />
-  <param name="filter_parameter_surf" type="double" value="0.2" />
+  <param name="filter_parameter_surf" type="double" value="0.4" />
   </node>
 
   <!-- <node pkg="livox_loam_kp" type="loam_scanRegistration_horizon" name="scanRegistration_horizon" output="screen">

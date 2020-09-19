@@ -572,7 +572,7 @@ bool SyncMeasure(MeasureGroup &measgroup, KPPoseConstPtr& state_in)
 {
   if (lidar_buffer.empty() || imu_buffer.empty()) {
     /// Note: this will happen
-    ROS_INFO("NO IMU DATA");
+    // ROS_INFO("NO IMU DATA");
     return false;
   }
 

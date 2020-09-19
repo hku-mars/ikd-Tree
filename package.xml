@@ -26,7 +26,6 @@
   <build_depend>tf</build_depend>
   <build_depend>pcl_ros</build_depend>
   <build_depend>livox_ros_driver</build_depend>
-  <build_depend>sophus</build_depend>
   <build_depend>message_generation</build_depend>
 
   <run_depend>geometry_msgs</run_depend>
