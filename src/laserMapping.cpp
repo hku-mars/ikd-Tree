@@ -63,9 +63,9 @@ namespace plt = matplotlibcpp;
 // #define USING_CORNER
 #define INIT_TIME (2.0)
 #define NUM_MATCH_POINTS (5)
-#define NUM_MAX_ITERATIONS (15)
+#define NUM_MAX_ITERATIONS (12)
 #define LASER_FRAME_INTEVAL (0.1)
-#define LASER_POINT_COV (0.0014)
+#define LASER_POINT_COV (0.0010)
 
 typedef pcl::PointXYZI PointType;
 
@@ -770,7 +770,7 @@ int main(int argc, char** argv)
                         {
                             /** Rematch (Reprojection) **/
                             kdtreeSurfFromMap_tmpt.nearestKSearch(pointSel_tmpt, NUM_MATCH_POINTS, points_near, pointSearchSqDis);
-                            if (*max_element(pointSearchSqDis.begin(), pointSearchSqDis.end()) < 0.5)
+                            if (pointSearchSqDis[NUM_MATCH_POINTS - 1] < 5.0)
                             {
                                 point_selected[i] = true;
                             }
