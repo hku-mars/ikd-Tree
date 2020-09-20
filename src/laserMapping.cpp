@@ -333,11 +333,12 @@ int main(int argc, char** argv)
 
     std::string map_file_path;
     bool dense_map_en;
-    double filter_parameter_corner, filter_parameter_surf;
+    double filter_parameter_corner, filter_parameter_surf, filter_parameter_map;
     ros::param::get("~dense_map_enable",dense_map_en);
     ros::param::get("~map_file_path",map_file_path);
     ros::param::get("~filter_parameter_corner",filter_parameter_corner);
     ros::param::get("~filter_parameter_surf",filter_parameter_surf);
+    ros::param::get("~filter_parameter_map",filter_parameter_map);
 
     PointType pointOri, pointSel, coeff;
 
@@ -354,7 +355,7 @@ int main(int argc, char** argv)
 
     downSizeFilterCorner.setLeafSize(filter_parameter_corner, filter_parameter_corner, filter_parameter_corner);
     downSizeFilterSurf.setLeafSize(filter_parameter_surf, filter_parameter_surf, filter_parameter_surf);
-    downSizeFilterMap.setLeafSize(0.3, 0.3, 0.3);
+    downSizeFilterMap.setLeafSize(filter_parameter_map, filter_parameter_map, filter_parameter_map);
 
     for (int i = 0; i < laserCloudNum; i++)
     {
@@ -691,16 +692,13 @@ int main(int argc, char** argv)
             
             for (int i = 0; i < laserCloudValidNum; i++)
             {
-                // *laserCloudCornerFromMap += *laserCloudCornerArray[laserCloudValidInd[i]];
+                #ifdef USING_CORNER
+                *laserCloudCornerFromMap += *laserCloudCornerArray[laserCloudValidInd[i]];
+                #endif
                 *laserCloudSurfFromMap += *laserCloudSurfArray[laserCloudValidInd[i]];
-
             }
 
-#ifdef USING_CORNER
-            laserCloudCornerLast_down->clear();
-            downSizeFilterCorner.setInputCloud(laserCloudCornerLast);
-            downSizeFilterCorner.filter(*laserCloudCornerLast_down);
-#endif
+
             laserCloudSurfLast->clear();
             laserCloudSurf_down->clear();
             pcl::fromROSMsg(LaserCloudSurfaceBuff.front(), *laserCloudSurfLast);
@@ -710,13 +708,17 @@ int main(int argc, char** argv)
             downSizeFilterMap.setInputCloud(laserCloudSurfFromMap);
             downSizeFilterMap.filter(*laserCloudSurfFromMap);
 
+#ifdef USING_CORNER
+            laserCloudCornerLast_down->clear();
+            downSizeFilterCorner.setInputCloud(laserCloudCornerLast);
+            downSizeFilterCorner.filter(*laserCloudCornerLast_down);
+            int laserCloudCornerFromMapNum = laserCloudCornerFromMap->points.size();
+            std::cout<<"DEBUG MAPPING CornerLast_down : "<<laserCloudCornerLast_down->points.size()<<" corner full: "
+            <<laserCloudCornerLast->points.size()<<std::endl;
+#endif
             int laserCloudSurfFromMapNum = laserCloudSurfFromMap->points.size();
             int laserCloudSurf_down_size = laserCloudSurf_down->points.size();
 
-#ifdef USING_CORNER
-            std::cout<<"DEBUG MAPPING laserCloudCornerLast_down : "<<laserCloudCornerLast_down->points.size()<<" laserCloudSurf_down : "
-            <<laserCloudSurf_down_size<<std::endl;
-#endif
             std::cout<<"DEBUG MAPPING laserCloudSurf_down : "<<laserCloudSurf_down_size<<" laserCloudSurf : "
             <<laserCloudSurfLast->points.size()<<std::endl;
             std::cout<<"DEBUG MAPPING laserCloudValidNum : "<<laserCloudValidNum<<" laserCloudSurfFromMapNum : "
@@ -733,28 +735,144 @@ int main(int argc, char** argv)
 
 #ifdef USING_CORNER
             if (laserCloudCornerFromMapNum > 10 && laserCloudSurfFromMapNum > 100)
+            {
+                match_start = omp_get_wtime();
+                kdtreeCornerFromMap->setInputCloud(laserCloudCornerFromMap);
 #else
             if (laserCloudSurfFromMapNum > 100)
-#endif
-            {
-#ifdef USING_CORNER
-                kdtreeCornerFromMap->setInputCloud(laserCloudCornerFromMap);
-#endif
+            {  
                 match_start = omp_get_wtime();
-
+#endif
                 pcl::KdTreeFLANN<PointType> kdtreeSurfFromMap_tmpt;
                 kdtreeSurfFromMap_tmpt.setInputCloud(laserCloudSurfFromMap);
-                
+                std::vector<int> pointSearchInd_corner;
+                std::vector<float> pointSearchSqDis_corner;
+                std::vector<bool> point_selected_surf(laserCloudSurf_down_size, true);
+                std::vector<std::vector<int>> pointSearchInd_surf(laserCloudSurf_down_size);
+
                 int  rematch_num = 0;
                 bool rematch_en = 0;
-
-                std::vector<bool> point_selected(laserCloudSurf_down_size, true);
-                std::vector<std::vector<int>> pointSearchInd(laserCloudSurf_down_size);
                 
                 for (iterCount = 0; iterCount < NUM_MAX_ITERATIONS; iterCount++) 
                 {
                     laserCloudOri->clear();
                     coeffSel->clear();
+
+#ifdef USING_CONER
+                    for (int i = 0; i < laserCloudCornerLast->points.size(); i++) {
+                        pointOri = laserCloudCornerLast->points[i];
+
+                        pointAssociateToMap(&pointOri, &pointSel);
+                        //find the closest 5 points
+                        if (iterCount == 0 || rematch_en)
+                        {
+                            kdtreeCornerFromMap->nearestKSearch(pointSel, 5, pointSearchInd_corner, pointSearchSqDis_corner);
+                        }
+
+                        if (pointSearchSqDis_corner[4] < 1.5) {
+                            float cx = 0;
+                            float cy = 0;
+                            float cz = 0;
+                            for (int j = 0; j < 5; j++) {
+                                cx += laserCloudCornerFromMap->points[pointSearchInd_corner[j]].x;
+                                cy += laserCloudCornerFromMap->points[pointSearchInd_corner[j]].y;
+                                cz += laserCloudCornerFromMap->points[pointSearchInd_corner[j]].z;
+                            }
+                            cx /= 5;
+                            cy /= 5;
+                            cz /= 5;
+                            //mean square error
+                            float a11 = 0;
+                            float a12 = 0;
+                            float a13 = 0;
+                            float a22 = 0;
+                            float a23 = 0;
+                            float a33 = 0;
+                            for (int j = 0; j < 5; j++) {
+                                float ax = laserCloudCornerFromMap->points[pointSearchInd_corner[j]].x - cx;
+                                float ay = laserCloudCornerFromMap->points[pointSearchInd_corner[j]].y - cy;
+                                float az = laserCloudCornerFromMap->points[pointSearchInd_corner[j]].z - cz;
+
+                                a11 += ax * ax;
+                                a12 += ax * ay;
+                                a13 += ax * az;
+                                a22 += ay * ay;
+                                a23 += ay * az;
+                                a33 += az * az;
+                            }
+                            a11 /= 5;
+                            a12 /= 5;
+                            a13 /= 5;
+                            a22 /= 5;
+                            a23 /= 5;
+                            a33 /= 5;
+
+                            matA1.at<float>(0, 0) = a11;
+                            matA1.at<float>(0, 1) = a12;
+                            matA1.at<float>(0, 2) = a13;
+                            matA1.at<float>(1, 0) = a12;
+                            matA1.at<float>(1, 1) = a22;
+                            matA1.at<float>(1, 2) = a23;
+                            matA1.at<float>(2, 0) = a13;
+                            matA1.at<float>(2, 1) = a23;
+                            matA1.at<float>(2, 2) = a33;
+
+                            cv::eigen(matA1, matD1, matV1);
+
+                            if (matD1.at<float>(0, 0) > 3 * matD1.at<float>(0, 1)) {
+
+                                float x0 = pointSel.x;
+                                float y0 = pointSel.y;
+                                float z0 = pointSel.z;
+                                float x1 = cx + 0.1 * matV1.at<float>(0, 0);
+                                float y1 = cy + 0.1 * matV1.at<float>(0, 1);
+                                float z1 = cz + 0.1 * matV1.at<float>(0, 2);
+                                float x2 = cx - 0.1 * matV1.at<float>(0, 0);
+                                float y2 = cy - 0.1 * matV1.at<float>(0, 1);
+                                float z2 = cz - 0.1 * matV1.at<float>(0, 2);
+
+                                //OA = (x0 - x1, y0 - y1, z0 - z1),OB = (x0 - x2, y0 - y2, z0 - z2)，AB = （x1 - x2, y1 - y2, z1 - z2）
+                                //cross:
+                                //|  i      j      k  |
+                                //|x0-x1  y0-y1  z0-z1|
+                                //|x0-x2  y0-y2  z0-z2|
+                                float a012 = sqrt(((x0 - x1)*(y0 - y2) - (x0 - x2)*(y0 - y1))
+                                                    * ((x0 - x1)*(y0 - y2) - (x0 - x2)*(y0 - y1))
+                                                    + ((x0 - x1)*(z0 - z2) - (x0 - x2)*(z0 - z1))
+                                                    * ((x0 - x1)*(z0 - z2) - (x0 - x2)*(z0 - z1))
+                                                    + ((y0 - y1)*(z0 - z2) - (y0 - y2)*(z0 - z1))
+                                                    * ((y0 - y1)*(z0 - z2) - (y0 - y2)*(z0 - z1)));
+
+                                float l12 = sqrt((x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2) + (z1 - z2)*(z1 - z2));
+
+                                float la = ((y1 - y2)*((x0 - x1)*(y0 - y2) - (x0 - x2)*(y0 - y1))
+                                            + (z1 - z2)*((x0 - x1)*(z0 - z2) - (x0 - x2)*(z0 - z1))) / a012 / l12;
+
+                                float lb = -((x1 - x2)*((x0 - x1)*(y0 - y2) - (x0 - x2)*(y0 - y1))
+                                                - (z1 - z2)*((y0 - y1)*(z0 - z2) - (y0 - y2)*(z0 - z1))) / a012 / l12;
+
+                                float lc = -((x1 - x2)*((x0 - x1)*(z0 - z2) - (x0 - x2)*(z0 - z1))
+                                                + (y1 - y2)*((y0 - y1)*(z0 - z2) - (y0 - y2)*(z0 - z1))) / a012 / l12;
+
+                                float ld2 = a012 / l12;
+                                //if(fabs(ld2) > 1) continue;
+
+                                float s = 1 - 0.9 * fabs(ld2);
+
+                                coeff.x = s * la;
+                                coeff.y = s * lb;
+                                coeff.z = s * lc;
+                                coeff.intensity = s * ld2;
+
+                                if (s > 0.1) {
+                                    laserCloudOri->push_back(pointOri);
+                                    coeffSel->push_back(coeff);
+                                }
+                            }
+                        }
+                    }
+#endif
+
                     // variables for the points matching
                     omp_set_num_threads(4);
                     #pragma omp parallel for
@@ -764,19 +882,19 @@ int main(int argc, char** argv)
                         PointType &pointSel_tmpt = laserCloudSurf_down_updated->points[i];
                         pointAssociateToMap(&pointOri_tmpt, &pointSel_tmpt);
 
-                        std::vector<float> pointSearchSqDis;
-                        auto &points_near = pointSearchInd[i];
+                        std::vector<float> pointSearchSqDis_surf;
+                        auto &points_near = pointSearchInd_surf[i];
                         if (iterCount == 0 || rematch_en)
                         {
                             /** Rematch (Reprojection) **/
-                            kdtreeSurfFromMap_tmpt.nearestKSearch(pointSel_tmpt, NUM_MATCH_POINTS, points_near, pointSearchSqDis);
-                            if (pointSearchSqDis[NUM_MATCH_POINTS - 1] < 5.0)
+                            kdtreeSurfFromMap_tmpt.nearestKSearch(pointSel_tmpt, NUM_MATCH_POINTS, points_near, pointSearchSqDis_surf);
+                            if (pointSearchSqDis_surf[NUM_MATCH_POINTS - 1] < 5.0)
                             {
-                                point_selected[i] = true;
+                                point_selected_surf[i] = true;
                             }
                         }
                         
-                        if (! point_selected[i]) continue;
+                        if (! point_selected_surf[i]) continue;
 
                         double pca_start = omp_get_wtime();
 
@@ -820,7 +938,7 @@ int main(int argc, char** argv)
                                         pc * laserCloudSurfFromMap->points[points_near[j]].z + pd) > 0.05)
                             {
                                 planeValid = false;
-                                point_selected[i] = false;
+                                point_selected_surf[i] = false;
                                 break;
                             }
                         }
@@ -834,7 +952,7 @@ int main(int argc, char** argv)
 
                             if (s > 0.1)
                             {
-                                point_selected[i] = true;
+                                point_selected_surf[i] = true;
                                 coeffSel_tmpt->points[i].x = s * pa;
                                 coeffSel_tmpt->points[i].y = s * pb;
                                 coeffSel_tmpt->points[i].z = s * pc;
@@ -842,7 +960,7 @@ int main(int argc, char** argv)
                             }
                             else
                             {
-                                point_selected[i] = false;
+                                point_selected_surf[i] = false;
                             }
                         }
 
@@ -853,17 +971,18 @@ int main(int argc, char** argv)
                     for (int i = 0; i < coeffSel_tmpt->points.size(); i++)
                     {
                         float error_abs = std::abs(coeffSel_tmpt->points[i].intensity);
-                        if (point_selected[i] && (error_abs < 0.5))
+                        if (point_selected_surf[i] && (error_abs < 0.5))
                         {
                             laserCloudOri->push_back(laserCloudSurf_down->points[i]);
                             coeffSel->push_back(coeffSel_tmpt->points[i]);
                             total_residual += error_abs;
                         }
                     }
+
                     int laserCloudSelNum = laserCloudOri->points.size();
                     double ave_residual = total_residual / laserCloudSelNum;
 
-                    // std::cout << "DEBUG mapping select all points : " << coeffSel->size() << "  " << count_effect_point << std::endl;
+                    std::cout << "DEBUG mapping select all points : " << coeffSel->size() << "  " << count_effect_point << std::endl;
                     count_effect_point = 0;
 
                     match_time += omp_get_wtime() - match_start;
@@ -1035,7 +1154,7 @@ int main(int argc, char** argv)
 
                     // V_global_cur = (T_global_cur - T_global_last) / (timeIMUkpCur - timeIMUkpLast);
                     Eigen::Vector3d euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
-                    // std::cout<<"***new stat: "<<euler_cur.transpose()<<" "<<T_global_cur.transpose()<<"dR & dT: "<<deltaR<<" "<<deltaT<<" bias: "<<bias_a.transpose()<<" G: "<<gravity.transpose()<<" average res: "<<total_residual/laserCloudSelNum<<std::endl;
+                    std::cout<<"***new stat: "<<euler_cur.transpose()<<" "<<T_global_cur.transpose()<<"dR & dT: "<<deltaR<<" "<<deltaT<<" bias: "<<bias_a.transpose()<<" G: "<<gravity.transpose()<<" average res: "<<total_residual/laserCloudSelNum<<std::endl;
                     // std::cout<<"***solution: "<<solution.transpose()<<std::endl;
 
                     transformTobeMapped[0] = euler_cur(0);
@@ -1047,7 +1166,7 @@ int main(int argc, char** argv)
 
                     solve_time += omp_get_wtime() - solve_start;
                     
-                    if ((deltaR < 0.01 && deltaT < 0.02) || ave_residual <= 0.003)
+                    if ((deltaR < 0.02 && deltaT < 0.05) || ave_residual <= 0.003)
                     {
                         rematch_en = true;
                         rematch_num ++;
@@ -1068,6 +1187,8 @@ int main(int argc, char** argv)
                         rematch_num  = 0;
                         break;
                     }
+
+                    
                 }
 
                 std::cout<<"current time: "<<timeIMUkpCur<<" iteration count: "<<iterCount+1<<" Number of Degeneration: "<<degenerate_count<<std::endl;
@@ -1204,11 +1325,11 @@ int main(int argc, char** argv)
             laserCloudFullRes3.header.frame_id = "/camera_init";
             pubLaserCloudFullRes.publish(laserCloudFullRes3);
 
-            // sensor_msgs::PointCloud2 laserCloudMap;
-            // pcl::toROSMsg(*laserCloudSurfFromMap, laserCloudMap);
-            // laserCloudMap.header.stamp = ros::Time().fromSec(timeLaserCloudCornerLast);
-            // laserCloudMap.header.frame_id = "/camera_init";
-            // pubLaserCloudMap.publish(laserCloudMap);
+            sensor_msgs::PointCloud2 laserCloudMap;
+            pcl::toROSMsg(*laserCloudSurfFromMap, laserCloudMap);
+            laserCloudMap.header.stamp = ros::Time().fromSec(timeLaserCloudCornerLast);
+            laserCloudMap.header.frame_id = "/camera_init";
+            pubLaserCloudMap.publish(laserCloudMap);
 
             *laserCloudFullResColor_pcd += *laserCloudFullResColor;
 
@@ -1255,7 +1376,7 @@ int main(int argc, char** argv)
             frame_num ++;
             aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t3 - t1) / frame_num;
             T1.push_back(timeLaserCloudSurfLast);
-            s_plot.push_back((t3 - t1));
+            s_plot.push_back((t4 - t1));
             s_plot2.push_back(double(deltaR));
             s_plot3.push_back(double(deltaT));
 
