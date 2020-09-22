@@ -45,7 +45,7 @@ Clone the repository and catkin_make:
 Connect to your PC to Livox Avia LiDAR following [Livox-ros-driver installation](https://github.com/Livox-SDK/livox_ros_driver), then
 ```
     ....
-    roslaunch like_loam mapping_avia_indoor.launch
+    roslaunch like_loam mapping_avia_outdoor.launch
     roslaunch livox_ros_driver livox_lidar_msg.launch
     
 ```
@@ -53,7 +53,7 @@ Connect to your PC to Livox Avia LiDAR following [Livox-ros-driver installation]
 Connect to your PC to Livox Avia LiDAR by following  [Livox-ros-driver installation](https://github.com/Livox-SDK/livox_ros_driver), then
 ```
     ....
-    roslaunch livox_mapping mapping_avia_outdoor.launch
+    roslaunch livox_mapping mapping_avia_indoor.launch
     roslaunch livox_ros_driver livox_lidar_msg.launch
     
 ```
@@ -66,7 +66,7 @@ Connect to your PC to Livox Avia LiDAR by following  [Livox-ros-driver installat
 
 Download [avia_hku_mb_example](https://drive.google.com/file/d/1GSb9eLQuwqmgI3VWSB5ApEUhOCFG_Sv5/view?usp=sharing) and then
 ```
-roslaunch livox_mapping mapping_mid.launch
+roslaunch livox_mapping mapping_avia_outdoor.launch
 rosbag play YOUR_DOWNLOADED.bag
 ```
 ### 4.2 Livox Avia indoor rosbag
@@ -75,7 +75,7 @@ rosbag play YOUR_DOWNLOADED.bag
 
 Download [avia_indoor_quick_shake_example](https://drive.google.com/file/d/1SWmrwlUD5FlyA-bTr1rakIYx1GxS4xNl/view?usp=sharing) and then
 ```
-roslaunch livox_mapping mapping_mid.launch
+roslaunch livox_mapping mapping_avia_indoor.launch
 rosbag play YOUR_DOWNLOADED.bag
 ```
 
