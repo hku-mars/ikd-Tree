@@ -427,7 +427,7 @@ int main(int argc, char** argv)
             transformTobeMapped[4]  = T_global_cur(1);
             transformTobeMapped[5]  = T_global_cur(2);
 
-            // std::cout<<"******pre-integrated states: "<<euler_cur.transpose()<<" "<<T_global_cur.transpose()<<" "<<V_global_cur.transpose()<<" "<<bias_g.transpose()<<" "<<bias_a.transpose()<<std::endl;
+            std::cout<<"******pre-integrated states: "<<euler_cur.transpose()*57.3<<" "<<T_global_cur.transpose()<<" "<<V_global_cur.transpose()<<" "<<bias_g.transpose()<<" "<<bias_a.transpose()<<std::endl;
             
             pointAssociateToMap(&pointOnYAxis, &pointOnYAxis);
 
@@ -935,7 +935,7 @@ int main(int argc, char** argv)
                         {
                             if (fabs(pa * laserCloudSurfFromMap->points[points_near[j]].x +
                                         pb * laserCloudSurfFromMap->points[points_near[j]].y +
-                                        pc * laserCloudSurfFromMap->points[points_near[j]].z + pd) > 0.05)
+                                        pc * laserCloudSurfFromMap->points[points_near[j]].z + pd) > 0.1)
                             {
                                 planeValid = false;
                                 point_selected_surf[i] = false;
@@ -1154,7 +1154,7 @@ int main(int argc, char** argv)
 
                     // V_global_cur = (T_global_cur - T_global_last) / (timeIMUkpCur - timeIMUkpLast);
                     Eigen::Vector3d euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
-                    std::cout<<"***new stat: "<<euler_cur.transpose()<<" "<<T_global_cur.transpose()<<"dR & dT: "<<deltaR<<" "<<deltaT<<" bias: "<<bias_a.transpose()<<" G: "<<gravity.transpose()<<" average res: "<<total_residual/laserCloudSelNum<<std::endl;
+                    std::cout<<"***new stat: "<<euler_cur.transpose()*57.3<<" "<<T_global_cur.transpose()<<"dR & dT: "<<deltaR<<" "<<deltaT<<" bias: "<<bias_a.transpose()<<" G: "<<gravity.transpose()<<" average res: "<<total_residual/laserCloudSelNum<<std::endl;
                     // std::cout<<"***solution: "<<solution.transpose()<<std::endl;
 
                     transformTobeMapped[0] = euler_cur(0);
@@ -1291,11 +1291,11 @@ int main(int argc, char** argv)
                 *laserCloudSurround2 += *laserCloudSurfArray[ind];
             }
 
-            sensor_msgs::PointCloud2 laserCloudSurround3;
-            pcl::toROSMsg(*laserCloudSurround2, laserCloudSurround3);
-            laserCloudSurround3.header.stamp = ros::Time().fromSec(timeLaserCloudCornerLast);
-            laserCloudSurround3.header.frame_id = "/camera_init";
-            pubLaserCloudSurround.publish(laserCloudSurround3);
+            // sensor_msgs::PointCloud2 laserCloudSurround3;
+            // pcl::toROSMsg(*laserCloudSurround2, laserCloudSurround3);
+            // laserCloudSurround3.header.stamp = ros::Time().fromSec(timeLaserCloudCornerLast);
+            // laserCloudSurround3.header.frame_id = "/camera_init";
+            // pubLaserCloudSurround.publish(laserCloudSurround3);
 
             // sensor_msgs::PointCloud2 laserCloudSurround3_corner;
             // pcl::toROSMsg(*laserCloudSurround2_corner, laserCloudSurround3_corner);
@@ -1325,11 +1325,11 @@ int main(int argc, char** argv)
             laserCloudFullRes3.header.frame_id = "/camera_init";
             pubLaserCloudFullRes.publish(laserCloudFullRes3);
 
-            sensor_msgs::PointCloud2 laserCloudMap;
-            pcl::toROSMsg(*laserCloudSurfFromMap, laserCloudMap);
-            laserCloudMap.header.stamp = ros::Time().fromSec(timeLaserCloudCornerLast);
-            laserCloudMap.header.frame_id = "/camera_init";
-            pubLaserCloudMap.publish(laserCloudMap);
+            // sensor_msgs::PointCloud2 laserCloudMap;
+            // pcl::toROSMsg(*laserCloudSurfFromMap, laserCloudMap);
+            // laserCloudMap.header.stamp = ros::Time().fromSec(timeLaserCloudCornerLast);
+            // laserCloudMap.header.frame_id = "/camera_init";
+            // pubLaserCloudMap.publish(laserCloudMap);
 
             *laserCloudFullResColor_pcd += *laserCloudFullResColor;
 
@@ -1412,8 +1412,8 @@ int main(int argc, char** argv)
         if (!T1.empty())
         {
             plt::named_plot("time consumed",T1,s_plot);
-            plt::named_plot("R_residual",T1,s_plot2);
-            plt::named_plot("T_residual",T1,s_plot3);
+            // plt::named_plot("R_residual",T1,s_plot2);
+            // plt::named_plot("T_residual",T1,s_plot3);
             plt::legend();
             plt::show();
             plt::pause(0.5);

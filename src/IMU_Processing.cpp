@@ -579,7 +579,13 @@ bool SyncMeasure(MeasureGroup &measgroup, KPPoseConstPtr& state_in)
   if (imu_buffer.back()->header.stamp.toSec() <
       lidar_buffer.front()->header.stamp.toSec()) 
   {
-    std::cout<<"LIDAR TIME WRONG: "<<imu_buffer.back()->header.stamp.toSec()<<" "<<lidar_buffer.front()->header.stamp.toSec();
+    // std::cout<<"LIDAR TIME WRONG: "<<imu_buffer.back()->header.stamp.toSec()<<" "<<lidar_buffer.front()->header.stamp.toSec();
+    return false;
+  }
+
+  if ((imu_buffer.back()->header.stamp.toSec() - lidar_buffer.front()->header.stamp.toSec()) < 0.09)
+  {
+    std::cout<<"[IMU DELAY]: "<<imu_buffer.back()->header.stamp.toSec()<<" "<<lidar_buffer.front()->header.stamp.toSec()<<std::endl;
     return false;
   }
 
@@ -624,7 +630,7 @@ void ProcessLoop(std::shared_ptr<ImuProcess> p_imu)
 {
   ROS_INFO("Start ProcessLoop");
 
-  ros::Rate r(100);
+  ros::Rate r(200);
 
   while (ros::ok())
   {
