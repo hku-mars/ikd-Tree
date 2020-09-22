@@ -1,5 +1,5 @@
 ## LIKE_LOAM
-LIKE_LOAM is a lidar-initial mapping package for Livox Avia LiDAR. 
+LIKE_LOAM (Lidar Iterative Kalam Estimator LOAM) is a lidar-initial mapping package for Livox Avia LiDAR. 
 The package currently contains the basic functions of real-time mapping and localization.
 
 <div align="center">
