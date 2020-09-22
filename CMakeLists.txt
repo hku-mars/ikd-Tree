@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(livox_loam_kp)
+project(like_loam)
 
 SET(CMAKE_BUILD_TYPE "Debug")
 

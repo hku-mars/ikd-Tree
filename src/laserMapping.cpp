@@ -53,7 +53,7 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <tf/transform_datatypes.h>
 #include <tf/transform_broadcaster.h>
-#include <livox_loam_kp/KeyPointPose.h>
+#include <like_loam/KeyPointPose.h>
 #include <geometry_msgs/Vector3.h>
 #include "Exp_mat.h"
 #include "matplotlibcpp.h"
@@ -118,7 +118,7 @@ pcl::PointCloud<PointType>::Ptr laserCloudSurfFromMap(new pcl::PointCloud<PointT
 
 std::vector< Eigen::Matrix<float,7,1> > keyframe_pose;
 std::vector< Eigen::Matrix4f > pose_map;
-std::deque< livox_loam_kp::KeyPointPose > rot_kp_imu_buff;
+std::deque< like_loam::KeyPointPose > rot_kp_imu_buff;
 //all points
 pcl::PointCloud<PointType>::Ptr laserCloudFullRes(new pcl::PointCloud<PointType>());
 pcl::PointCloud<PointType>::Ptr laserCloudFullRes2(new pcl::PointCloud<PointType>());
@@ -264,7 +264,7 @@ void laserCloudFullResHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloud
     newLaserCloudFullRes = true;
 }
 
-void KeyPointPose6DHandler(const livox_loam_kp::KeyPointPoseConstPtr& KeyPointPose)
+void KeyPointPose6DHandler(const like_loam::KeyPointPoseConstPtr& KeyPointPose)
 {
     rot_kp_imu_buff.push_back(*KeyPointPose);
 
@@ -309,7 +309,7 @@ int main(int argc, char** argv)
 
     ros::Subscriber subLaserCloudSurfLast = nh.subscribe<sensor_msgs::PointCloud2>
             ("/livox_undistort", 100, laserCloudSurfLastHandler);
-    ros::Subscriber KeyPointPose6D = nh.subscribe<livox_loam_kp::KeyPointPose>
+    ros::Subscriber KeyPointPose6D = nh.subscribe<like_loam::KeyPointPose>
             ("/Pose6D_IMUKeyPoints", 100, KeyPointPose6DHandler);
 
     // ros::Subscriber subIMUOri = nh.subscribe<sensor_msgs::>
@@ -322,14 +322,14 @@ int main(int argc, char** argv)
             ("/cloud_registered", 100);
     ros::Publisher pubLaserCloudMap = nh.advertise<sensor_msgs::PointCloud2>
             ("/Laser_map", 100);
-    ros::Publisher pubSolvedPose6D = nh.advertise<livox_loam_kp::KeyPointPose>
+    ros::Publisher pubSolvedPose6D = nh.advertise<like_loam::KeyPointPose>
             ("/Pose6D_Solved", 100);
     
     ros::Publisher pubOdomAftMapped = nh.advertise<nav_msgs::Odometry> ("/aft_mapped_to_init", 10);
     nav_msgs::Odometry odomAftMapped;
     odomAftMapped.header.frame_id = "/camera_init";
     odomAftMapped.child_frame_id = "/aft_mapped";
-    livox_loam_kp::KeyPointPose Pose6D_Solved;
+    like_loam::KeyPointPose Pose6D_Solved;
 
     std::string map_file_path;
     bool dense_map_en;
