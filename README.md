@@ -60,7 +60,7 @@ Connect to your PC to Livox Avia LiDAR by following  [Livox-ros-driver installat
 ## 4. Rosbag Example
 ### 4.1 Livox Avia outdoor rosbag
 
-<div align="center"><img src="doc/results/HKU_MB_002.png" width=90% /></div>
+<div align="center"><img src="doc/results/HKU_MB_002.png" width=100% /></div>
 
 <!-- <div align="center"><img src="doc/results/mid40_outdoor.png" width=90% /></div> -->
 
@@ -71,7 +71,7 @@ rosbag play YOUR_DOWNLOADED.bag
 ```
 ### 4.2 Livox Avia indoor rosbag
 
-<div align="center"><img src="doc/results/HKU_LG_Indoor.png" width=90% /></div>
+<div align="center"><img src="doc/results/HKU_LG_Indoor.png" width=100% /></div>
 
 Download [avia_indoor_quick_shake_example](https://drive.google.com/file/d/1SWmrwlUD5FlyA-bTr1rakIYx1GxS4xNl/view?usp=sharing) and then
 ```
