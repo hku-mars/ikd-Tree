@@ -8,7 +8,7 @@ The package currently contains the basic functions of real-time mapping and loca
 </div>
 
 Some key issues:
-1. Realtime tightly coupled LiDAR-IMU Fusion;
+1. Real-time tightly-coupled LiDAR-IMU Fusion;
 2. Remove odometry;
 3. Robust feature extraction.
 
