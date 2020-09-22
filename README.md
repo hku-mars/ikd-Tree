@@ -33,6 +33,7 @@ Clone the repository and catkin_make:
 ```
     cd ~/catkin_ws/src
     git clone https://github.com/XW-HKU/LIKE_LOAM.git
+    cd ..
     catkin_make
     source devel/setup.bash
 ```
