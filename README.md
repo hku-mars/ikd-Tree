@@ -41,16 +41,16 @@ Clone the repository and catkin_make:
 *Remarks:*
 - If you want to save the pcd file please add map_file_path in launch file.
 ## 3. Directly run
-### 3.1 For indoor environments
-Connect to your PC to Livox LiDAR (mid40) by following  [Livox-ros-driver installation](https://github.com/Livox-SDK/livox_ros_driver), then
+### 3.1 For outdoor environments
+Connect to your PC to Livox Avia LiDAR following [Livox-ros-driver installation](https://github.com/Livox-SDK/livox_ros_driver), then
 ```
     ....
     roslaunch like_loam mapping_avia_indoor.launch
     roslaunch livox_ros_driver livox_lidar_msg.launch
     
 ```
-### 3.2 For outdoor environments
-Connect to your PC to Livox LiDAR (Horizon) by following  [Livox-ros-driver installation](https://github.com/Livox-SDK/livox_ros_driver), then
+### 3.2 For indoor environments
+Connect to your PC to Livox Avia LiDAR by following  [Livox-ros-driver installation](https://github.com/Livox-SDK/livox_ros_driver), then
 ```
     ....
     roslaunch livox_mapping mapping_avia_outdoor.launch
@@ -64,8 +64,7 @@ Connect to your PC to Livox LiDAR (Horizon) by following  [Livox-ros-driver inst
 
 <!-- <div align="center"><img src="doc/results/mid40_outdoor.png" width=90% /></div> -->
 
-Download [mid40_hall_example](https://terra-1-g.djicdn.com/65c028cd298f4669a7f0e40e50ba1131/Showcase/mid40_hall_example.bag) or [mid40_outdoor](https://terra-1-g.djicdn.com/65c028cd298f4669a7f0e40e50ba1131/Showcase/mid40_outdoor.bag) 
-and then
+Download [avia_hku_mb_example](https://drive.google.com/file/d/1GSb9eLQuwqmgI3VWSB5ApEUhOCFG_Sv5/view?usp=sharing) and then
 ```
 roslaunch livox_mapping mapping_mid.launch
 rosbag play YOUR_DOWNLOADED.bag
@@ -74,7 +73,7 @@ rosbag play YOUR_DOWNLOADED.bag
 
 <div align="center"><img src="doc/results/HKU_LG_Indoor.png" width=90% /></div>
 
-Download [mid100_example](https://terra-1-g.djicdn.com/65c028cd298f4669a7f0e40e50ba1131/Showcase/mid100_example.bag) and then
+Download [avia_indoor_quick_shake_example](https://drive.google.com/file/d/1SWmrwlUD5FlyA-bTr1rakIYx1GxS4xNl/view?usp=sharing) and then
 ```
 roslaunch livox_mapping mapping_mid.launch
 rosbag play YOUR_DOWNLOADED.bag
