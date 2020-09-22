@@ -8,10 +8,9 @@ The package currently contains the basic functions of real-time mapping and loca
 </div>
 
 Some key issues:
-1. Support Livox Avia;
-2. IMU Fusion;
-3. Remove odometry;
-4. New and robust feature extraction
+1. Realtime tightly coupled LiDAR-IMU Fusion;
+2. Remove odometry;
+3. Robust feature extraction.
 
 In the development of our package, we reference to LOAM, LOAM_NOTED.
 ## 1. Prerequisites
