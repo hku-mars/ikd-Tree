@@ -29,8 +29,8 @@
   <param name="map_file_path" type="string" value=" " />
   <param name="dense_map_enable" type="bool" value="true" />
   <param name="filter_parameter_corner" type="double" value="0.5" />
-  <param name="filter_parameter_surf" type="double" value="0.4" />
-  <param name="filter_parameter_map" type="double" value="0.5" />
+  <param name="filter_parameter_surf" type="double" value="0.25" />
+  <param name="filter_parameter_map" type="double" value="0.3" />
   </node>
 
   <!-- <node pkg="livox_loam_kp" type="loam_scanRegistration_horizon" name="scanRegistration_horizon" output="screen">
