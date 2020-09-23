@@ -1,5 +1,5 @@
 ## LIKE_LOAM
-LIKE_LOAM (Lidar Iterative Kalam Estimator LOAM) is a lidar-initial mapping package for Livox Avia LiDAR. 
+LIKE_LOAM (Lidar-inertial Iterative Kalam Estimator) is a tightly coupled lidar-initial mapping package, which has been tested
 The package currently contains the basic functions of real-time mapping and localization.
 
 <div align="center">
@@ -9,7 +9,7 @@ The package currently contains the basic functions of real-time mapping and loca
 
 Some key issues:
 1. Real-time tightly-coupled LiDAR-IMU Fusion;
-2. Remove odometry;
+2. Directly odometry by mapping;
 3. Robust feature extraction.
 
 In the development of our package, we reference to LOAM, LOAM_NOTED.
@@ -80,4 +80,4 @@ rosbag play YOUR_DOWNLOADED.bag
 ```
 
 ## 5.Acknowledgments
-Thanks for LOAM(J. Zhang and S. Singh. LOAM: Lidar Odometry and Mapping in Real-time), [LOAM_NOTED](https://github.com/cuitaixiang/LOAM_NOTED).
+Thanks for LOAM(J. Zhang and S. Singh. LOAM: Lidar Odometry and Mapping in Real-time), [LOAM_NOTED](https://github.com/cuitaixiang/LOAM_NOTED), [Livox_Mapping](https://github.com/Livox-SDK/livox_mapping).
