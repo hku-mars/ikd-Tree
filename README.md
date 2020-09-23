@@ -11,7 +11,6 @@ Some key issues:
 2. Directly odometry by mapping;
 3. Robust feature extraction.
 
-In the development of our package, we reference to LOAM, LOAM_NOTED.
 ## 1. Prerequisites
 ### 1.1 **Ubuntu** and **ROS**
 Ubuntu 64-bit 18.04.
