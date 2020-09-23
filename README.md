@@ -62,7 +62,7 @@ Connect to your PC to Livox Avia LiDAR by following  [Livox-ros-driver installat
 
 <!-- <div align="center"><img src="doc/results/mid40_outdoor.png" width=90% /></div> -->
 
-Download [avia_hku_mb_example](https://drive.google.com/file/d/1GSb9eLQuwqmgI3VWSB5ApEUhOCFG_Sv5/view?usp=sharing) and then
+Download [avia_hku_main building_mapping](https://drive.google.com/file/d/1GSb9eLQuwqmgI3VWSB5ApEUhOCFG_Sv5/view?usp=sharing) and then
 ```
 roslaunch like_loam mapping_avia_outdoor.launch
 rosbag play YOUR_DOWNLOADED.bag
@@ -71,7 +71,7 @@ rosbag play YOUR_DOWNLOADED.bag
 
 <div align="center"><img src="doc/results/HKU_LG_Indoor.png" width=100% /></div>
 
-Download [avia_indoor_quick_shake_example](https://drive.google.com/file/d/1SWmrwlUD5FlyA-bTr1rakIYx1GxS4xNl/view?usp=sharing) or [avia_indoor_slow_shake_example](https://drive.google.com/file/d/1wD485CIbzZlNs4z8e20Dv2Q1q-7Gv_AT/view?usp=sharing) and then
+Download [avia_indoor_quick_shake_example1](https://drive.google.com/file/d/1SWmrwlUD5FlyA-bTr1rakIYx1GxS4xNl/view?usp=sharing) or [avia_indoor_quick_shake_example2](https://drive.google.com/file/d/1wD485CIbzZlNs4z8e20Dv2Q1q-7Gv_AT/view?usp=sharing) and then
 ```
 roslaunch like_loam mapping_avia_indoor.launch
 rosbag play YOUR_DOWNLOADED.bag
