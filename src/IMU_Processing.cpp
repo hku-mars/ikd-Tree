@@ -12,7 +12,7 @@
 #include <eigen_conversions/eigen_msg.h>
 #include <condition_variable>
 
-#include <opencv2/opencv.hpp>
+// #include <opencv2/opencv.hpp>
 #include <nav_msgs/Odometry.h>
 #include <tf/transform_broadcaster.h>
 

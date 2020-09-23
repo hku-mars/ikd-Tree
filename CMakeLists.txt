@@ -74,16 +74,7 @@ catkin_package(
 )
 
 add_executable(imu_process src/IMU_Processing.cpp)
-target_link_libraries(imu_process ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
-
-add_executable(livox_repub src/livox_repub.cpp)
-target_link_libraries(livox_repub ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
-
-add_executable(loam_scanRegistration src/scanRegistration.cpp)
-target_link_libraries(loam_scanRegistration ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
-
-add_executable(loam_scanRegistration_horizon src/scanRegistration_horizon.cpp)
-target_link_libraries(loam_scanRegistration_horizon ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
+target_link_libraries(imu_process ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable(loam_feat_extract src/unity_feature.cpp)
 target_link_libraries(loam_feat_extract ${catkin_LIBRARIES} ${PCL_LIBRARIES})
