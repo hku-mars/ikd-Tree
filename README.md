@@ -17,9 +17,11 @@ Ubuntu 64-bit 18.04.
 ROS Melodic. [ROS Installation](http://wiki.ros.org/ROS/Installation)
 
 ### 1.2. **PCL && Eigen && openCV**
-Follow [PCL Installation](http://www.pointclouds.org/downloads/linux.html).
-Follow [Eigen Installation](http://eigen.tuxfamily.org/index.php?title=Main_Page).
-Follow [openCV Installation](https://opencv.org/releases/).
+PCL    >= 1.8,   Follow [PCL Installation](http://www.pointclouds.org/downloads/linux.html).
+
+Eigen  >= 3.3.4, Follow [Eigen Installation](http://eigen.tuxfamily.org/index.php?title=Main_Page).
+
+OpenCV >= 3.2,   Follow [openCV Installation](https://opencv.org/releases/).
 
 ### 1.3. **livox_ros_driver**
 Follow [livox_ros_driver Installation](https://github.com/Livox-SDK/livox_ros_driver).

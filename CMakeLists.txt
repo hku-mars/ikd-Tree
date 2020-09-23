@@ -7,9 +7,6 @@ ADD_COMPILE_OPTIONS(-std=c++14 )
 ADD_COMPILE_OPTIONS(-std=c++14 )
 set( CMAKE_CXX_FLAGS "-std=c++14 -O3" )
 
-#set(CMAKE_CXX_COMPILER "/usr/bin/clang++")
-
-#set(CMAKE_C_COMPILER "/usr/bin/clang")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fexceptions" )
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -22,10 +19,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}   ${OpenMP_C_FLAGS}")
 
 find_package(PythonLibs REQUIRED)
 find_path(MATPLOTLIB_CPP_INCLUDE_DIRS "matplotlibcpp.h")
-# target_include_directories(myproject PRIVATE ${PYTHON_INCLUDE_DIRS})
-# target_link_libraries(myproject ${PYTHON_LIBRARIES})
 
-# set(Sophus_INCLUDE_DIRS "/usr/local/include/sophus")
 
 find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
@@ -39,13 +33,12 @@ find_package(catkin REQUIRED COMPONENTS
   livox_ros_driver
   message_generation
   eigen_conversions
-  # PythonLibs 3.6
   )
 
 find_package(Eigen3 REQUIRED)
 find_package(PCL REQUIRED)
 find_package(OpenCV REQUIRED)
-# find_package(Sophus REQUIRED)
+
 
 message(Eigen: ${EIGEN3_INCLUDE_DIR})
 
