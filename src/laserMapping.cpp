@@ -63,7 +63,7 @@ namespace plt = matplotlibcpp;
 // #define USING_CORNER
 #define INIT_TIME (2.0)
 #define NUM_MATCH_POINTS (5)
-#define NUM_MAX_ITERATIONS (12)
+#define NUM_MAX_ITERATIONS (15)
 #define LASER_FRAME_INTEVAL (0.1)
 #define LASER_POINT_COV (0.0010)
 
@@ -427,7 +427,7 @@ int main(int argc, char** argv)
             transformTobeMapped[4]  = T_global_cur(1);
             transformTobeMapped[5]  = T_global_cur(2);
 
-            std::cout<<"******pre-integrated states: "<<euler_cur.transpose()*57.3<<" "<<T_global_cur.transpose()<<" "<<V_global_cur.transpose()<<" "<<bias_g.transpose()<<" "<<bias_a.transpose()<<std::endl;
+            // std::cout<<"******pre-integrated states: "<<euler_cur.transpose()*57.3<<" "<<T_global_cur.transpose()<<" "<<V_global_cur.transpose()<<" "<<bias_g.transpose()<<" "<<bias_a.transpose()<<std::endl;
             
             pointAssociateToMap(&pointOnYAxis, &pointOnYAxis);
 
@@ -1003,7 +1003,7 @@ int main(int argc, char** argv)
                     int laserCloudSelNum = laserCloudOri->points.size();
                     double ave_residual = total_residual / laserCloudSelNum;
 
-                    std::cout << "DEBUG mapping select all points : " << coeffSel->size() << "  " << count_effect_point << std::endl;
+                    // std::cout << "DEBUG mapping select all points : " << coeffSel->size() << "  " << count_effect_point << std::endl;
                     count_effect_point = 0;
 
                     match_time += omp_get_wtime() - match_start;
@@ -1175,7 +1175,7 @@ int main(int argc, char** argv)
 
                     // V_global_cur = (T_global_cur - T_global_last) / (timeIMUkpCur - timeIMUkpLast);
                     Eigen::Vector3d euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
-                    std::cout<<"***new stat: "<<euler_cur.transpose()*57.3<<" "<<T_global_cur.transpose()<<"dR & dT: "<<deltaR<<" "<<deltaT<<" bias: "<<bias_a.transpose()<<" G: "<<gravity.transpose()<<" average res: "<<total_residual/laserCloudSelNum<<std::endl;
+                    // std::cout<<"***new stat: "<<euler_cur.transpose()*57.3<<" "<<T_global_cur.transpose()<<"dR & dT: "<<deltaR<<" "<<deltaT<<" bias: "<<bias_a.transpose()<<" G: "<<gravity.transpose()<<" average res: "<<total_residual/laserCloudSelNum<<std::endl;
                     // std::cout<<"***solution: "<<solution.transpose()<<std::endl;
 
                     transformTobeMapped[0] = euler_cur(0);
@@ -1187,7 +1187,7 @@ int main(int argc, char** argv)
 
                     solve_time += omp_get_wtime() - solve_start;
                     
-                    if ((deltaR < 0.02 && deltaT < 0.05) || ave_residual <= 0.003)
+                    if ((deltaR < 0.01 && deltaT < 0.01) || ave_residual <= 0.003)
                     {
                         rematch_en = true;
                         rematch_num ++;
