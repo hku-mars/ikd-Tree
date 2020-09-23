@@ -333,12 +333,12 @@ int main(int argc, char** argv)
 
     std::string map_file_path;
     bool dense_map_en;
-    double filter_parameter_corner, filter_parameter_surf, filter_parameter_map;
+    double filter_size_corner_min, filter_size_surf_min, filter_size_map_min;
     ros::param::get("~dense_map_enable",dense_map_en);
     ros::param::get("~map_file_path",map_file_path);
-    ros::param::get("~filter_parameter_corner",filter_parameter_corner);
-    ros::param::get("~filter_parameter_surf",filter_parameter_surf);
-    ros::param::get("~filter_parameter_map",filter_parameter_map);
+    ros::param::get("~filter_size_corner",filter_size_corner_min);
+    ros::param::get("~filter_size_surf",filter_size_surf_min);
+    ros::param::get("~filter_size_map",filter_size_map_min);
 
     PointType pointOri, pointSel, coeff;
 
@@ -353,9 +353,9 @@ int main(int argc, char** argv)
     pcl::VoxelGrid<PointType> downSizeFilterSurf;
     pcl::VoxelGrid<PointType> downSizeFilterMap;
 
-    downSizeFilterCorner.setLeafSize(filter_parameter_corner, filter_parameter_corner, filter_parameter_corner);
-    downSizeFilterSurf.setLeafSize(filter_parameter_surf, filter_parameter_surf, filter_parameter_surf);
-    downSizeFilterMap.setLeafSize(filter_parameter_map, filter_parameter_map, filter_parameter_map);
+    downSizeFilterCorner.setLeafSize(filter_size_corner_min, filter_size_corner_min, filter_size_corner_min);
+    downSizeFilterSurf.setLeafSize(filter_size_surf_min, filter_size_surf_min, filter_size_surf_min);
+    downSizeFilterMap.setLeafSize(filter_size_map_min, filter_size_map_min, filter_size_map_min);
 
     for (int i = 0; i < laserCloudNum; i++)
     {
@@ -698,10 +698,31 @@ int main(int argc, char** argv)
                 *laserCloudSurfFromMap += *laserCloudSurfArray[laserCloudValidInd[i]];
             }
 
-
             laserCloudSurfLast->clear();
             laserCloudSurf_down->clear();
             pcl::fromROSMsg(LaserCloudSurfaceBuff.front(), *laserCloudSurfLast);
+            /* float cent_point[3] = {0.0};
+            int num = 0;
+            for (int i = 0; i < laserCloudSurfLast->points.size(); i += 100)
+            {
+                num ++;
+                // std::cout<<"cent_point[0] "<<cent_point[0]<<cent_point[1]<<cent_point[2];
+                // std::cout<<" point: "<<laserCloudSurfLast->points[i]<<std::endl;
+                cent_point[0] += (laserCloudSurfLast->points[i].x - cent_point[0]) / num;
+                cent_point[1] += (laserCloudSurfLast->points[i].y - cent_point[1]) / num;
+                cent_point[2] += (laserCloudSurfLast->points[i].z - cent_point[2]) / num;                
+            }
+
+            float center_dist = std::sqrt(cent_point[0] * cent_point[0] + cent_point[1] * cent_point[1] 
+                                            + cent_point[2] * cent_point[2]);
+            double filter_size_surf, filter_size_map;
+            filter_size_surf = double(center_dist - 5.0) / 100.0 * (0.5 - filter_size_surf_min) + filter_size_surf_min;
+            filter_size_surf = CONSTRAIN(filter_size_surf, filter_size_surf_min, 0.4);
+            filter_size_map  = filter_size_surf * 1.3333;
+            downSizeFilterSurf.setLeafSize(filter_size_surf, filter_size_surf, filter_size_surf);
+            downSizeFilterMap.setLeafSize(filter_size_map, filter_size_map, filter_size_map);
+            std::cout<<"center distance: "<<center_dist<<" surf size: "<<filter_size_surf<<" map size: "<<filter_size_map<<std::endl; */
+
             downSizeFilterSurf.setInputCloud(laserCloudSurfLast);
             downSizeFilterSurf.filter(*laserCloudSurf_down);
 

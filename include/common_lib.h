@@ -22,6 +22,7 @@
 #define CORRECR_PI(v)     ((v > 1.57) ? (v - PI_M) : ((v < -1.57) ? (v + PI_M) : v))
 #define ARRAY_FROM_EIGEN(mat)  mat.data(), mat.data() + mat.rows() * mat.cols()
 #define STD_VEC_FROM_EIGEN(mat)  std::vector<decltype(mat)::Scalar> (mat.data(), mat.data() + mat.rows() * mat.cols())
+#define CONSTRAIN(v,min,max) ((v>min)?((v<max)?v:max):min)
 
 Eigen::Matrix3d Eye3d(Eigen::Matrix3d::Identity());
 Eigen::Matrix3f Eye3f(Eigen::Matrix3f::Identity());

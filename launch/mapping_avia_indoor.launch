@@ -28,9 +28,9 @@
   <node pkg="like_loam" type="loam_laserMapping" name="laserMapping" output="screen">
   <param name="map_file_path" type="string" value=" " />
   <param name="dense_map_enable" type="bool" value="true" />
-  <param name="filter_parameter_corner" type="double" value="0.3" />
-  <param name="filter_parameter_surf" type="double" value="0.15" />
-  <param name="filter_parameter_map" type="double" value="0.2" />
+  <param name="filter_size_corner" type="double" value="0.3" />
+  <param name="filter_size_surf" type="double" value="0.15" />
+  <param name="filter_size_map" type="double" value="0.2" />
   </node>
 
   <!-- <node pkg="like_loam" type="loam_scanRegistration_horizon" name="scanRegistration_horizon" output="screen">
