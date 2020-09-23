@@ -1,6 +1,5 @@
 ## LIKE_LOAM
-LIKE_LOAM (Lidar-inertial Iterative Kalam Estimator) is a tightly coupled lidar-initial mapping package, which has been tested
-The package currently contains the basic functions of real-time mapping and localization.
+LIKE_LOAM (Lidar-inertial Iterative Kalam Estimator) is a real-time tightly coupled lidar-initial mapping package, which has been tested in Livox Avia Lidar.
 
 <div align="center">
     <img src="doc/results/HKU_HW.png" width = 49% >
