@@ -94,7 +94,7 @@ class ImuProcess
  private:
   /*** Whether is the first frame, init for first frame ***/
   bool b_first_frame_ = true;
-  bool imu_need_init_      = true;
+  bool imu_need_init_ = true;
 
   int init_iter_num = 1;
   Eigen::Vector3d mean_acc;
@@ -187,17 +187,8 @@ void ImuProcess::IMU_Initial(const MeasureGroup &meas, int &N)
   if (b_first_frame_)
   {
     Reset();
-    const auto &imu_acc = meas.imu.front()->linear_acceleration;
-    const auto &gyr_acc = meas.imu.front()->angular_velocity;
-    cur_acc << imu_acc.x, imu_acc.y, imu_acc.z;
-    cur_gyr << gyr_acc.x, gyr_acc.y, gyr_acc.z;
-    double &&cur_norm = cur_acc.norm();
-
-    scale_gravity = cur_acc.norm();
-    mean_acc      = cur_acc;
-    mean_gyr      = cur_gyr;
-
     N = 1;
+    b_first_frame_ = false;
   }
 
   for (const auto &imu : meas.imu)
@@ -207,9 +198,7 @@ void ImuProcess::IMU_Initial(const MeasureGroup &meas, int &N)
     cur_acc << imu_acc.x, imu_acc.y, imu_acc.z;
     cur_gyr << gyr_acc.x, gyr_acc.y, gyr_acc.z;
 
-    double &&cur_norm = cur_acc.norm();
-
-    scale_gravity += (cur_norm - scale_gravity) / N;
+    scale_gravity += (cur_acc.norm() - scale_gravity) / N;
     mean_acc      += (cur_acc - mean_acc) / N;
     mean_gyr      += (cur_gyr - mean_gyr) / N;
 
@@ -401,13 +390,12 @@ void ImuProcess::Process(const MeasureGroup &meas, const KPPoseConstPtr &state_i
 
   auto pcl_in_msg = meas.lidar;
 
-  if (b_first_frame_ || imu_need_init_)
+  if (imu_need_init_)
   {
     /// The very first lidar frame
     IMU_Initial(meas, init_iter_num);
 
     imu_need_init_ = true;
-    b_first_frame_ = false;
     
     last_lidar_ = pcl_in_msg;
     last_imu_   = meas.imu.back();
@@ -483,6 +471,7 @@ std::mutex mtx_buffer;
 std::condition_variable sig_buffer;
 bool b_exit = false;
 bool b_reset = false;
+bool b_first = true;
 
 /// Buffers for measurements
 double last_timestamp_lidar = -1;
@@ -492,7 +481,6 @@ double last_timestamp_pose  = -1;
 
 std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer;
 std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer;
-std::deque<nav_msgs::Odometry::ConstPtr> odo_buffer;
 std::deque<like_loam::KeyPointPoseConstPtr> pose_buffer;
 
 void SigHandle(int sig)
@@ -535,6 +523,7 @@ void imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in)
     ROS_ERROR("imu loop back, clear buffer");
     imu_buffer.clear();
     b_reset = true;
+    b_first = true;
   }
   last_timestamp_imu = timestamp;
 
@@ -544,34 +533,16 @@ void imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in)
   sig_buffer.notify_all();
 }
 
-void odo_cbk(const nav_msgs::Odometry::ConstPtr &msg_in)
-{
-  nav_msgs::Odometry::Ptr msg(new nav_msgs::Odometry(*msg_in));
-  double timestamp = msg->header.stamp.toSec();
-  // ROS_DEBUG("get imu at time: %.6f", timestamp);
-  mtx_buffer.lock();
-
-  if (timestamp < last_timestamp_odo) {
-    ROS_ERROR("odometry loop back, clear buffer");
-    odo_buffer.clear();
-  }
-  last_timestamp_odo = timestamp;
-
-  odo_buffer.push_back(msg);
-
-  mtx_buffer.unlock();
-  sig_buffer.notify_all();
-}
-
 void pose_cbk(const KPPoseConstPtr& KeyPointPose)
 {
+    b_first = false;
     pose_buffer.push_back(KeyPointPose);
     last_timestamp_pose = pose_buffer.front()->header.stamp.toSec();
 }
 
 bool SyncMeasure(MeasureGroup &measgroup, KPPoseConstPtr& state_in) 
 {
-  if (lidar_buffer.empty() || imu_buffer.empty()) {
+  if (lidar_buffer.empty() || imu_buffer.empty() || (pose_buffer.empty() && (!b_first))) {
     /// Note: this will happen
     // ROS_INFO("NO IMU DATA");
     return false;
@@ -668,7 +639,6 @@ int main(int argc, char **argv)
 
   ros::Subscriber sub_pcl = nh.subscribe("/laser_cloud_flat", 100, pointcloud_cbk);
   ros::Subscriber sub_imu = nh.subscribe("/livox/imu", 100, imu_cbk);
-  ros::Subscriber sub_odo = nh.subscribe("/aft_mapped_to_init", 10, odo_cbk); //pubOdomAftMapped = nh.advertise<nav_msgs::Odometry> ("/aft_mapped_to_init", 10);
   ros::Subscriber sub_pose = nh.subscribe("/Pose6D_Solved", 10, pose_cbk);
   std::shared_ptr<ImuProcess> p_imu(new ImuProcess());
 
