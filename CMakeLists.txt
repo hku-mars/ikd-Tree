@@ -36,7 +36,7 @@ find_package(catkin REQUIRED COMPONENTS
   )
 
 find_package(Eigen3 REQUIRED)
-find_package(PCL REQUIRED)
+find_package(PCL 1.8 REQUIRED)
 find_package(OpenCV REQUIRED)
 
 
