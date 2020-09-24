@@ -25,7 +25,7 @@
 
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/PointCloud2.h>
-#include <like_loam/KeyPointPose.h>
+#include <fast_lio/KeyPointPose.h>
 #include <geometry_msgs/Vector3.h>
 
 /// *************Preconfiguration
@@ -115,7 +115,7 @@ class ImuProcess
   std::deque<sensor_msgs::ImuConstPtr> v_imu_;
   std::vector<Eigen::Matrix3d> v_rot_pcl_;
 
-  like_loam::KeyPointPose v_rot_kp_;
+  fast_lio::KeyPointPose v_rot_kp_;
 };
 
 ImuProcess::ImuProcess()
@@ -450,7 +450,7 @@ void ImuProcess::Process(const MeasureGroup &meas, const KPPoseConstPtr &state_i
 
   {
     static ros::Publisher pub_KeyPointPose6D =
-        nh.advertise<like_loam::KeyPointPose>("/Pose6D_IMUKeyPoints", 100);
+        nh.advertise<fast_lio::KeyPointPose>("/Pose6D_IMUKeyPoints", 100);
     pub_KeyPointPose6D.publish(v_rot_kp_);
   }
 
@@ -481,7 +481,7 @@ double last_timestamp_pose  = -1;
 
 std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer;
 std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer;
-std::deque<like_loam::KeyPointPoseConstPtr> pose_buffer;
+std::deque<fast_lio::KeyPointPoseConstPtr> pose_buffer;
 
 void SigHandle(int sig)
 {

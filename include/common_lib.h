@@ -3,7 +3,7 @@
 
 #include <Eigen/Eigen>
 #include <eigen_conversions/eigen_msg.h>
-#include <like_loam/KeyPointPose.h>
+#include <fast_lio/KeyPointPose.h>
 // #include <geometry_msgs/Vector3.h>
 #include <nav_msgs/Odometry.h>
 #include <tf/transform_broadcaster.h>
@@ -29,9 +29,9 @@ Eigen::Matrix3f Eye3f(Eigen::Matrix3f::Identity());
 Eigen::Vector3d Zero3d(0, 0, 0);
 Eigen::Vector3f Zero3f(0, 0, 0);
 
-typedef like_loam::KeyPointPoseConstPtr KPPoseConstPtr;
-typedef like_loam::KeyPointPose KPPose;
-typedef like_loam::Pose6D Pose6D;
+typedef fast_lio::KeyPointPoseConstPtr KPPoseConstPtr;
+typedef fast_lio::KeyPointPose KPPose;
+typedef fast_lio::Pose6D Pose6D;
 typedef geometry_msgs::Vector3 Vec3;
 
 template<typename T>
