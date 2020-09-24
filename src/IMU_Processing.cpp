@@ -135,7 +135,8 @@ ImuProcess::ImuProcess()
   Gravity_acc   = Eigen::Vector3d(0, 0, G_m_s2);
   cov_state_last = Eigen::Matrix<double,DIM_OF_STATES,DIM_OF_STATES>::Identity() * INIT_COV;
   cov_proc_noise = Eigen::Matrix<double,DIM_OF_PROC_N,1>::Zero();
-  Lidar_offset_to_IMU = Eigen::Vector3d(0.05512, 0.02226, 0.0297);
+  // Lidar_offset_to_IMU = Eigen::Vector3d(0.05512, 0.02226, 0.0297); // Horizon
+  Lidar_offset_to_IMU = Eigen::Vector3d(0.04165, 0.02326, -0.0284); // Avia
 }
 
 ImuProcess::~ImuProcess() {}
