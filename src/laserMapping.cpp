@@ -60,7 +60,7 @@
 
 namespace plt = matplotlibcpp;
 
-// #define USING_CORNER
+// #define DEBUG_PRINT
 #define INIT_TIME (2.0)
 #define NUM_MATCH_POINTS (5)
 #define NUM_MAX_ITERATIONS (15)
@@ -69,7 +69,6 @@ namespace plt = matplotlibcpp;
 
 typedef pcl::PointXYZI PointType;
 
-int kfNum = 0;
 int iterCount = 0;
 
 float timeLaserCloudCornerLast = 0;
@@ -138,11 +137,11 @@ pcl::KdTreeFLANN<PointType>::Ptr kdtreeCornerFromMap(new pcl::KdTreeFLANN<PointT
 pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfFromMap(new pcl::KdTreeFLANN<PointType>());
 
 //optimization states 
-float transformTobeMapped[6] = {0};
+double transformTobeMapped[6] = {0};
 //optimization states after mapping
-float transformAftMapped[6] = {0};
+double transformAftMapped[6] = {0};
 //last optimization states
-float transformLastMapped[6] = {0};
+double transformLastMapped[6] = {0};
 
 //estimated rotation and translation;
 Eigen::Matrix3d R_global_cur(Eigen::Matrix3d::Identity());
@@ -176,8 +175,8 @@ void transformUpdate()
 //lidar coordinate sys to world coordinate sys
 void pointAssociateToMap(PointType const * const pi, PointType * const po)
 {
-    Eigen::Vector3f p_body(pi->x, pi->y, pi->z);
-    Eigen::Vector3f p_global(R_global_cur.cast<float>() * p_body + T_global_cur.cast<float>());
+    Eigen::Vector3d p_body(pi->x, pi->y, pi->z);
+    Eigen::Vector3d p_global(R_global_cur * p_body + T_global_cur);
     
     po->x = p_global(0);
     po->y = p_global(1);
@@ -187,8 +186,8 @@ void pointAssociateToMap(PointType const * const pi, PointType * const po)
 
 void RGBpointAssociateToMap(PointType const * const pi, pcl::PointXYZRGB * const po)
 {
-    Eigen::Vector3f p_body(pi->x, pi->y, pi->z);
-    Eigen::Vector3f p_global(R_global_cur.cast<float>() * p_body + T_global_cur.cast<float>());
+    Eigen::Vector3d p_body(pi->x, pi->y, pi->z);
+    Eigen::Vector3d p_global(R_global_cur * p_body + T_global_cur);
     
     po->x = p_global(0);
     po->y = p_global(1);
@@ -232,7 +231,7 @@ void RGBpointAssociateToMap(PointType const * const pi, pcl::PointXYZRGB * const
     }
 }
 
-// #ifdef USING_CORNER
+#ifdef USING_CORNER
 void laserCloudCornerLastHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudCornerLast2)
 {
     timeLaserCloudCornerLast = laserCloudCornerLast2->header.stamp.toSec();
@@ -242,7 +241,7 @@ void laserCloudCornerLastHandler(const sensor_msgs::PointCloud2ConstPtr& laserCl
 
     newLaserCloudCornerLast = true;
 }
-// #endif
+#endif
 
 void laserCloudSurfLastHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudSurfLast2)
 {
@@ -296,10 +295,9 @@ int main(int argc, char** argv)
     ros::init(argc, argv, "laserMapping");
     ros::NodeHandle nh;
 
+#ifdef USING_CORNER
     ros::Subscriber subLaserCloudCornerLast = nh.subscribe<sensor_msgs::PointCloud2>
             ("/laser_cloud_sharp", 100, laserCloudCornerLastHandler);
-
-#ifdef USING_CORNER
     ros::Subscriber subLaserCloudFullRes = nh.subscribe<sensor_msgs::PointCloud2>
             ("/livox_cloud", 100, laserCloudFullResHandler);
 #else
@@ -417,8 +415,7 @@ int main(int argc, char** argv)
             R_global_cur=Eigen::Map<Eigen::Matrix3d>(rot_kp_imu_buff.front().rot_end.data());
             cov_stat_cur=Eigen::Map<Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> >(rot_kp_imu_buff.front().cov.data());
 
-            Eigen::Matrix3f R_global_f(R_global_cur.cast <float> ());
-            Eigen::Vector3f euler_cur = correct_pi(R_global_f.eulerAngles(1, 0, 2));
+            Eigen::Vector3d euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
 
             transformTobeMapped[0]  = euler_cur(0);
             transformTobeMapped[1]  = euler_cur(1);
@@ -427,7 +424,9 @@ int main(int argc, char** argv)
             transformTobeMapped[4]  = T_global_cur(1);
             transformTobeMapped[5]  = T_global_cur(2);
 
+            #ifdef DEBUG_PRINT
             std::cout<<"******pre-integrated states: "<<euler_cur.transpose()*57.3<<" "<<T_global_cur.transpose()<<" "<<V_global_cur.transpose()<<" "<<bias_g.transpose()<<" "<<bias_a.transpose()<<std::endl;
+            #endif
             
             pointAssociateToMap(&pointOnYAxis, &pointOnYAxis);
 
@@ -467,7 +466,6 @@ int main(int argc, char** argv)
                         laserCloudCubeSurfPointer->clear();
                     }
                 }
-
                 centerCubeI++;
                 laserCloudCenWidth++;
             }
@@ -779,7 +777,7 @@ int main(int argc, char** argv)
                     laserCloudOri->clear();
                     coeffSel->clear();
 
-#ifdef USING_CONER
+#ifdef USING_CORNER
                     for (int i = 0; i < laserCloudCornerLast->points.size(); i++) {
                         pointOri = laserCloudCornerLast->points[i];
 
@@ -991,7 +989,7 @@ int main(int argc, char** argv)
                     for (int i = 0; i < coeffSel_tmpt->points.size(); i++)
                     {
                         float error_abs = std::abs(coeffSel_tmpt->points[i].intensity);
-                        if (point_selected_surf[i] && (error_abs < 0.5))
+                        if (point_selected_surf[i]  && (error_abs < 0.5))
                         {
                             laserCloudOri->push_back(laserCloudSurf_down->points[i]);
                             coeffSel->push_back(coeffSel_tmpt->points[i]);
@@ -1002,7 +1000,8 @@ int main(int argc, char** argv)
                     int laserCloudSelNum = laserCloudOri->points.size();
                     double ave_residual = total_residual / laserCloudSelNum;
 
-                    // std::cout << "DEBUG mapping select all points : " << coeffSel->size() << "  " << count_effect_point << std::endl;
+                    if(iterCount == 1) std::cout << "DEBUG mapping select all points : " << coeffSel->size() << "  " << count_effect_point << std::endl;
+
                     count_effect_point = 0;
 
                     match_time += omp_get_wtime() - match_start;
@@ -1013,18 +1012,6 @@ int main(int argc, char** argv)
                         continue;
                     }
 
-                    /// |c1c3+s1s2s3 c3s1s2-c1s3 c2s1|
-                    /// |   c2s3        c2c3      -s2|
-                    /// |c1s2s3-c3s1 c1c3s2+s1s3 c1c2|
-                    /// AT*A*x = AT*b
-                    cv::Mat matA(laserCloudSelNum, 6, CV_32F, cv::Scalar::all(0));
-                    cv::Mat matAt(6, laserCloudSelNum, CV_32F, cv::Scalar::all(0));
-                    cv::Mat matAtA(6, 6, CV_32F, cv::Scalar::all(0));
-                    cv::Mat matB(laserCloudSelNum, 1, CV_32F, cv::Scalar::all(0));
-                    cv::Mat matAtB(6, 1, CV_32F, cv::Scalar::all(0));
-                    cv::Mat matX(6, 1, CV_32F, cv::Scalar::all(0));
-
-                    R_global_f = R_global_cur.cast<float> ();
                     Eigen::MatrixXd H(laserCloudSelNum, DIM_OF_STATES) ;
                     Eigen::VectorXd res(laserCloudSelNum);
 
@@ -1041,58 +1028,10 @@ int main(int argc, char** argv)
                         point_crossmat<<SKEW_SYM_MATRX(point_this);
                         
                         Eigen::Vector3d A(point_crossmat * R_global_cur.transpose() * vect_norm);
-                        auto &&A_f = A.cast<float> ();
-                        
-                        //TODO: the partial derivative
-                        matA.at<float>(i, 0) = A_f(0);
-                        matA.at<float>(i, 1) = A_f(1);
-                        matA.at<float>(i, 2) = A_f(2);
-                        matA.at<float>(i, 3) = nor_vec.x;
-                        matA.at<float>(i, 4) = nor_vec.y;
-                        matA.at<float>(i, 5) = nor_vec.z;
-                        matB.at<float>(i, 0) = - nor_vec.intensity;
 
                         H.row(i) = Eigen::Matrix<double, 1, DIM_OF_STATES>::Zero();
                         H.block<1,6>(i,0) << VEC_FROM_ARRAY(A), nor_vec.x, nor_vec.y, nor_vec.z;
                         res(i) = - nor_vec.intensity;
-                    }
-                    
-                    cv::transpose(matA, matAt);
-                    matAtA = matAt * matA;
-                    matAtB = matAt * matB;
-
-                    #ifdef USE_OPENCV_SOLVER
-                    cv::solve(matAtA, matAtB, matX, cv::DECOMP_QR);
-                    #endif
-
-                    //Deterioration judgment
-                    if (iterCount == 0)
-                    {
-                        cv::Mat matE(1, 6, CV_32F, cv::Scalar::all(0));
-                        cv::Mat matV(6, 6, CV_32F, cv::Scalar::all(0));
-                        cv::Mat matV2(6, 6, CV_32F, cv::Scalar::all(0));
-
-                        cv::eigen(matAtA, matE, matV);
-                        matV.copyTo(matV2);
-
-                        isDegenerate = false;
-                        float eignThre[6] = {1, 1, 1, 1, 1, 1};
-                        for (int i = 5; i >= 0; i--)
-                        {
-                            if (matE.at<float>(0, i) < eignThre[i])
-                            {
-                                for (int j = 0; j < 6; j++)
-                                {
-                                    matV2.at<float>(i, j) = 0;
-                                }
-                                isDegenerate = true;
-                            }
-                            else
-                            {
-                                break;
-                            }
-                        }
-                        matP = matV.inv() * matV2;
                     }
 
                     Eigen::Vector3d rot_add, t_add, v_add, bg_add, ba_add, g_add;
@@ -1101,6 +1040,7 @@ int main(int argc, char** argv)
 
                     if (Need_Init)
                     {
+                        /*** Iterative Kalan Filter (initiallization) ***/
                         Eigen::MatrixXd H_init(Eigen::Matrix<double, 9, DIM_OF_STATES>::Zero());
                         Eigen::MatrixXd z_init(Eigen::Matrix<double, 9, 1>::Zero());
                         H_init.block<3,3>(0,0)  = Eigen::Matrix3d::Identity();
@@ -1131,6 +1071,7 @@ int main(int argc, char** argv)
                     }
                     else
                     {
+                        /*** Iterative Kalman Filter ***/
                         auto &&H_T = H.transpose();
                         Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 = (H_T * H + (cov_stat_cur / LASER_POINT_COV).inverse()).inverse();
                         K = K_1 * H_T;
@@ -1138,17 +1079,12 @@ int main(int argc, char** argv)
                         // std::cout<<"***solution: "<<solution.transpose()<<std::endl;
                         for (int ind = 0; ind < 3; ind ++)
                         {
-                            #ifdef USE_OPENCV_SOLVER
-                            rot_add[ind] = matX.at<float>(ind, 0);
-                            t_add[ind]   = matX.at<float>(ind+3, 0);
-                            #else
                             rot_add[ind] = solution(ind);
                             t_add[ind]   = solution(ind+3);
                             v_add[ind]   = solution(ind+6);
                             bg_add[ind]  = solution(ind+9);
                             ba_add[ind]  = solution(ind+12);
                             g_add[ind]   = solution(ind+15);
-                            #endif
                         }
 
                         R_global_cur = R_global_cur * Exp(rot_add);
@@ -1162,20 +1098,11 @@ int main(int argc, char** argv)
                         deltaT = t_add.norm() * 100.0;
                     }
 
-                    if (isDegenerate)
-                    {
-                        degenerate_count ++;
-                        #ifdef USE_OPENCV_SOLVER
-                        cv::Mat matX2(6, 1, CV_32F, cv::Scalar::all(0));
-                        matX.copyTo(matX2);
-                        matX = matP * matX2;
-                        #endif
-                    }
-
-                    // V_global_cur = (T_global_cur - T_global_last) / (timeIMUkpCur - timeIMUkpLast);
                     Eigen::Vector3d euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
+
+                    #ifdef DEBUG_PRINT
                     std::cout<<"***new stat: "<<euler_cur.transpose()*57.3<<" "<<T_global_cur.transpose()<<"dR & dT: "<<deltaR<<" "<<deltaT<<" bias: "<<bias_a.transpose()<<" G: "<<gravity.transpose()<<" average res: "<<total_residual/laserCloudSelNum<<std::endl;
-                    // std::cout<<"***solution: "<<solution.transpose()<<std::endl;
+                    #endif
 
                     transformTobeMapped[0] = euler_cur(0);
                     transformTobeMapped[1] = euler_cur(1);
@@ -1184,38 +1111,30 @@ int main(int argc, char** argv)
                     transformTobeMapped[4] = T_global_cur(1);
                     transformTobeMapped[5] = T_global_cur(2);
 
-                    solve_time += omp_get_wtime() - solve_start;
-                    
-                    if ((deltaR < 0.01 && deltaT < 0.01) || ave_residual <= 0.003)
+                    rematch_en = false;
+
+                    if ((deltaR < 0.01 && deltaT < 0.01))
                     {
                         rematch_en = true;
                         rematch_num ++;
-                        // std::cout<<"``````ReMatch!!!``````"<<std::endl;
-                    }
-                    else
-                    {
-                        rematch_en = false;
                     }
 
                     if (rematch_num >= 2)
                     {
                         if (!Need_Init)
                         {
+                            /*** Covariance Update ***/
                             cov_stat_cur = (Eigen::MatrixXd::Identity(DIM_OF_STATES, DIM_OF_STATES) - K * H) * cov_stat_cur;
-                            // std::cout<<"***Sigma: "<<cov_stat_cur.diagonal().transpose()<<std::endl;
                         }
-                        rematch_num  = 0;
+                        solve_time += omp_get_wtime() - solve_start;
                         break;
                     }
-
-                    
+                    solve_time += omp_get_wtime() - solve_start;
                 }
 
-                std::cout<<"current time: "<<timeIMUkpCur<<" iteration count: "<<iterCount+1<<" Number of Degeneration: "<<degenerate_count<<std::endl;
+                std::cout<<"current time: "<<timeIMUkpCur<<" iteration count: "<<iterCount+1<<std::endl;
                 transformUpdate();
             }
-
-            t3 = omp_get_wtime();
 
             /*** save results ***/
             save_states(Pose6D_Solved, rot_kp_imu_buff.front().header, gravity, bias_g, bias_a, \
@@ -1253,13 +1172,12 @@ int main(int argc, char** argv)
                         cubeJ >= 0 && cubeJ < laserCloudHeight &&
                         cubeK >= 0 && cubeK < laserCloudDepth)
                 {
-
                     int cubeInd = cubeI + laserCloudWidth * cubeJ + laserCloudWidth * laserCloudHeight * cubeK;
                     laserCloudCornerArray[cubeInd]->push_back(pointSel);
                 }
             }
 #endif
-
+            
             for (int i = 0; i < laserCloudSurf_down_size; i++)
             {
                 PointType &pointSel = laserCloudSurf_down_updated->points[i];
@@ -1283,25 +1201,28 @@ int main(int argc, char** argv)
             for (int i = 0; i < laserCloudValidNum; i++)
             {
                 int ind = laserCloudValidInd[i];
-
-                laserCloudCornerArray2[ind]->clear();
-                downSizeFilterCorner.setInputCloud(laserCloudCornerArray[ind]);
-                downSizeFilterCorner.filter(*laserCloudCornerArray2[ind]);
-
                 laserCloudSurfArray2[ind]->clear();
                 downSizeFilterSurf.setInputCloud(laserCloudSurfArray[ind]);
                 downSizeFilterSurf.filter(*laserCloudSurfArray2[ind]);
 
-                pcl::PointCloud<PointType>::Ptr laserCloudTemp = laserCloudCornerArray[ind];
-                laserCloudCornerArray[ind] = laserCloudCornerArray2[ind];
-                laserCloudCornerArray2[ind] = laserCloudTemp;
-
-                laserCloudTemp = laserCloudSurfArray[ind];
+                pcl::PointCloud<PointType>::Ptr laserCloudTemp = laserCloudSurfArray[ind];
                 laserCloudSurfArray[ind] = laserCloudSurfArray2[ind];
                 laserCloudSurfArray2[ind] = laserCloudTemp;
+
+                #ifdef USING_CORNER
+                laserCloudCornerArray2[ind]->clear();
+                downSizeFilterCorner.setInputCloud(laserCloudCornerArray[ind]);
+                downSizeFilterCorner.filter(*laserCloudCornerArray2[ind]);
+
+                laserCloudTemp = laserCloudCornerArray[ind];
+                laserCloudCornerArray[ind] = laserCloudCornerArray2[ind];
+                laserCloudCornerArray2[ind] = laserCloudTemp;
+                #endif
             }
 
-            /*** Publish messages:  ***/
+            t3 = omp_get_wtime();
+
+            /******* Publish messages:  *******/
             laserCloudSurround2->clear();
             laserCloudSurround2_corner->clear();
 
@@ -1310,18 +1231,6 @@ int main(int argc, char** argv)
                 *laserCloudSurround2_corner += *laserCloudCornerArray[ind];
                 *laserCloudSurround2 += *laserCloudSurfArray[ind];
             }
-
-            // sensor_msgs::PointCloud2 laserCloudSurround3;
-            // pcl::toROSMsg(*laserCloudSurround2, laserCloudSurround3);
-            // laserCloudSurround3.header.stamp = ros::Time().fromSec(timeLaserCloudCornerLast);
-            // laserCloudSurround3.header.frame_id = "/camera_init";
-            // pubLaserCloudSurround.publish(laserCloudSurround3);
-
-            // sensor_msgs::PointCloud2 laserCloudSurround3_corner;
-            // pcl::toROSMsg(*laserCloudSurround2_corner, laserCloudSurround3_corner);
-            // laserCloudSurround3_corner.header.stamp = ros::Time().fromSec(timeLaserCloudCornerLast);
-            // laserCloudSurround3_corner.header.frame_id = "/camera_init";
-            // pubLaserCloudSurround_corner.publish(laserCloudSurround3_corner);
             
             laserCloudFullRes2->clear();
             // *laserCloudFullRes2 = *laserCloudFullRes;
@@ -1331,7 +1240,6 @@ int main(int argc, char** argv)
             int laserCloudFullResNum = laserCloudFullRes2->points.size();
 
             pcl::PointXYZRGB temp_point;
-            // std::cout<<"Points number of NewFrameAddedtoMap: "<<laserCloudFullResNum<<std::endl;
 
             for (int i = 0; i < laserCloudFullResNum; i++)
             {
@@ -1380,27 +1288,17 @@ int main(int argc, char** argv)
             transform.setRotation( q );
             br.sendTransform( tf::StampedTransform( transform, odomAftMapped.header.stamp, "/camera_init", "/aft_mapped" ) );
 
-            kfNum++;
-
-            if(kfNum >= NUM_MAX_ITERATIONS)
-            {
-                // std::cout<<"iteration count:"<<kfNum<<std::endl;
-                Eigen::Matrix<float,7,1> kf_pose;
-                kf_pose << -geoQuat.y,-geoQuat.z,geoQuat.x,geoQuat.w,transformAftMapped[3],transformAftMapped[4],transformAftMapped[5];
-                keyframe_pose.push_back(kf_pose);
-                kfNum = 0;
-            }
-
             /*** plot variables ***/
             t4 = omp_get_wtime();
             frame_num ++;
-            aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t3 - t1) / frame_num;
+            // aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t4 - t1) / frame_num;
+            aver_time_consu = aver_time_consu * 0.5 + (t4 - t1) * 0.5;
             T1.push_back(timeLaserCloudSurfLast);
-            s_plot.push_back((t4 - t1));
+            s_plot.push_back(t4 - t1);
             s_plot2.push_back(double(deltaR));
             s_plot3.push_back(double(deltaT));
 
-            std::cout<<"mapping time : selection "<<t2-t1 <<" match time: "<<match_time<<"  solve time: "<<solve_time<<" with pub time: "<<t4 - t1<<" total: "<<t3-t1<<std::endl;
+            std::cout<<"mapping time : selection "<<t2-t1 <<" match time: "<<match_time<<"  solve time: "<<solve_time<<" total with publish: "<<t4 - t1<<" no publish: "<<t3-t1<<std::endl;
             // std::cout<<"match time: "<<match_time<<"  solve time: "<<solve_time<<std::endl;
         }
         status = ros::ok();
@@ -1410,12 +1308,12 @@ int main(int argc, char** argv)
     std::string surf_filename(map_file_path + "/surf.pcd");
     std::string corner_filename(map_file_path + "/corner.pcd");
     std::string all_points_filename(map_file_path + "/all_points.pcd");
-    std::ofstream keyframe_file(map_file_path + "/key_frame.txt");
-    for(auto kf : keyframe_pose){
-        keyframe_file << kf[0] << " "<< kf[1] << " "<< kf[2] << " "<< kf[3] << " "
-                          << kf[4] << " "<< kf[5] << " "<< kf[6] << " "<< std::endl;
-    }
-    keyframe_file.close();
+    // std::ofstream keyframe_file(map_file_path + "/key_frame.txt");
+    // for(auto kf : keyframe_pose){
+    //     keyframe_file << kf[0] << " "<< kf[1] << " "<< kf[2] << " "<< kf[3] << " "
+    //                       << kf[4] << " "<< kf[5] << " "<< kf[6] << " "<< std::endl;
+    // }
+    // keyframe_file.close();
     pcl::PointCloud<pcl::PointXYZI> surf_points, corner_points;
     surf_points = *laserCloudSurfFromMap;
     corner_points = *laserCloudCornerFromMap;
