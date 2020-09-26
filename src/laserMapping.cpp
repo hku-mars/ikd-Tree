@@ -61,7 +61,7 @@
 
 namespace plt = matplotlibcpp;
 
-#define DEBUG_PRINT
+// #define DEBUG_PRINT
 
 #define INIT_TIME           (2.0)
 #define LASER_POINT_COV     (0.0010)
@@ -1261,18 +1261,18 @@ int main(int argc, char** argv)
             laserCloudFullRes3.header.frame_id = "/camera_init";
             pubLaserCloudFullRes.publish(laserCloudFullRes3);
 
-            // sensor_msgs::PointCloud2 laserCloudMap;
-            // pcl::toROSMsg(*laserCloudSurfFromMap, laserCloudMap);
-            // laserCloudMap.header.stamp = ros::Time().fromSec(timeLaserCloudCornerLast);
-            // laserCloudMap.header.frame_id = "/camera_init";
-            // pubLaserCloudMap.publish(laserCloudMap);
+            sensor_msgs::PointCloud2 laserCloudMap;
+            pcl::toROSMsg(*laserCloudSurfFromMap, laserCloudMap);
+            laserCloudMap.header.stamp = ros::Time()::now();//ros::Time().fromSec(timeLaserCloudCornerLast);
+            laserCloudMap.header.frame_id = "/camera_init";
+            pubLaserCloudMap.publish(laserCloudMap);
 
             *laserCloudFullResColor_pcd += *laserCloudFullResColor;
 
             geometry_msgs::Quaternion geoQuat = tf::createQuaternionMsgFromRollPitchYaw
                     (transformAftMapped[2], - transformAftMapped[0], - transformAftMapped[1]);
 
-            odomAftMapped.header.stamp = ros::Time().fromSec(timeLaserCloudCornerLast);
+            odomAftMapped.header.stamp = ros::Time()::now();//ros::Time().fromSec(timeLaserCloudCornerLast);
             odomAftMapped.pose.pose.orientation.x = -geoQuat.y;
             odomAftMapped.pose.pose.orientation.y = -geoQuat.z;
             odomAftMapped.pose.pose.orientation.z = geoQuat.x;
