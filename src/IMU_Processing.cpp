@@ -91,6 +91,8 @@ class ImuProcess
   Eigen::Vector3d cov_acc;
   Eigen::Vector3d cov_gyr;
 
+  std::ofstream fout;
+
  private:
   /*** Whether is the first frame, init for first frame ***/
   bool b_first_frame_ = true;
@@ -136,10 +138,12 @@ ImuProcess::ImuProcess()
   cov_state_last = Eigen::Matrix<double,DIM_OF_STATES,DIM_OF_STATES>::Identity() * INIT_COV;
   cov_proc_noise = Eigen::Matrix<double,DIM_OF_PROC_N,1>::Zero();
   // Lidar_offset_to_IMU = Eigen::Vector3d(0.05512, 0.02226, 0.0297); // Horizon
-  Lidar_offset_to_IMU = Eigen::Vector3d(0.04165, 0.02326, -0.0284); // Avia
+  // Lidar_offset_to_IMU = Eigen::Vector3d(0.04165, 0.02326, -0.0284); // Avia
+  Lidar_offset_to_IMU = Eigen::Vector3d(0.0, 0.0, -0.0);
+  fout.open("/home/xw/catkin_like_loam/src/LIEK_LOAM/imu.txt",std::ios::out);
 }
 
-ImuProcess::~ImuProcess() {}
+ImuProcess::~ImuProcess() {fout.close();}
 
 void ImuProcess::Reset() 
 {
@@ -175,6 +179,9 @@ void ImuProcess::Reset()
 
   cur_pcl_in_.reset(new PointCloudXYZI());
   cur_pcl_un_.reset(new PointCloudXYZI());
+
+  fout.close();
+  fout.open("/home/xw/XW/catkin_LIKE_loam/src/LIEK_LOAM/imu.txt",std::ios::out);
 }
 
 void ImuProcess::IMU_Initial(const MeasureGroup &meas, int &N)
@@ -256,8 +263,6 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
   Eigen::MatrixXd F_x(Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES>::Identity());
   Eigen::MatrixXd cov_w(Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES>::Zero());
   double dt = 0;
-  std::ofstream fout;
-  fout.open("/home/xw/catkin_like_loam/src/LIEK_LOAM/imu.txt",std::ios::app);
   for (auto it_imu = v_imu.begin(); it_imu != (v_imu.end() - 1); it_imu++)
   {
     auto &&head = *(it_imu);
@@ -323,8 +328,6 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
 
     // std::cout<<acc_kp<< angvel_avr<< vel_kp<< pos_kp<< R_kp<<std::endl;
   }
-
-  fout.close();
 
   /*** calculated the pos and attitude at the end lidar point ***/
   dt    = pcl_end_time - imu_end_time;

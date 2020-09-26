@@ -8,18 +8,17 @@
 #include <nav_msgs/Odometry.h>
 #include <tf/transform_broadcaster.h>
 
-
+#define PI_M (3.14159265358)
 #define G_m_s2 (9.8099)         // Gravaty const in GuangDong/China
 #define DIM_OF_STATES (18)      // Dimension of states (Let Dim(SO(3)) = 3)
 #define DIM_OF_PROC_N (12)      // Dimension of process noise (Let Dim(SO(3)) = 3)
-#define PI_M (3.14159265358)
 
 #define DIM_OF_STATES_SQUARE (18*18)
 
 #define SKEW_SYM_MATRX(v) 0.0,-v[2],v[1],v[2],0.0,-v[0],-v[1],v[0],0.0
 #define MAT_FROM_ARRAY(v) v[0],v[1],v[2],v[3],v[4],v[5],v[6],v[7],v[8]
 #define VEC_FROM_ARRAY(v) v[0],v[1],v[2]
-#define CORRECR_PI(v)     ((v > 1.57) ? (v - PI_M) : ((v < -1.57) ? (v + PI_M) : v))
+#define CORRECR_PI(v)     ((v > PI_M) ? (v - PI_M) : ((v < -PI_M) ? (v + PI_M) : v))
 #define ARRAY_FROM_EIGEN(mat)  mat.data(), mat.data() + mat.rows() * mat.cols()
 #define STD_VEC_FROM_EIGEN(mat)  std::vector<decltype(mat)::Scalar> (mat.data(), mat.data() + mat.rows() * mat.cols())
 #define CONSTRAIN(v,min,max) ((v>min)?((v<max)?v:max):min)

@@ -72,5 +72,11 @@
         "typeinfo": "cpp",
         "core": "cpp",
         "eigen": "cpp"
-    }
+    },
+    "python.pythonPath": "/usr/bin/python",
+    "python.analysis.extraPaths": [
+        "/home/xw/catkin_loam/devel/lib/python2.7/dist-packages",
+        "/home/xw/Livox_ros_driver/devel/lib/python2.7/dist-packages",
+        "/opt/ros/melodic/lib/python2.7/dist-packages"
+    ]
 }

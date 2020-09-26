@@ -366,8 +366,8 @@ int main(int argc, char** argv)
 	}
 	std::cout<<"path:"<<path<<std::endl;
     std::ofstream fout_pre, fout_out;
-    fout_pre.open("/home/xw/catkin_like_loam/src/LIEK_LOAM/mat_pre.txt",std::ios::out);
-    fout_out.open("/home/xw/catkin_like_loam/src/LIEK_LOAM/mat_out.txt",std::ios::out);
+    fout_pre.open("/home/xw/XW/catkin_LIKE_loam/src/LIEK_LOAM/mat_pre.txt",std::ios::out);
+    fout_out.open("/home/xw/XW/catkin_LIKE_loam/src/LIEK_LOAM/mat_out.txt",std::ios::out);
     if (fout_pre && fout_out)  //条件成立，则说明文件打开成功
         std::cout << "~~~~file opened" << std::endl;
     else
@@ -1263,7 +1263,7 @@ int main(int argc, char** argv)
 
             sensor_msgs::PointCloud2 laserCloudMap;
             pcl::toROSMsg(*laserCloudSurfFromMap, laserCloudMap);
-            laserCloudMap.header.stamp = ros::Time()::now();//ros::Time().fromSec(timeLaserCloudCornerLast);
+            laserCloudMap.header.stamp = ros::Time::now();//ros::Time().fromSec(timeLaserCloudCornerLast);
             laserCloudMap.header.frame_id = "/camera_init";
             pubLaserCloudMap.publish(laserCloudMap);
 
@@ -1272,7 +1272,7 @@ int main(int argc, char** argv)
             geometry_msgs::Quaternion geoQuat = tf::createQuaternionMsgFromRollPitchYaw
                     (transformAftMapped[2], - transformAftMapped[0], - transformAftMapped[1]);
 
-            odomAftMapped.header.stamp = ros::Time()::now();//ros::Time().fromSec(timeLaserCloudCornerLast);
+            odomAftMapped.header.stamp = ros::Time::now();//ros::Time().fromSec(timeLaserCloudCornerLast);
             odomAftMapped.pose.pose.orientation.x = -geoQuat.y;
             odomAftMapped.pose.pose.orientation.y = -geoQuat.z;
             odomAftMapped.pose.pose.orientation.z = geoQuat.x;
