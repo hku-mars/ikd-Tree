@@ -227,8 +227,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
   std::sort(pcl_in_out.points.begin(), pcl_in_out.points.end(), time_list);
   const double &pcl_end_time = pcl_beg_time + pcl_in_out.points.back().curvature / double(1000);
   std::cout<<"[ IMU Process ]: Process lidar from "<<pcl_beg_time<<" to "<<pcl_end_time<<", " \
-           <<meas.imu.size()<<" imu msgs from "<<meas.imu.front()->header.stamp.toSec()<<" to " \
-           <<meas.imu.back()->header.stamp.toSec()<<std::endl;
+           <<meas.imu.size()<<" imu msgs from "<<imu_beg_time<<" to "<<imu_end_time<<std::endl;
 
   /*** initialization ***/
   if (state_in != NULL)
@@ -257,6 +256,8 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
   Eigen::MatrixXd F_x(Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES>::Identity());
   Eigen::MatrixXd cov_w(Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES>::Zero());
   double dt = 0;
+  std::ofstream fout;
+  fout.open("/home/xw/catkin_like_loam/src/LIEK_LOAM/imu.txt",std::ios::app);
   for (auto it_imu = v_imu.begin(); it_imu != (v_imu.end() - 1); it_imu++)
   {
     auto &&head = *(it_imu);
@@ -268,9 +269,12 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
     acc_avr   <<0.5 * (head->linear_acceleration.x + tail->linear_acceleration.x),
                 0.5 * (head->linear_acceleration.y + tail->linear_acceleration.y),
                 0.5 * (head->linear_acceleration.z + tail->linear_acceleration.z);
-    
+
     angvel_avr -= bias_gyr;
     acc_avr     = acc_avr * G_m_s2 / scale_gravity - bias_acc;
+
+    fout<<head->header.stamp.toSec()<<" "<<angvel_avr.transpose()<<" "<<acc_avr.transpose()<<std::endl;
+
     /* we propagate from the first lidar point to the last imu point */
     dt = tail->header.stamp.toSec() - head->header.stamp.toSec();
     
@@ -319,6 +323,8 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
 
     // std::cout<<acc_kp<< angvel_avr<< vel_kp<< pos_kp<< R_kp<<std::endl;
   }
+
+  fout.close();
 
   /*** calculated the pos and attitude at the end lidar point ***/
   dt    = pcl_end_time - imu_end_time;
@@ -601,6 +607,13 @@ bool SyncMeasure(MeasureGroup &measgroup, KPPoseConstPtr& state_in)
 void ProcessLoop(std::shared_ptr<ImuProcess> p_imu)
 {
   ROS_INFO("Start ProcessLoop");
+
+  std::ofstream fout;
+  fout.open("/home/xw/catkin_like_loam/src/LIEK_LOAM/imu.txt",std::ios::out);
+  if (fout) 
+      std::cout << "~~~~imu file opened" << std::endl;
+  else
+      std::cout << "~~~~imu file doesn't exist" << std::endl;
 
   ros::Rate r(200);
 

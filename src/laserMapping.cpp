@@ -34,6 +34,7 @@
 // POSSIBILITY OF SUCH DAMAGE.
 #include <omp.h>
 #include <math.h>
+#include <fstream>
 #include <unistd.h>
 #include <Python.h>
 #include <Eigen/Core>
@@ -60,12 +61,13 @@
 
 namespace plt = matplotlibcpp;
 
-// #define DEBUG_PRINT
-#define INIT_TIME (2.0)
-#define NUM_MATCH_POINTS (5)
-#define NUM_MAX_ITERATIONS (15)
+#define DEBUG_PRINT
+
+#define INIT_TIME           (2.0)
+#define LASER_POINT_COV     (0.0010)
+#define NUM_MATCH_POINTS    (5)
+#define NUM_MAX_ITERATIONS  (15)
 #define LASER_FRAME_INTEVAL (0.1)
-#define LASER_POINT_COV (0.0010)
 
 typedef pcl::PointXYZI PointType;
 
@@ -276,17 +278,6 @@ bool sync_packages()
     {
         return false;
     }
-    // while (fabs(timeIMUkpLast - timeLaserCloudSurfLast) > 0.6 * LASER_FRAME_INTEVAL)
-    // {
-    //     (timeIMUkpLast > timeLaserCloudSurfLast) ? LaserCloudSurfaceBuff.pop_front() : rot_kp_imu_buff.pop_front();
-    //     std::cout<<"`````````````````````````````````````````````````````````````````````````"<<std::endl;
-
-    //     if(rot_kp_imu_buff.empty() || LaserCloudSurfaceBuff.empty()) {return false;}
-
-    //     timeIMUkpLast = rot_kp_imu_buff.front().header.stamp.toSec();
-    //     timeLaserCloudSurfLast = LaserCloudSurfaceBuff.front().header.stamp.toSec();
-    // }
-    // std::cout<<"Sync TIme: "<< timeIMUkpLast << " " << timeLaserCloudSurfLast <<std::endl;
     return true;
 }
 
@@ -368,6 +359,20 @@ int main(int argc, char** argv)
     double frame_num = 0;
 
 //------------------------------------------------------------------------------------------------------
+    char path[255];
+	if(!getcwd(path,255)){
+		std::cout<<"Get path fail!"<<std::endl;
+		return 0;
+	}
+	std::cout<<"path:"<<path<<std::endl;
+    std::ofstream fout_pre, fout_out;
+    fout_pre.open("/home/xw/catkin_like_loam/src/LIEK_LOAM/mat_pre.txt",std::ios::out);
+    fout_out.open("/home/xw/catkin_like_loam/src/LIEK_LOAM/mat_out.txt",std::ios::out);
+    if (fout_pre && fout_out)  //条件成立，则说明文件打开成功
+        std::cout << "~~~~file opened" << std::endl;
+    else
+        std::cout << "~~~~file doesn't exist" << std::endl;
+    
     ros::Rate rate(100);
     bool status = ros::ok();
     while (status)
@@ -378,9 +383,9 @@ int main(int argc, char** argv)
         {
             static int degenerate_count = 0;
             static double first_lidar_time = LaserCloudSurfaceBuff.front().header.stamp.toSec();
-            bool Need_Init = (timeLaserCloudSurfLast - first_lidar_time < INIT_TIME) ? true : false;
+            bool Need_Init = ((timeLaserCloudSurfLast - first_lidar_time) < INIT_TIME) ? true : false;
             if(Need_Init) {std::cout<<"||||||||||Initiallizing LiDar||||||||||"<<std::endl;}
-            // std::cout<<"~~~~~~~~~~~"<<LaserCloudSurfaceBuff.size()<<" "<<rot_kp_imu_buff.size()<<" "<<timeIMUkpLast<<" "<<timeLaserCloudSurfLast<<std::endl;
+            std::cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~frame buff size: "<<LaserCloudSurfaceBuff.size()<<" time of this frame: "<<timeLaserCloudSurfLast<<std::endl;
             double t1,t2,t3,t4;
             double match_start, match_time, solve_start, solve_time, pca_time, svd_time;
 
@@ -424,8 +429,10 @@ int main(int argc, char** argv)
             transformTobeMapped[4]  = T_global_cur(1);
             transformTobeMapped[5]  = T_global_cur(2);
 
+            fout_pre << std::setw(10) << timeLaserCloudSurfLast << " " << euler_cur.transpose()*57.3 << " " << T_global_cur.transpose() << " " << V_global_cur.transpose() << std::endl;
+
             #ifdef DEBUG_PRINT
-            std::cout<<"******pre-integrated states: "<<euler_cur.transpose()*57.3<<" "<<T_global_cur.transpose()<<" "<<V_global_cur.transpose()<<" "<<bias_g.transpose()<<" "<<bias_a.transpose()<<std::endl;
+            std::cout<<"pre-integrated states: "<<euler_cur.transpose()*57.3<<" "<<T_global_cur.transpose()<<" "<<V_global_cur.transpose()<<" "<<bias_g.transpose()<<" "<<bias_a.transpose()<<std::endl;
             #endif
             
             pointAssociateToMap(&pointOnYAxis, &pointOnYAxis);
@@ -1098,7 +1105,7 @@ int main(int argc, char** argv)
                         deltaT = t_add.norm() * 100.0;
                     }
 
-                    Eigen::Vector3d euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
+                    euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
 
                     #ifdef DEBUG_PRINT
                     std::cout<<"***new stat: "<<euler_cur.transpose()*57.3<<" "<<T_global_cur.transpose()<<"dR & dT: "<<deltaR<<" "<<deltaT<<" bias: "<<bias_a.transpose()<<" G: "<<gravity.transpose()<<" average res: "<<total_residual/laserCloudSelNum<<std::endl;
@@ -1145,6 +1152,7 @@ int main(int argc, char** argv)
             V_global_last = V_global_cur;
             T_global_last = T_global_cur;
             R_global_last = R_global_cur;
+            fout_out << std::setw(10) << timeLaserCloudSurfLast << " " << euler_cur.transpose()*57.3 << " " << T_global_last.transpose() << " " << V_global_last.transpose() << std::endl;
             timeIMUkpLast = timeIMUkpCur;
 
             LaserCloudSurfaceBuff.pop_front();
@@ -1317,6 +1325,8 @@ int main(int argc, char** argv)
     pcl::PointCloud<pcl::PointXYZI> surf_points, corner_points;
     surf_points = *laserCloudSurfFromMap;
     corner_points = *laserCloudCornerFromMap;
+    fout_out.close();
+    fout_pre.close();
     if (surf_points.size() > 0 && corner_points.size() > 0) 
     {
     pcl::PCDWriter pcd_writer;
@@ -1335,6 +1345,8 @@ int main(int argc, char** argv)
             plt::legend();
             plt::show();
             plt::pause(0.5);
+            plt::close();
+            plt::save("/home/xw/catkin_like_loam/src/LIEK_LOAM/a.png");
         }
         std::cout << "no points saved";
     }
