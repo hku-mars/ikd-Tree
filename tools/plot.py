@@ -37,13 +37,14 @@ plt.figure(1)
 fig, axs = plt.subplots(2)
 imu=np.loadtxt('imu.txt')
 time=imu[:,0]
-axs[0].set_title('succed')
+axs[0].set_title('Gyroscope')
+axs[1].set_title('Accelerameter')
 lab_1 = ['gyr-x', 'gyr-y', 'gyr-z']
 lab_2 = ['acc-x', 'acc-y', 'acc-z']
-for i in range(1,4):
+for i in range(3):
     # if i==1:
-    axs[0].plot(time, imu[:,i],'.-', label=lab_1[i])
-    axs[1].plot(time, imu[:,i+3],'.-', label=lab_2[i])
+    axs[0].plot(time, imu[:,i+1],'.-', label=lab_1[i])
+    axs[1].plot(time, imu[:,i+4],'.-', label=lab_2[i])
 axs[0].grid()
 axs[0].legend()
 axs[1].grid()
