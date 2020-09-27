@@ -138,9 +138,9 @@ ImuProcess::ImuProcess()
   cov_state_last = Eigen::Matrix<double,DIM_OF_STATES,DIM_OF_STATES>::Identity() * INIT_COV;
   cov_proc_noise = Eigen::Matrix<double,DIM_OF_PROC_N,1>::Zero();
   // Lidar_offset_to_IMU = Eigen::Vector3d(0.05512, 0.02226, 0.0297); // Horizon
-  // Lidar_offset_to_IMU = Eigen::Vector3d(0.04165, 0.02326, -0.0284); // Avia
-  Lidar_offset_to_IMU = Eigen::Vector3d(0.0, 0.0, -0.0);
-  fout.open("/home/xw/catkin_like_loam/src/LIEK_LOAM/imu.txt",std::ios::out);
+  Lidar_offset_to_IMU = Eigen::Vector3d(0.04165, 0.02326, -0.0284); // Avia
+  // Lidar_offset_to_IMU = Eigen::Vector3d(0.0, 0.0, -0.0);
+  fout.open(FILE_DIR("imu.txt"),std::ios::out);
 }
 
 ImuProcess::~ImuProcess() {fout.close();}
@@ -181,7 +181,7 @@ void ImuProcess::Reset()
   cur_pcl_un_.reset(new PointCloudXYZI());
 
   fout.close();
-  fout.open("/home/xw/XW/catkin_LIKE_loam/src/LIEK_LOAM/imu.txt",std::ios::out);
+  fout.open(FILE_DIR("imu.txt"),std::ios::out);
 }
 
 void ImuProcess::IMU_Initial(const MeasureGroup &meas, int &N)
@@ -301,11 +301,11 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
     Eigen::Matrix3d cov_acc_diag(Eye3d), cov_gyr_diag(Eye3d);
     cov_acc_diag.diagonal() = cov_acc;
     cov_gyr_diag.diagonal() = cov_gyr;
-    cov_w.block<3,3>(0,0).diagonal()   = cov_gyr * dt * dt * 10000;
-    cov_w.block<3,3>(3,3)              = R_kp * cov_gyr_diag * R_kp.transpose() * dt * dt * 10000;
+    cov_w.block<3,3>(0,0).diagonal()   = cov_gyr * dt * dt * 1000;
+    cov_w.block<3,3>(3,3)              = R_kp * cov_gyr_diag * R_kp.transpose() * dt * dt * 1000;
     cov_w.block<3,3>(6,6)              = R_kp * cov_acc_diag * R_kp.transpose() * dt * dt * 10000;
     cov_w.block<3,3>(9,9).diagonal()   = Eigen::Vector3d(0.01, 0.01, 0.01) * dt * dt; // bias gyro covariance
-    cov_w.block<3,3>(12,12).diagonal() = Eigen::Vector3d(0.01, 0.01, 0.01) * dt * dt; // bias acc covariance
+    cov_w.block<3,3>(12,12).diagonal() = Eigen::Vector3d(0.001, 0.001, 0.001) * dt * dt; // bias acc covariance
 
     cov_state_last = F_x * cov_state_last * F_x.transpose() + cov_w;
 
@@ -610,13 +610,6 @@ bool SyncMeasure(MeasureGroup &measgroup, KPPoseConstPtr& state_in)
 void ProcessLoop(std::shared_ptr<ImuProcess> p_imu)
 {
   ROS_INFO("Start ProcessLoop");
-
-  std::ofstream fout;
-  fout.open("/home/xw/catkin_like_loam/src/LIEK_LOAM/imu.txt",std::ios::out);
-  if (fout) 
-      std::cout << "~~~~imu file opened" << std::endl;
-  else
-      std::cout << "~~~~imu file doesn't exist" << std::endl;
 
   ros::Rate r(200);
 

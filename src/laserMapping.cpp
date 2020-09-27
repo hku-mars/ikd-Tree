@@ -68,8 +68,11 @@ namespace plt = matplotlibcpp;
 #define NUM_MATCH_POINTS    (5)
 #define NUM_MAX_ITERATIONS  (15)
 #define LASER_FRAME_INTEVAL (0.1)
+#define STR2(a)             #a
 
 typedef pcl::PointXYZI PointType;
+
+std::string root_dir = ROOT_DIR;
 
 int iterCount = 0;
 
@@ -359,19 +362,14 @@ int main(int argc, char** argv)
     double frame_num = 0;
 
 //------------------------------------------------------------------------------------------------------
-    char path[255];
-	if(!getcwd(path,255)){
-		std::cout<<"Get path fail!"<<std::endl;
-		return 0;
-	}
-	std::cout<<"path:"<<path<<std::endl;
     std::ofstream fout_pre, fout_out;
-    fout_pre.open("/home/xw/XW/catkin_LIKE_loam/src/LIEK_LOAM/mat_pre.txt",std::ios::out);
-    fout_out.open("/home/xw/XW/catkin_LIKE_loam/src/LIEK_LOAM/mat_out.txt",std::ios::out);
-    if (fout_pre && fout_out)  //条件成立，则说明文件打开成功
-        std::cout << "~~~~file opened" << std::endl;
+    
+    fout_pre.open(FILE_DIR("mat_pre.txt"),std::ios::out);
+    fout_out.open(FILE_DIR("mat_out.txt"),std::ios::out);
+    if (fout_pre && fout_out)
+        std::cout << "~~~~"<<ROOT_DIR<<" file opened" << std::endl;
     else
-        std::cout << "~~~~file doesn't exist" << std::endl;
+        std::cout << "~~~~"<<ROOT_DIR<<" doesn't exist" << std::endl;
     
     ros::Rate rate(100);
     bool status = ros::ok();
