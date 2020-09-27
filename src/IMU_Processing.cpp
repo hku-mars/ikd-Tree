@@ -84,6 +84,7 @@ class ImuProcess
 
   Eigen::Vector3d pos_last;
   Eigen::Vector3d vel_last;
+  Eigen::Vector3d angvel_last;
   Eigen::Matrix3d R_last;
   Eigen::Matrix<double,DIM_OF_STATES,DIM_OF_STATES> cov_state_last;
   Eigen::Matrix<double,DIM_OF_PROC_N,1> cov_proc_noise;
@@ -134,6 +135,7 @@ ImuProcess::ImuProcess()
   pos_last      = Zero3d;
   vel_last      = Zero3d;
   R_last        = Eye3d;
+  angvel_last  = Zero3d;
   Gravity_acc   = Eigen::Vector3d(0, 0, G_m_s2);
   cov_state_last = Eigen::Matrix<double,DIM_OF_STATES,DIM_OF_STATES>::Identity() * INIT_COV;
   cov_proc_noise = Eigen::Matrix<double,DIM_OF_PROC_N,1>::Zero();
@@ -156,6 +158,7 @@ void ImuProcess::Reset()
   pos_last  = Zero3d;
   vel_last  = Zero3d;
   R_last    = Eye3d;
+  angvel_last   = Zero3d;
   cov_state_last = Eigen::Matrix<double,DIM_OF_STATES,DIM_OF_STATES>::Identity() * INIT_COV;
   cov_proc_noise = Eigen::Matrix<double,DIM_OF_PROC_N,1>::Zero();
 
@@ -259,6 +262,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
 
   /*** forward pre-integration at each imu point ***/
   Eigen::Vector3d acc_kp, angvel_avr, acc_avr, vel_kp(vel_last), vel_e, pos_kp(pos_last), pos_e, pos_relat;
+  Eigen::Vector3d acc_imu, vel_imu, off_vel;
   Eigen::Matrix3d R_kp(R_last), R_relat, R_e;
   Eigen::MatrixXd F_x(Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES>::Identity());
   Eigen::MatrixXd cov_w(Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES>::Zero());
@@ -277,6 +281,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
 
     angvel_avr -= bias_gyr;
     acc_avr     = acc_avr * G_m_s2 / scale_gravity - bias_acc;
+    vel_imu     = vel_kp - R_kp * angvel_last.cross(Lidar_offset_to_IMU);
 
     fout<<head->header.stamp.toSec()<<" "<<angvel_avr.transpose()<<" "<<acc_avr.transpose()<<std::endl;
 
@@ -286,7 +291,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
     /* covariance propagation */
     Eigen::Matrix3d acc_avr_skew, off_vel_skew;
     Eigen::Matrix3d Exp_f   = Exp(angvel_avr, dt);
-    Eigen::Vector3d off_vel = angvel_avr.cross(Lidar_offset_to_IMU);
+    off_vel = angvel_avr.cross(Lidar_offset_to_IMU);
     acc_avr_skew<<SKEW_SYM_MATRX(angvel_avr);
     off_vel_skew<<SKEW_SYM_MATRX(off_vel);
 
@@ -301,32 +306,33 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
     Eigen::Matrix3d cov_acc_diag(Eye3d), cov_gyr_diag(Eye3d);
     cov_acc_diag.diagonal() = cov_acc;
     cov_gyr_diag.diagonal() = cov_gyr;
-    cov_w.block<3,3>(0,0).diagonal()   = cov_gyr * dt * dt * 1000;
-    cov_w.block<3,3>(3,3)              = R_kp * cov_gyr_diag * R_kp.transpose() * dt * dt * 1000;
+    cov_w.block<3,3>(0,0).diagonal()   = cov_gyr * dt * dt * 10000;
+    cov_w.block<3,3>(3,3)              = R_kp * cov_gyr_diag * R_kp.transpose() * dt * dt * 10000;
     cov_w.block<3,3>(6,6)              = R_kp * cov_acc_diag * R_kp.transpose() * dt * dt * 10000;
     cov_w.block<3,3>(9,9).diagonal()   = Eigen::Vector3d(0.01, 0.01, 0.01) * dt * dt; // bias gyro covariance
     cov_w.block<3,3>(12,12).diagonal() = Eigen::Vector3d(0.001, 0.001, 0.001) * dt * dt; // bias acc covariance
 
     cov_state_last = F_x * cov_state_last * F_x.transpose() + cov_w;
 
-    /* the estimated total acceleration (global frame) at the Lidar origin point (considering the offset of Lidar to IMU) */
-    acc_kp = R_kp * (acc_avr + angvel_avr.cross(angvel_avr.cross(Lidar_offset_to_IMU))) + Gravity_acc; 
+    /* propogation of Lidar attitude */
+    R_kp = R_kp * Exp_f;
+
+    /* total acceleration (global frame) at the Lidar origin point (considering the offset of Lidar to IMU) */
+    acc_imu = R_kp * acc_avr + Gravity_acc;
+    acc_kp  = acc_imu + R_kp * angvel_avr.cross(angvel_avr.cross(Lidar_offset_to_IMU));
 
     /* position of Lidar */
     pos_kp = pos_kp + vel_kp * dt + 0.5 * acc_kp * dt * dt;
 
     /* velocity of Lidar */
-    vel_kp = vel_kp + acc_kp * dt;
-
-    /* attitude of Lidar */
-    R_kp = R_kp * Exp_f;
-    // std::cout<<"acc_kp measures"<< acc_avr.transpose() << "in word frame: "<<acc_kp.transpose()<<std::endl;
+    vel_imu = vel_imu + acc_imu * dt;
+    vel_kp = vel_imu + R_kp * off_vel;
 
     /* save the Lidar poses at each IMU measurements */
+    angvel_last = angvel_avr;
     double &&offs_t = tail->header.stamp.toSec() - pcl_beg_time;
-    v_rot_kp_.pose6D.push_back(set_pose6d(offs_t, acc_kp, angvel_avr, vel_kp, pos_kp, R_kp));
-
-    // std::cout<<acc_kp<< angvel_avr<< vel_kp<< pos_kp<< R_kp<<std::endl;
+    v_rot_kp_.pose6D.push_back(set_pose6d(offs_t, acc_imu, angvel_avr, vel_kp, pos_kp, R_kp));
+    std::cout<<"acc imu: "<<acc_imu.transpose()<<" acc_kp: "<<acc_kp.transpose()<<" vel_kp: "<<vel_kp.transpose()<<" pos_kp: "<<pos_kp.transpose()<<" off_vel: "<<off_vel.transpose()<<std::endl;
   }
 
   /*** calculated the pos and attitude at the end lidar point ***/
@@ -413,8 +419,8 @@ void ImuProcess::Process(const MeasureGroup &meas, const KPPoseConstPtr &state_i
     {
       imu_need_init_ = false;
       // std::cout<<"mean acc: "<<mean_acc<<" acc measures in word frame:"<<R_last.transpose()*mean_acc<<std::endl;
-      ROS_INFO("IMU Initial Results: Gravity_scale: %.4f; bias_gyr: %.4f %.4f %.4f; acc covarience: %.8f %.8f %.8f; gry covarience: %.8f %.8f %.8f",\
-               scale_gravity, bias_gyr[0], bias_gyr[1], bias_gyr[2], cov_acc[0], cov_acc[1], cov_acc[2], cov_gyr[0], cov_gyr[1], cov_gyr[2]);
+      ROS_INFO("IMU Initials: Gravity: %.4f %.4f %.4f; bias_gyr: %.4f %.4f %.4f; acc covarience: %.8f %.8f %.8f; gry covarience: %.8f %.8f %.8f",\
+               Gravity_acc[0], Gravity_acc[1], Gravity_acc[2], bias_gyr[0], bias_gyr[1], bias_gyr[2], cov_acc[0], cov_acc[1], cov_acc[2], cov_gyr[0], cov_gyr[1], cov_gyr[2]);
     }
 
     return;

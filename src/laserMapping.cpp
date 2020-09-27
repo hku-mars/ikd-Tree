@@ -61,7 +61,7 @@
 
 namespace plt = matplotlibcpp;
 
-// #define DEBUG_PRINT
+#define DEBUG_PRINT
 
 #define INIT_TIME           (2.0)
 #define LASER_POINT_COV     (0.0010)
@@ -1344,7 +1344,7 @@ int main(int argc, char** argv)
             plt::show();
             plt::pause(0.5);
             plt::close();
-            plt::save("/home/xw/catkin_like_loam/src/LIEK_LOAM/a.png");
+            // plt::save("/home/xw/catkin_like_loam/src/LIEK_LOAM/a.png");
         }
         std::cout << "no points saved";
     }
