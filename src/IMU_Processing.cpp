@@ -142,7 +142,7 @@ ImuProcess::ImuProcess()
   // Lidar_offset_to_IMU = Eigen::Vector3d(0.05512, 0.02226, 0.0297); // Horizon
   Lidar_offset_to_IMU = Eigen::Vector3d(0.04165, 0.02326, -0.0284); // Avia
   // Lidar_offset_to_IMU = Eigen::Vector3d(0.0, 0.0, -0.0);
-  fout.open(FILE_DIR("imu.txt"),std::ios::out);
+  // fout.open(DEBUG_FILE_DIR("imu.txt"),std::ios::out);
 }
 
 ImuProcess::~ImuProcess() {fout.close();}
@@ -184,7 +184,7 @@ void ImuProcess::Reset()
   cur_pcl_un_.reset(new PointCloudXYZI());
 
   fout.close();
-  fout.open(FILE_DIR("imu.txt"),std::ios::out);
+  fout.open(DEBUG_FILE_DIR("imu.txt"),std::ios::out);
 }
 
 void ImuProcess::IMU_Initial(const MeasureGroup &meas, int &N)
@@ -282,8 +282,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
     angvel_avr -= bias_gyr;
     acc_avr     = acc_avr * G_m_s2 / scale_gravity - bias_acc;
     vel_imu     = vel_kp - R_kp * angvel_last.cross(Lidar_offset_to_IMU);
-
-    fout<<head->header.stamp.toSec()<<" "<<angvel_avr.transpose()<<" "<<acc_avr.transpose()<<std::endl;
+    // fout<<head->header.stamp.toSec()<<" "<<angvel_avr.transpose()<<" "<<acc_avr.transpose()<<std::endl;
 
     /* we propagate from the first lidar point to the last imu point */
     dt = tail->header.stamp.toSec() - head->header.stamp.toSec();
@@ -332,7 +331,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
     angvel_last = angvel_avr;
     double &&offs_t = tail->header.stamp.toSec() - pcl_beg_time;
     v_rot_kp_.pose6D.push_back(set_pose6d(offs_t, acc_imu, angvel_avr, vel_kp, pos_kp, R_kp));
-    std::cout<<"acc imu: "<<acc_imu.transpose()<<" acc_kp: "<<acc_kp.transpose()<<" vel_kp: "<<vel_kp.transpose()<<" pos_kp: "<<pos_kp.transpose()<<" off_vel: "<<off_vel.transpose()<<std::endl;
+    // std::cout<<"acc imu: "<<acc_imu.transpose()<<" acc_kp: "<<acc_kp.transpose()<<" vel_kp: "<<vel_kp.transpose()<<" pos_kp: "<<pos_kp.transpose()<<" off_vel: "<<off_vel.transpose()<<std::endl;
   }
 
   /*** calculated the pos and attitude at the end lidar point ***/
@@ -484,11 +483,13 @@ void ImuProcess::Process(const MeasureGroup &meas, const KPPoseConstPtr &state_i
 /// To notify new data
 std::mutex mtx_buffer;
 std::condition_variable sig_buffer;
+pcl::PointCloud<PointType> v_pcl;
 bool b_exit = false;
 bool b_reset = false;
 bool b_first = true;
 
 /// Buffers for measurements
+double lidar_end_time = 0.0;
 double last_timestamp_lidar = -1;
 double last_timestamp_imu   = -1;
 double last_timestamp_odo   = -1;
@@ -563,44 +564,28 @@ bool SyncMeasure(MeasureGroup &measgroup, KPPoseConstPtr& state_in)
     return false;
   }
 
-  if (imu_buffer.back()->header.stamp.toSec() <
-      lidar_buffer.front()->header.stamp.toSec()) 
+  /// Add lidar data once when lidar msg comes, and pop from buffer
+  if(v_pcl.empty())
   {
-    // std::cout<<"LIDAR TIME WRONG: "<<imu_buffer.back()->header.stamp.toSec()<<" "<<lidar_buffer.front()->header.stamp.toSec();
-    return false;
+    measgroup.lidar = lidar_buffer.front();
+    pcl::fromROSMsg(*(measgroup.lidar), v_pcl);
+    lidar_end_time = measgroup.lidar->header.stamp.toSec() + v_pcl.points.back().curvature / double(1000);
   }
 
-  if ((imu_buffer.back()->header.stamp.toSec() - lidar_buffer.front()->header.stamp.toSec()) < 0.09)
+  double imu_end_time = imu_buffer.back()->header.stamp.toSec();
+
+  if (imu_end_time < lidar_end_time)
   {
-    std::cout<<"[IMU DELAY]: "<<imu_buffer.back()->header.stamp.toSec()<<" "<<lidar_buffer.front()->header.stamp.toSec()<<std::endl;
+    std::cout<<"[IMU DELAY]: "<<imu_buffer.back()->header.stamp.toSec()<<" "<<lidar_end_time<<std::endl;
     return false;
   }
-
-  /// Add lidar data, and pop from buffer
-  measgroup.lidar = lidar_buffer.front();
-  lidar_buffer.pop_front();
-  pcl::PointCloud<PointType> v_pcl;
-  pcl::fromROSMsg(*(measgroup.lidar), v_pcl);
-
-  // double lidar_end_time = measgroup.lidar->header.stamp.toSec();
-  double lidar_end_time = measgroup.lidar->header.stamp.toSec() + \
-                          v_pcl.points.back().curvature / double(1000);
 
   /// Add imu data, and pop from buffer
   measgroup.imu.clear();
-  int imu_cnt = 0;
-  for (const auto &imu : imu_buffer)
-  {
-    double imu_time = imu->header.stamp.toSec();
-    if (imu_time <= lidar_end_time) 
-    {
-      measgroup.imu.push_back(imu);
-      imu_cnt++;
-    }
-  }
 
-  for (int i = 0; i < imu_cnt; ++i)
+  while (imu_buffer.front()->header.stamp.toSec() < lidar_end_time)
   {
+    measgroup.imu.push_back(imu_buffer.front());
     imu_buffer.pop_front();
   }
 
@@ -609,6 +594,9 @@ bool SyncMeasure(MeasureGroup &measgroup, KPPoseConstPtr& state_in)
     state_in = pose_buffer.back();
     pose_buffer.pop_front();
   }
+
+  lidar_buffer.pop_front();
+  v_pcl.clear();
   
   return true;
 }

@@ -23,7 +23,7 @@
 #define STD_VEC_FROM_EIGEN(mat)  std::vector<decltype(mat)::Scalar> (mat.data(), mat.data() + mat.rows() * mat.cols())
 #define CONSTRAIN(v,min,max) ((v>min)?((v<max)?v:max):min)
 
-#define FILE_DIR(name)  (std::string(std::string(ROOT_DIR) + name))
+#define DEBUG_FILE_DIR(name)  (std::string(std::string(ROOT_DIR) + "Debug/"+ name))
 
 Eigen::Matrix3d Eye3d(Eigen::Matrix3d::Identity());
 Eigen::Matrix3f Eye3f(Eigen::Matrix3f::Identity());

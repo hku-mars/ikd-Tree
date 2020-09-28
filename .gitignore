@@ -1,1 +1,3 @@
-build/
+build
+Debug/*.png
+Debug/*.txt

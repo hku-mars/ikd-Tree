@@ -61,7 +61,7 @@
 
 namespace plt = matplotlibcpp;
 
-#define DEBUG_PRINT
+// #define DEBUG_PRINT
 
 #define INIT_TIME           (2.0)
 #define LASER_POINT_COV     (0.0010)
@@ -364,8 +364,8 @@ int main(int argc, char** argv)
 //------------------------------------------------------------------------------------------------------
     std::ofstream fout_pre, fout_out;
     
-    fout_pre.open(FILE_DIR("mat_pre.txt"),std::ios::out);
-    fout_out.open(FILE_DIR("mat_out.txt"),std::ios::out);
+    fout_pre.open(DEBUG_FILE_DIR("mat_pre.txt"),std::ios::out);
+    fout_out.open(DEBUG_FILE_DIR("mat_out.txt"),std::ios::out);
     if (fout_pre && fout_out)
         std::cout << "~~~~"<<ROOT_DIR<<" file opened" << std::endl;
     else
@@ -1118,7 +1118,7 @@ int main(int argc, char** argv)
 
                     rematch_en = false;
 
-                    if ((deltaR < 0.01 && deltaT < 0.01))
+                    if ((deltaR < 0.015 && deltaT < 0.015))
                     {
                         rematch_en = true;
                         rematch_num ++;
@@ -1259,11 +1259,11 @@ int main(int argc, char** argv)
             laserCloudFullRes3.header.frame_id = "/camera_init";
             pubLaserCloudFullRes.publish(laserCloudFullRes3);
 
-            sensor_msgs::PointCloud2 laserCloudMap;
-            pcl::toROSMsg(*laserCloudSurfFromMap, laserCloudMap);
-            laserCloudMap.header.stamp = ros::Time::now();//ros::Time().fromSec(timeLaserCloudCornerLast);
-            laserCloudMap.header.frame_id = "/camera_init";
-            pubLaserCloudMap.publish(laserCloudMap);
+            // sensor_msgs::PointCloud2 laserCloudMap;
+            // pcl::toROSMsg(*laserCloudSurfFromMap, laserCloudMap);
+            // laserCloudMap.header.stamp = ros::Time::now();//ros::Time().fromSec(timeLaserCloudCornerLast);
+            // laserCloudMap.header.frame_id = "/camera_init";
+            // pubLaserCloudMap.publish(laserCloudMap);
 
             *laserCloudFullResColor_pcd += *laserCloudFullResColor;
 
@@ -1297,10 +1297,10 @@ int main(int argc, char** argv)
             /*** plot variables ***/
             t4 = omp_get_wtime();
             frame_num ++;
-            // aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t4 - t1) / frame_num;
-            aver_time_consu = aver_time_consu * 0.5 + (t4 - t1) * 0.5;
+            aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t4 - t1) / frame_num;
+            // aver_time_consu = aver_time_consu * 0.5 + (t4 - t1) * 0.5;
             T1.push_back(timeLaserCloudSurfLast);
-            s_plot.push_back(t4 - t1);
+            s_plot.push_back(aver_time_consu);
             s_plot2.push_back(double(deltaR));
             s_plot3.push_back(double(deltaT));
 
