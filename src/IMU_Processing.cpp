@@ -239,7 +239,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
   std::cout<<"[ IMU Process ]: Process lidar from "<<pcl_beg_time<<" to "<<pcl_end_time<<", " \
            <<meas.imu.size()<<" imu msgs from "<<imu_beg_time<<" to "<<imu_end_time<<std::endl;
 
-  /*** initialization ***/
+  /*** get last states ***/
   if (state_in != NULL)
   {
     KPPose state(*state_in);
@@ -250,9 +250,11 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
     vel_last<<VEC_FROM_ARRAY(state.vel_end);
     R_last  =Eigen::Map<Eigen::Matrix3d>(state.rot_end.data());
     cov_state_last = Eigen::Map<Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> >(state.cov.data());
-    
+
+    #ifdef DEBUG_PRINT
     Eigen::Vector3d euler_cur = correct_pi(R_last.eulerAngles(1, 0, 2));
     // std::cout<<"!!!! Got pose: R: "<<euler_cur.transpose()<<" T: "<<pos_last.transpose()<<std::endl;
+    #endif
   }
   v_rot_kp_.header  = meas.lidar->header;
   v_rot_kp_.pose6D.clear();
@@ -260,10 +262,10 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
   v_rot_pcl_.clear();
   v_rot_pcl_.push_back(Eye3d);
 
-  /*** forward pre-integration at each imu point ***/
-  Eigen::Vector3d acc_kp, angvel_avr, acc_avr, vel_kp(vel_last), vel_e, pos_kp(pos_last), pos_e, pos_relat;
+  /*** forward propagation at each imu point ***/
+  Eigen::Vector3d acc_kp, angvel_avr, acc_avr, vel_liD(vel_last), vel_e, pos_liD(pos_last), pos_e, pos_relat;
   Eigen::Vector3d acc_imu, vel_imu, off_vel;
-  Eigen::Matrix3d R_kp(R_last), R_relat, R_e;
+  Eigen::Matrix3d R_liD(R_last), R_relat, R_e;
   Eigen::MatrixXd F_x(Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES>::Identity());
   Eigen::MatrixXd cov_w(Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES>::Zero());
   double dt = 0;
@@ -281,10 +283,11 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
 
     angvel_avr -= bias_gyr;
     acc_avr     = acc_avr * G_m_s2 / scale_gravity - bias_acc;
-    vel_imu     = vel_kp - R_kp * angvel_last.cross(Lidar_offset_to_IMU);
-    // fout<<head->header.stamp.toSec()<<" "<<angvel_avr.transpose()<<" "<<acc_avr.transpose()<<std::endl;
+    vel_imu     = vel_liD - R_liD * angvel_last.cross(Lidar_offset_to_IMU);
 
-    /* we propagate from the first lidar point to the last imu point */
+    #ifdef DEBUG_PRINT
+    fout<<head->header.stamp.toSec()<<" "<<angvel_avr.transpose()<<" "<<acc_avr.transpose()<<std::endl;
+    #endif
     dt = tail->header.stamp.toSec() - head->header.stamp.toSec();
     
     /* covariance propagation */
@@ -296,74 +299,67 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
 
     F_x.block<3,3>(0,0)  = Exp_f;
     F_x.block<3,3>(0,9)  = - Eye3d * dt;
-    F_x.block<3,3>(3,0)  = R_kp * off_vel_skew * dt;
+    F_x.block<3,3>(3,0)  = R_liD * off_vel_skew * dt;
     F_x.block<3,3>(3,6)  = Eye3d * dt;
-    F_x.block<3,3>(6,0)  = R_kp * acc_avr_skew * dt;
-    F_x.block<3,3>(6,12) = - R_kp * dt;
+    F_x.block<3,3>(6,0)  = R_liD * acc_avr_skew * dt;
+    F_x.block<3,3>(6,12) = - R_liD * dt;
     F_x.block<3,3>(6,15) = Eye3d * dt;
 
     Eigen::Matrix3d cov_acc_diag(Eye3d), cov_gyr_diag(Eye3d);
     cov_acc_diag.diagonal() = cov_acc;
     cov_gyr_diag.diagonal() = cov_gyr;
     cov_w.block<3,3>(0,0).diagonal()   = cov_gyr * dt * dt * 10000;
-    cov_w.block<3,3>(3,3)              = R_kp * cov_gyr_diag * R_kp.transpose() * dt * dt * 10000;
-    cov_w.block<3,3>(6,6)              = R_kp * cov_acc_diag * R_kp.transpose() * dt * dt * 10000;
+    cov_w.block<3,3>(3,3)              = R_liD * cov_gyr_diag * R_liD.transpose() * dt * dt * 10000;
+    cov_w.block<3,3>(6,6)              = R_liD * cov_acc_diag * R_liD.transpose() * dt * dt * 10000;
     cov_w.block<3,3>(9,9).diagonal()   = Eigen::Vector3d(0.01, 0.01, 0.01) * dt * dt; // bias gyro covariance
     cov_w.block<3,3>(12,12).diagonal() = Eigen::Vector3d(0.001, 0.001, 0.001) * dt * dt; // bias acc covariance
 
     cov_state_last = F_x * cov_state_last * F_x.transpose() + cov_w;
 
     /* propogation of Lidar attitude */
-    R_kp = R_kp * Exp_f;
+    R_liD = R_liD * Exp_f;
 
     /* total acceleration (global frame) at the Lidar origin point (considering the offset of Lidar to IMU) */
-    acc_imu = R_kp * acc_avr + Gravity_acc;
-    acc_kp  = acc_imu + R_kp * angvel_avr.cross(angvel_avr.cross(Lidar_offset_to_IMU));
+    acc_imu = R_liD * acc_avr + Gravity_acc;
+    acc_kp  = acc_imu + R_liD * angvel_avr.cross(angvel_avr.cross(Lidar_offset_to_IMU));
 
-    /* position of Lidar */
-    pos_kp = pos_kp + vel_kp * dt + 0.5 * acc_kp * dt * dt;
+    /* propogation of Lidar position */
+    pos_liD = pos_liD + vel_liD * dt + 0.5 * acc_kp * dt * dt;
 
     /* velocity of Lidar */
     vel_imu = vel_imu + acc_imu * dt;
-    vel_kp = vel_imu + R_kp * off_vel;
+    vel_liD = vel_imu + R_liD * off_vel;
 
     /* save the Lidar poses at each IMU measurements */
     angvel_last = angvel_avr;
     double &&offs_t = tail->header.stamp.toSec() - pcl_beg_time;
-    v_rot_kp_.pose6D.push_back(set_pose6d(offs_t, acc_imu, angvel_avr, vel_kp, pos_kp, R_kp));
-    // std::cout<<"acc imu: "<<acc_imu.transpose()<<" acc_kp: "<<acc_kp.transpose()<<" vel_kp: "<<vel_kp.transpose()<<" pos_kp: "<<pos_kp.transpose()<<" off_vel: "<<off_vel.transpose()<<std::endl;
+    v_rot_kp_.pose6D.push_back(set_pose6d(offs_t, acc_imu, angvel_avr, vel_liD, pos_liD, R_liD));
   }
 
-  /*** calculated the pos and attitude at the end lidar point ***/
+  /*** calculated the pos and attitude at the frame End (the lase lidar point) ***/
   dt    = pcl_end_time - imu_end_time;
-  vel_e = vel_kp + acc_kp * dt;
-  pos_e = pos_kp + vel_kp * dt + 0.5 * acc_kp * dt * dt;
-  R_e   = R_kp * Exp(angvel_avr, dt);
-  // pos_e = pos_kp;
-  // R_e   = R_kp;
+  vel_e = vel_liD + acc_kp * dt;
+  pos_e = pos_liD + vel_liD * dt + 0.5 * acc_kp * dt * dt;
+  R_e   = R_liD * Exp(angvel_avr, dt);
+
   v_rot_kp_.gravity  = STD_VEC_FROM_EIGEN(Gravity_acc);
   v_rot_kp_.bias_gyr = STD_VEC_FROM_EIGEN(bias_gyr);
   v_rot_kp_.bias_acc = STD_VEC_FROM_EIGEN(bias_acc);
   v_rot_kp_.pos_end  = STD_VEC_FROM_EIGEN(pos_e);
   v_rot_kp_.vel_end  = STD_VEC_FROM_EIGEN(vel_e);
   v_rot_kp_.rot_end  = STD_VEC_FROM_EIGEN(R_e);
-  v_rot_kp_.cov      = STD_VEC_FROM_EIGEN(cov_state_last); // std::vector<decltype(cov_state_last)::Scalar> (cov_state_last.data(), cov_state_last.data() + DIM_OF_STATES_SQUARE);
-  
-  Eigen::Vector3d euler_cur = correct_pi(R_e.eulerAngles(1, 0, 2));
-  // std::cout<<"!!!! propagated states: gravity "<<Gravity_acc.transpose()<<std::endl;
-  // std::cout<<"!!!! propagated states: sta_cov "<<cov_state_last.diagonal().transpose()<<std::endl;
+  v_rot_kp_.cov      = STD_VEC_FROM_EIGEN(cov_state_last);
 
-  /*** undistort each lidar point (backward pre-integration) ***/
+  /*** undistort each lidar point (backward iterated computation) ***/
   auto it_pcl = pcl_in_out.points.end() - 1;
-  auto &&kps = v_rot_kp_.pose6D;
-  /* using the results of forward pre-integration */
+  auto &kps = v_rot_kp_.pose6D;
   for (auto it_kp = kps.end() - 1; it_kp != kps.begin(); it_kp--)
   {
     auto head = it_kp - 1;
-    R_kp<<MAT_FROM_ARRAY(head->rot);
+    R_liD<<MAT_FROM_ARRAY(head->rot);
     acc_kp<<VEC_FROM_ARRAY(head->acc);
-    vel_kp<<VEC_FROM_ARRAY(head->vel);
-    pos_kp<<VEC_FROM_ARRAY(head->pos);
+    vel_liD<<VEC_FROM_ARRAY(head->vel);
+    pos_liD<<VEC_FROM_ARRAY(head->pos);
     angvel_avr<<VEC_FROM_ARRAY(head->gyr);
 
     int i = 0;
@@ -377,8 +373,8 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
        * So if we want to compensate a point at timestamp-i to the frame-e
        * P_compensate = R_e ^ T * (R_i * P_i + T_ei) where T_ei is represented in global frame */
       Eigen::Vector3d P_i(it_pcl->x, it_pcl->y, it_pcl->z);
-      Eigen::Vector3d T_ei(pos_kp + vel_kp * dt + 0.5 * acc_kp * dt * dt - pos_e);
-      Eigen::Matrix3d R_i(R_kp * Exp(angvel_avr, dt));
+      Eigen::Vector3d T_ei(pos_liD + vel_liD * dt + 0.5 * acc_kp * dt * dt - pos_e);
+      Eigen::Matrix3d R_i(R_liD * Exp(angvel_avr, dt));
       Eigen::Vector3d P_compensate = R_e.transpose() * (R_i * P_i + T_ei);
 
       /// save Undistorted points and their rotation

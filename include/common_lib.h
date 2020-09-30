@@ -8,6 +8,8 @@
 #include <nav_msgs/Odometry.h>
 #include <tf/transform_broadcaster.h>
 
+#define DEBUG_PRINT
+
 #define PI_M (3.14159265358)
 #define G_m_s2 (9.8099)         // Gravaty const in GuangDong/China
 #define DIM_OF_STATES (18)      // Dimension of states (Let Dim(SO(3)) = 3)
