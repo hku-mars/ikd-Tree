@@ -4,11 +4,10 @@
 #include <Eigen/Eigen>
 #include <eigen_conversions/eigen_msg.h>
 #include <fast_lio/KeyPointPose.h>
-// #include <geometry_msgs/Vector3.h>
 #include <nav_msgs/Odometry.h>
 #include <tf/transform_broadcaster.h>
 
-#define DEBUG_PRINT
+// #define DEBUG_PRINT
 
 #define PI_M (3.14159265358)
 #define G_m_s2 (9.8099)         // Gravaty const in GuangDong/China

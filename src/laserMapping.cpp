@@ -79,8 +79,6 @@ int iterCount = 0;
 float timeLaserCloudCornerLast = 0;
 float timeLaserCloudSurfLast   = 0;
 float timeLaserCloudFullRes    = 0;
-double timeIMUkpLast = 0;
-double timeIMUkpCur  = 0;
 
 bool newLaserCloudCornerLast = false;
 bool newLaserCloudSurfLast   = false;
@@ -269,8 +267,6 @@ void laserCloudFullResHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloud
 void KeyPointPose6DHandler(const fast_lio::KeyPointPoseConstPtr& KeyPointPose)
 {
     rot_kp_imu_buff.push_back(*KeyPointPose);
-
-    timeIMUkpCur = rot_kp_imu_buff.front().header.stamp.toSec();
 }
 
 bool sync_packages()
@@ -407,14 +403,14 @@ int main(int argc, char** argv)
             /** Get the propagated states **/
             Eigen::Vector3d gravity, bias_g, bias_a;
             Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> cov_stat_cur;
-
-            gravity<<VEC_FROM_ARRAY(rot_kp_imu_buff.front().gravity);
-            bias_g<<VEC_FROM_ARRAY(rot_kp_imu_buff.front().bias_gyr);
-            bias_a<<VEC_FROM_ARRAY(rot_kp_imu_buff.front().bias_acc);
-            T_global_cur<<VEC_FROM_ARRAY(rot_kp_imu_buff.front().pos_end);
-            V_global_cur<<VEC_FROM_ARRAY(rot_kp_imu_buff.front().vel_end);
-            R_global_cur=Eigen::Map<Eigen::Matrix3d>(rot_kp_imu_buff.front().rot_end.data());
-            cov_stat_cur=Eigen::Map<Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> >(rot_kp_imu_buff.front().cov.data());
+            auto &states_propagted = rot_kp_imu_buff.front();
+            gravity<<VEC_FROM_ARRAY(states_propagted.gravity);
+            bias_g<<VEC_FROM_ARRAY(states_propagted.bias_gyr);
+            bias_a<<VEC_FROM_ARRAY(states_propagted.bias_acc);
+            T_global_cur<<VEC_FROM_ARRAY(states_propagted.pos_end);
+            V_global_cur<<VEC_FROM_ARRAY(states_propagted.vel_end);
+            R_global_cur=Eigen::Map<Eigen::Matrix3d>(states_propagted.rot_end.data());
+            cov_stat_cur=Eigen::Map<Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> >(states_propagted.cov.data());
 
             Eigen::Vector3d euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
 
@@ -1028,15 +1024,16 @@ int main(int argc, char** argv)
                         point_crossmat<<SKEW_SYM_MATRX(point_this);
 
                         /*** get the normal vector of closest surface/corner ***/
-                        Eigen::Vector3d norm_vec(coeffSel->points[i].x, coeffSel->points[i].y, coeffSel->points[i].z);
+                        const PointType &norm_p = coeffSel->points[i];
+                        Eigen::Vector3d norm_vec(norm_p.x, norm_p.y, norm_p.z);
 
                         /*** calculate the Measuremnt Jacobian matrix H ***/
                         Eigen::Vector3d A(point_crossmat * R_global_cur.transpose() * norm_vec);
                         H.row(i) = Eigen::Matrix<double, 1, DIM_OF_STATES>::Zero();
-                        H.block<1,6>(i,0) << VEC_FROM_ARRAY(A), norm_vec.x, norm_vec.y, norm_vec.z;
+                        H.block<1,6>(i,0) << VEC_FROM_ARRAY(A), norm_p.x, norm_p.y, norm_p.z;
 
                         /*** Measuremnt: distance to the closest surface/corner ***/
-                        meas_vec(i) = - norm_vec.intensity;
+                        meas_vec(i) = - norm_p.intensity;
                     }
 
                     Eigen::Vector3d rot_add, t_add, v_add, bg_add, ba_add, g_add;
@@ -1139,7 +1136,7 @@ int main(int argc, char** argv)
                     solve_time += omp_get_wtime() - solve_start;
                 }
 
-                std::cout<<"current time: "<<timeIMUkpCur<<" iteration count: "<<iterCount+1<<std::endl;
+                std::cout<<" iteration count: "<<iterCount+1<<std::endl;
                 transformUpdate();
             }
 
@@ -1149,7 +1146,6 @@ int main(int argc, char** argv)
             /**** Regester new feature point to map ***/
             if (!LaserCloudSurfaceBuff.empty() && !rot_kp_imu_buff.empty())
             {
-                timeIMUkpCur  = rot_kp_imu_buff.front().header.stamp.toSec();
                 timeLaserCloudSurfLast = LaserCloudSurfaceBuff.front().header.stamp.toSec();
             }
 
@@ -1221,7 +1217,7 @@ int main(int argc, char** argv)
             t3 = omp_get_wtime();
 
             /******* Publish Lidar states *******/
-            save_states(Pose6D_Solved, rot_kp_imu_buff.front().header, gravity, bias_g, bias_a, \
+            save_states(Pose6D_Solved, states_propagted.header, gravity, bias_g, bias_a, \
                         T_global_cur, V_global_cur, R_global_cur, cov_stat_cur); //std::cout<<"!!!! Sent pose:"<<T_global_cur.transpose()<<std::endl;
             Pose6D_Solved.pose6D.clear();
             pubSolvedPose6D.publish(Pose6D_Solved);
@@ -1229,8 +1225,10 @@ int main(int argc, char** argv)
             V_global_last = V_global_cur;
             T_global_last = T_global_cur;
             R_global_last = R_global_cur;
-            fout_out << std::setw(10) << timeLaserCloudSurfLast << " " << euler_cur.transpose()*57.3 << " " << T_global_last.transpose() << " " << V_global_last.transpose() << std::endl;
-            timeIMUkpLast = timeIMUkpCur;
+
+            #ifdef DEBUG_PRINT
+                fout_out << std::setw(10) << timeLaserCloudSurfLast << " " << euler_cur.transpose()*57.3 << " " << T_global_last.transpose() << " " << V_global_last.transpose() << std::endl;
+            #endif
 
             /******* Publish current frame points in world coordinates:  *******/
             laserCloudSurround2->clear();
