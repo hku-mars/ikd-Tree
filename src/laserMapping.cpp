@@ -127,8 +127,6 @@ std::deque< fast_lio::KeyPointPose > rot_kp_imu_buff;
 pcl::PointCloud<PointType>::Ptr laserCloudFullRes(new pcl::PointCloud<PointType>());
 pcl::PointCloud<PointType>::Ptr laserCloudFullRes2(new pcl::PointCloud<PointType>());
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr laserCloudFullResColor(new pcl::PointCloud<pcl::PointXYZRGB>());
-pcl::PointCloud<pcl::PointXYZRGB>::Ptr laserCloudFullResColor_pcd(new pcl::PointCloud<pcl::PointXYZRGB>());
-
 
 pcl::PointCloud<PointType>::Ptr laserCloudCornerArray[laserCloudNum];
 
@@ -141,11 +139,11 @@ pcl::PointCloud<PointType>::Ptr laserCloudSurfArray2[laserCloudNum];
 pcl::KdTreeFLANN<PointType>::Ptr kdtreeCornerFromMap(new pcl::KdTreeFLANN<PointType>());
 pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfFromMap(new pcl::KdTreeFLANN<PointType>());
 
-//optimization states 
+//optimization poses 
 double transformTobeMapped[6] = {0};
-//optimization states after mapping
+//optimization poses after mapping
 double transformAftMapped[6] = {0};
-//last optimization states
+//last optimization poses
 double transformLastMapped[6] = {0};
 
 //estimated rotation and translation;
@@ -406,7 +404,7 @@ int main(int argc, char** argv)
             pointOnYAxis.y = 10.0;
             pointOnYAxis.z = 0.0;
             
-            /** Get the rotations and translations of IMU keypoints in a frame **/
+            /** Get the propagated states **/
             Eigen::Vector3d gravity, bias_g, bias_a;
             Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> cov_stat_cur;
 
@@ -781,7 +779,7 @@ int main(int argc, char** argv)
                 {
                     laserCloudOri->clear();
                     coeffSel->clear();
-
+                    /** closest line search and selection **/
 #ifdef USING_CORNER
                     for (int i = 0; i < laserCloudCornerLast->points.size(); i++) {
                         pointOri = laserCloudCornerLast->points[i];
@@ -896,7 +894,7 @@ int main(int argc, char** argv)
                         }
                     }
 #endif
-
+                    /** closest surface search and seclection **/
                     omp_set_num_threads(4);
                     #pragma omp parallel for
                     for (int i = 0; i < laserCloudSurf_down_size; i++)
@@ -945,7 +943,7 @@ int main(int argc, char** argv)
                         float pc = matX0.at<float>(2, 0);
                         float pd = 1;
 
-                        //ps is the norm of the plane normal vector
+                        //ps is the norm of the plane norm_vec vector
                         //pd is the distance from point to plane
                         float ps = sqrt(pa * pa + pb * pb + pc * pc);
                         pa /= ps;
@@ -1010,33 +1008,35 @@ int main(int argc, char** argv)
                     count_effect_point = 0;
 
                     match_time += omp_get_wtime() - match_start;
-                    match_start = omp_get_wtime();
                     solve_start = omp_get_wtime();
 
                     if (laserCloudSelNum < 50) {
                         continue;
                     }
-
+                    
+                    /*** Measuremnt Jacobian matrix: H and measurents vector: meas_vec ***/
                     Eigen::MatrixXd H(laserCloudSelNum, DIM_OF_STATES) ;
-                    Eigen::VectorXd res(laserCloudSelNum);
+                    Eigen::VectorXd meas_vec(laserCloudSelNum);
 
                     omp_set_num_threads(4);
                     #pragma omp parallel for
                     for (int i = 0; i < laserCloudSelNum; i++)
                     {
-                        const PointType &laser_p = laserCloudOri->points[i];
-                        const PointType &nor_vec = coeffSel->points[i];
-                        
+                        const PointType &laser_p  = laserCloudOri->points[i];
                         Eigen::Vector3d point_this(laser_p.x, laser_p.y, laser_p.z);
-                        Eigen::Vector3d vect_norm(nor_vec.x, nor_vec.y, nor_vec.z);
                         Eigen::Matrix3d point_crossmat;
                         point_crossmat<<SKEW_SYM_MATRX(point_this);
-                        
-                        Eigen::Vector3d A(point_crossmat * R_global_cur.transpose() * vect_norm);
 
+                        /*** get the normal vector of closest surface/corner ***/
+                        Eigen::Vector3d norm_vec(coeffSel->points[i].x, coeffSel->points[i].y, coeffSel->points[i].z);
+
+                        /*** calculate the Measuremnt Jacobian matrix H ***/
+                        Eigen::Vector3d A(point_crossmat * R_global_cur.transpose() * norm_vec);
                         H.row(i) = Eigen::Matrix<double, 1, DIM_OF_STATES>::Zero();
-                        H.block<1,6>(i,0) << VEC_FROM_ARRAY(A), nor_vec.x, nor_vec.y, nor_vec.z;
-                        res(i) = - nor_vec.intensity;
+                        H.block<1,6>(i,0) << VEC_FROM_ARRAY(A), norm_vec.x, norm_vec.y, norm_vec.z;
+
+                        /*** Measuremnt: distance to the closest surface/corner ***/
+                        meas_vec(i) = - norm_vec.intensity;
                     }
 
                     Eigen::Vector3d rot_add, t_add, v_add, bg_add, ba_add, g_add;
@@ -1076,11 +1076,11 @@ int main(int argc, char** argv)
                     }
                     else
                     {
-                        /*** Iterative Kalman Filter ***/
+                        /*** Iterative Kalman Filter Update ***/
                         auto &&H_T = H.transpose();
                         Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 = (H_T * H + (cov_stat_cur / LASER_POINT_COV).inverse()).inverse();
                         K = K_1 * H_T;
-                        solution = K * res;
+                        solution = K * meas_vec;
                         // std::cout<<"***solution: "<<solution.transpose()<<std::endl;
                         for (int ind = 0; ind < 3; ind ++)
                         {
@@ -1106,7 +1106,7 @@ int main(int argc, char** argv)
                     euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
 
                     #ifdef DEBUG_PRINT
-                    std::cout<<"***new stat: "<<euler_cur.transpose()*57.3<<" "<<T_global_cur.transpose()<<"dR & dT: "<<deltaR<<" "<<deltaT<<" bias: "<<bias_a.transpose()<<" G: "<<gravity.transpose()<<" average res: "<<total_residual/laserCloudSelNum<<std::endl;
+                    std::cout<<"***new stat: "<<euler_cur.transpose()*57.3<<" "<<T_global_cur.transpose()<<"dR & dT: "<<deltaR<<" "<<deltaT<<" bias: "<<bias_a.transpose()<<" G: "<<gravity.transpose()<<" average meas_vec: "<<total_residual/laserCloudSelNum<<std::endl;
                     #endif
 
                     transformTobeMapped[0] = euler_cur(0);
@@ -1118,12 +1118,14 @@ int main(int argc, char** argv)
 
                     rematch_en = false;
 
+                    /*** Rematch Judgement ***/
                     if ((deltaR < 0.015 && deltaT < 0.015))
                     {
                         rematch_en = true;
                         rematch_num ++;
                     }
 
+                    /*** End Judgements and Covariance Update ***/
                     if (rematch_num >= 2)
                     {
                         if (!Need_Init)
@@ -1141,20 +1143,10 @@ int main(int argc, char** argv)
                 transformUpdate();
             }
 
-            /*** save results ***/
-            save_states(Pose6D_Solved, rot_kp_imu_buff.front().header, gravity, bias_g, bias_a, \
-                        T_global_cur, V_global_cur, R_global_cur, cov_stat_cur); //std::cout<<"!!!! Sent pose:"<<T_global_cur.transpose()<<std::endl;
-            Pose6D_Solved.pose6D.clear();
-            pubSolvedPose6D.publish(Pose6D_Solved);
-
-            V_global_last = V_global_cur;
-            T_global_last = T_global_cur;
-            R_global_last = R_global_cur;
-            fout_out << std::setw(10) << timeLaserCloudSurfLast << " " << euler_cur.transpose()*57.3 << " " << T_global_last.transpose() << " " << V_global_last.transpose() << std::endl;
-            timeIMUkpLast = timeIMUkpCur;
-
             LaserCloudSurfaceBuff.pop_front();
             rot_kp_imu_buff.pop_front();
+
+            /**** Regester new feature point to map ***/
             if (!LaserCloudSurfaceBuff.empty() && !rot_kp_imu_buff.empty())
             {
                 timeIMUkpCur  = rot_kp_imu_buff.front().header.stamp.toSec();
@@ -1228,7 +1220,19 @@ int main(int argc, char** argv)
 
             t3 = omp_get_wtime();
 
-            /******* Publish messages:  *******/
+            /******* Publish Lidar states *******/
+            save_states(Pose6D_Solved, rot_kp_imu_buff.front().header, gravity, bias_g, bias_a, \
+                        T_global_cur, V_global_cur, R_global_cur, cov_stat_cur); //std::cout<<"!!!! Sent pose:"<<T_global_cur.transpose()<<std::endl;
+            Pose6D_Solved.pose6D.clear();
+            pubSolvedPose6D.publish(Pose6D_Solved);
+
+            V_global_last = V_global_cur;
+            T_global_last = T_global_cur;
+            R_global_last = R_global_cur;
+            fout_out << std::setw(10) << timeLaserCloudSurfLast << " " << euler_cur.transpose()*57.3 << " " << T_global_last.transpose() << " " << V_global_last.transpose() << std::endl;
+            timeIMUkpLast = timeIMUkpCur;
+
+            /******* Publish current frame points in world coordinates:  *******/
             laserCloudSurround2->clear();
             laserCloudSurround2_corner->clear();
 
@@ -1259,14 +1263,14 @@ int main(int argc, char** argv)
             laserCloudFullRes3.header.frame_id = "/camera_init";
             pubLaserCloudFullRes.publish(laserCloudFullRes3);
 
+            /******* Publish Maps:  *******/
             // sensor_msgs::PointCloud2 laserCloudMap;
             // pcl::toROSMsg(*laserCloudSurfFromMap, laserCloudMap);
             // laserCloudMap.header.stamp = ros::Time::now();//ros::Time().fromSec(timeLaserCloudCornerLast);
             // laserCloudMap.header.frame_id = "/camera_init";
             // pubLaserCloudMap.publish(laserCloudMap);
 
-            *laserCloudFullResColor_pcd += *laserCloudFullResColor;
-
+            /******* Publish Odometry ******/
             geometry_msgs::Quaternion geoQuat = tf::createQuaternionMsgFromRollPitchYaw
                     (transformAftMapped[2], - transformAftMapped[0], - transformAftMapped[1]);
 
@@ -1294,7 +1298,7 @@ int main(int argc, char** argv)
             transform.setRotation( q );
             br.sendTransform( tf::StampedTransform( transform, odomAftMapped.header.stamp, "/camera_init", "/aft_mapped" ) );
 
-            /*** plot variables ***/
+            /*** save debug variables ***/
             t4 = omp_get_wtime();
             frame_num ++;
             aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t4 - t1) / frame_num;
@@ -1305,7 +1309,6 @@ int main(int argc, char** argv)
             s_plot3.push_back(double(deltaT));
 
             std::cout<<"mapping time : selection "<<t2-t1 <<" match time: "<<match_time<<"  solve time: "<<solve_time<<" total with publish: "<<t4 - t1<<" no publish: "<<t3-t1<<std::endl;
-            // std::cout<<"match time: "<<match_time<<"  solve time: "<<solve_time<<std::endl;
         }
         status = ros::ok();
         rate.sleep();
@@ -1331,7 +1334,6 @@ int main(int argc, char** argv)
     std::cout << "saving...";
     pcd_writer.writeBinary(surf_filename, surf_points);
     pcd_writer.writeBinary(corner_filename, corner_points);
-    pcd_writer.writeBinary(all_points_filename, *laserCloudFullResColor_pcd);
     }
     else
     {

@@ -347,7 +347,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
   v_rot_kp_.pos_end  = STD_VEC_FROM_EIGEN(pos_e);
   v_rot_kp_.vel_end  = STD_VEC_FROM_EIGEN(vel_e);
   v_rot_kp_.rot_end  = STD_VEC_FROM_EIGEN(R_e);
-  v_rot_kp_.cov = STD_VEC_FROM_EIGEN(cov_state_last); // std::vector<decltype(cov_state_last)::Scalar> (cov_state_last.data(), cov_state_last.data() + DIM_OF_STATES_SQUARE);
+  v_rot_kp_.cov      = STD_VEC_FROM_EIGEN(cov_state_last); // std::vector<decltype(cov_state_last)::Scalar> (cov_state_last.data(), cov_state_last.data() + DIM_OF_STATES_SQUARE);
   
   Eigen::Vector3d euler_cur = correct_pi(R_e.eulerAngles(1, 0, 2));
   // std::cout<<"!!!! propagated states: gravity "<<Gravity_acc.transpose()<<std::endl;
