@@ -296,7 +296,7 @@ int main(int argc, char** argv)
     ros::Subscriber subLaserCloudSurfLast = nh.subscribe<sensor_msgs::PointCloud2>
             ("/livox_undistort", 100, laserCloudSurfLastHandler);
     ros::Subscriber KeyPointPose6D = nh.subscribe<fast_lio::KeyPointPose>
-            ("/Pose6D_IMUKeyPoints", 100, KeyPointPose6DHandler);
+            ("/States_propogated", 100, KeyPointPose6DHandler);
 
     // ros::Subscriber subIMUOri = nh.subscribe<sensor_msgs::>
 
@@ -365,7 +365,7 @@ int main(int argc, char** argv)
     else
         std::cout << "~~~~"<<ROOT_DIR<<" doesn't exist" << std::endl;
     
-    ros::Rate rate(100);
+    ros::Rate rate(500);
     bool status = ros::ok();
     while (status)
     {
@@ -1217,9 +1217,9 @@ int main(int argc, char** argv)
             t3 = omp_get_wtime();
 
             /******* Publish Lidar states *******/
-            save_states(Pose6D_Solved, states_propagted.header, gravity, bias_g, bias_a, \
+            save_states(Pose6D_Solved, gravity, bias_g, bias_a, \
                         T_global_cur, V_global_cur, R_global_cur, cov_stat_cur); //std::cout<<"!!!! Sent pose:"<<T_global_cur.transpose()<<std::endl;
-            Pose6D_Solved.pose6D.clear();
+            // Pose6D_Solved.pose6D.clear();
             pubSolvedPose6D.publish(Pose6D_Solved);
 
             V_global_last = V_global_cur;
@@ -1308,6 +1308,7 @@ int main(int argc, char** argv)
 
             std::cout<<"mapping time : selection "<<t2-t1 <<" match time: "<<match_time<<"  solve time: "<<solve_time<<" total with publish: "<<t4 - t1<<" no publish: "<<t3-t1<<std::endl;
         }
+        std::cout<<"loam not well"<<std::endl;
         status = ros::ok();
         rate.sleep();
     }

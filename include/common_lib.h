@@ -7,7 +7,7 @@
 #include <nav_msgs/Odometry.h>
 #include <tf/transform_broadcaster.h>
 
-// #define DEBUG_PRINT
+#define DEBUG_PRINT
 
 #define PI_M (3.14159265358)
 #define G_m_s2 (9.8099)         // Gravaty const in GuangDong/China
@@ -55,13 +55,13 @@ auto set_pose6d(const double t, const Eigen::Matrix<T, 3, 1> &a, const Eigen::Ma
 }
 
 template<typename T>
-void save_states(KPPose &states, const std_msgs::Header &header, \
+void save_states(KPPose &states, \
                 const Eigen::Matrix<T, 3, 1> &gravity, const Eigen::Matrix<T, 3, 1> &bg, \
                 const Eigen::Matrix<T, 3, 1> &ba, const Eigen::Matrix<T, 3, 1> &p, \
                 const Eigen::Matrix<T, 3, 1> &v,  const Eigen::Matrix<T, 3, 3> &R, \
                 const Eigen::Matrix<T, DIM_OF_STATES, DIM_OF_STATES> &cov)
 {
-    states.header   = header;
+    std::cout<<"0"<<std::endl;
     states.gravity  = std::vector<T> (ARRAY_FROM_EIGEN(gravity));
     states.bias_gyr = std::vector<T> (ARRAY_FROM_EIGEN(bg));
     states.bias_acc = std::vector<T> (ARRAY_FROM_EIGEN(ba));
@@ -72,11 +72,10 @@ void save_states(KPPose &states, const std_msgs::Header &header, \
 }
 
 template<typename T>
-void save_states(KPPose &states, const std_msgs::Header &header, \
+void save_states(KPPose &states, \
                 const Eigen::Matrix<T, DIM_OF_STATES, 1> &state_vec, \
                 const Eigen::Matrix<T, DIM_OF_STATES, DIM_OF_STATES> &cov)
 {
-    states.header   = header;
     states.gravity  = std::vector<T> (state_vec.data(), state_vec.data() + 3);
     states.bias_gyr = std::vector<T> (state_vec.data() + 3, state_vec.data() + 6);
     states.bias_acc = std::vector<T> (state_vec.data() + 6, state_vec.data() + 9);
