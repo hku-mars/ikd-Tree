@@ -57,11 +57,11 @@
 #include <fast_lio/KeyPointPose.h>
 #include <geometry_msgs/Vector3.h>
 #include "Exp_mat.h"
+
+#ifdef DEBUG_PRINT
 #include "matplotlibcpp.h"
-
 namespace plt = matplotlibcpp;
-
-// #define DEBUG_PRINT
+#endif
 
 #define INIT_TIME           (2.0)
 #define LASER_POINT_COV     (0.0010)
@@ -1308,7 +1308,6 @@ int main(int argc, char** argv)
 
             std::cout<<"mapping time : selection "<<t2-t1 <<" match time: "<<match_time<<"  solve time: "<<solve_time<<" total with publish: "<<t4 - t1<<" no publish: "<<t3-t1<<std::endl;
         }
-        std::cout<<"loam not well"<<std::endl;
         status = ros::ok();
         rate.sleep();
     }
@@ -1336,6 +1335,7 @@ int main(int argc, char** argv)
     }
     else
     {
+        #ifdef DEBUG_PRINT
         if (!T1.empty())
         {
             plt::named_plot("time consumed",T1,s_plot);
@@ -1348,6 +1348,7 @@ int main(int argc, char** argv)
             // plt::save("/home/xw/catkin_like_loam/src/LIEK_LOAM/a.png");
         }
         std::cout << "no points saved";
+        #endif
     }
     //--------------------------
     //  loss_output.close();
