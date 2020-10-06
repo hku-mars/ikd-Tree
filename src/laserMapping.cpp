@@ -58,10 +58,10 @@
 #include <geometry_msgs/Vector3.h>
 #include "Exp_mat.h"
 
-#ifdef DEBUG_PRINT
+// #ifdef DEBUG_PRINT
 #include "matplotlibcpp.h"
 namespace plt = matplotlibcpp;
-#endif
+// #endif
 
 #define INIT_TIME           (2.0)
 #define LASER_POINT_COV     (0.0010)
@@ -76,11 +76,9 @@ std::string root_dir = ROOT_DIR;
 
 int iterCount = 0;
 
-float timeLaserCloudCornerLast = 0;
 float timeLaserCloudSurfLast   = 0;
 float timeLaserCloudFullRes    = 0;
 
-bool newLaserCloudCornerLast = false;
 bool newLaserCloudSurfLast   = false;
 bool newLaserCloudFullRes    = false;
 
@@ -98,9 +96,6 @@ int laserCloudValidInd[125];
 
 int laserCloudSurroundInd[125];
 
-//corner feature
-pcl::PointCloud<PointType>::Ptr laserCloudCornerLast(new pcl::PointCloud<PointType>());
-pcl::PointCloud<PointType>::Ptr laserCloudCornerLast_down(new pcl::PointCloud<PointType>());
 //surf feature
 std::deque<sensor_msgs::PointCloud2> LaserCloudSurfaceBuff;
 pcl::PointCloud<PointType>::Ptr laserCloudSurfLast(new pcl::PointCloud<PointType>());
@@ -108,13 +103,7 @@ pcl::PointCloud<PointType>::Ptr laserCloudSurf_down(new pcl::PointCloud<PointTyp
 pcl::PointCloud<PointType>::Ptr laserCloudOri(new pcl::PointCloud<PointType>());
 pcl::PointCloud<PointType>::Ptr coeffSel(new pcl::PointCloud<PointType>());
 
-// pcl::PointCloud<PointType>::Ptr laserCloudSurround(new pcl::PointCloud<PointType>());
-// pcl::PointCloud<PointType>::Ptr laserCloudSurround_corner(new pcl::PointCloud<PointType>());
-
 pcl::PointCloud<PointType>::Ptr laserCloudSurround2(new pcl::PointCloud<PointType>());
-pcl::PointCloud<PointType>::Ptr laserCloudSurround2_corner(new pcl::PointCloud<PointType>());
-//corner feature in map
-pcl::PointCloud<PointType>::Ptr laserCloudCornerFromMap(new pcl::PointCloud<PointType>());
 //surf feature in map
 pcl::PointCloud<PointType>::Ptr laserCloudSurfFromMap(new pcl::PointCloud<PointType>());
 
@@ -126,15 +115,11 @@ pcl::PointCloud<PointType>::Ptr laserCloudFullRes(new pcl::PointCloud<PointType>
 pcl::PointCloud<PointType>::Ptr laserCloudFullRes2(new pcl::PointCloud<PointType>());
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr laserCloudFullResColor(new pcl::PointCloud<pcl::PointXYZRGB>());
 
-pcl::PointCloud<PointType>::Ptr laserCloudCornerArray[laserCloudNum];
-
 pcl::PointCloud<PointType>::Ptr laserCloudSurfArray[laserCloudNum];
-
-pcl::PointCloud<PointType>::Ptr laserCloudCornerArray2[laserCloudNum];
 
 pcl::PointCloud<PointType>::Ptr laserCloudSurfArray2[laserCloudNum];
 
-pcl::KdTreeFLANN<PointType>::Ptr kdtreeCornerFromMap(new pcl::KdTreeFLANN<PointType>());
+// pcl::KdTreeFLANN<PointType> kdtreeSurfFromMap;
 pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfFromMap(new pcl::KdTreeFLANN<PointType>());
 
 //optimization poses 
@@ -232,18 +217,6 @@ void RGBpointAssociateToMap(PointType const * const pi, pcl::PointXYZRGB * const
     }
 }
 
-#ifdef USING_CORNER
-void laserCloudCornerLastHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudCornerLast2)
-{
-    timeLaserCloudCornerLast = laserCloudCornerLast2->header.stamp.toSec();
-
-    laserCloudCornerLast->clear();
-    pcl::fromROSMsg(*laserCloudCornerLast2, *laserCloudCornerLast);
-
-    newLaserCloudCornerLast = true;
-}
-#endif
-
 void laserCloudSurfLastHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudSurfLast2)
 {
     LaserCloudSurfaceBuff.push_back(*laserCloudSurfLast2);
@@ -335,19 +308,15 @@ int main(int argc, char** argv)
     bool isDegenerate = false;
     cv::Mat matP(6, 6, CV_32F, cv::Scalar::all(0));
     //VoxelGrid
-    pcl::VoxelGrid<PointType> downSizeFilterCorner;
     pcl::VoxelGrid<PointType> downSizeFilterSurf;
     pcl::VoxelGrid<PointType> downSizeFilterMap;
 
-    downSizeFilterCorner.setLeafSize(filter_size_corner_min, filter_size_corner_min, filter_size_corner_min);
     downSizeFilterSurf.setLeafSize(filter_size_surf_min, filter_size_surf_min, filter_size_surf_min);
     downSizeFilterMap.setLeafSize(filter_size_map_min, filter_size_map_min, filter_size_map_min);
 
     for (int i = 0; i < laserCloudNum; i++)
     {
-        laserCloudCornerArray[i].reset(new pcl::PointCloud<PointType>());
         laserCloudSurfArray[i].reset(new pcl::PointCloud<PointType>());
-        laserCloudCornerArray2[i].reset(new pcl::PointCloud<PointType>());
         laserCloudSurfArray2[i].reset(new pcl::PointCloud<PointType>());
     }
     
@@ -365,7 +334,7 @@ int main(int argc, char** argv)
     else
         std::cout << "~~~~"<<ROOT_DIR<<" doesn't exist" << std::endl;
     
-    ros::Rate rate(500);
+    ros::Rate rate(1000);
     bool status = ros::ok();
     while (status)
     {
@@ -388,7 +357,6 @@ int main(int argc, char** argv)
 
             t1 = omp_get_wtime();
 
-            newLaserCloudCornerLast = false;
             newLaserCloudSurfLast = false;
             newLaserCloudFullRes = false;
 
@@ -421,9 +389,8 @@ int main(int argc, char** argv)
             transformTobeMapped[4]  = T_global_cur(1);
             transformTobeMapped[5]  = T_global_cur(2);
 
-            fout_pre << std::setw(10) << timeLaserCloudSurfLast << " " << euler_cur.transpose()*57.3 << " " << T_global_cur.transpose() << " " << V_global_cur.transpose() << std::endl;
-
             #ifdef DEBUG_PRINT
+            fout_pre << std::setw(10) << timeLaserCloudSurfLast << " " << euler_cur.transpose()*57.3 << " " << T_global_cur.transpose() << " " << V_global_cur.transpose() << std::endl;
             std::cout<<"pre-integrated states: "<<euler_cur.transpose()*57.3<<" "<<T_global_cur.transpose()<<" "<<V_global_cur.transpose()<<" "<<bias_g.transpose()<<" "<<bias_a.transpose()<<std::endl;
             #endif
             
@@ -445,23 +412,15 @@ int main(int argc, char** argv)
                     {
                         int i = laserCloudWidth - 1;
 
-                        pcl::PointCloud<PointType>::Ptr laserCloudCubeCornerPointer =
-                                laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
                         pcl::PointCloud<PointType>::Ptr laserCloudCubeSurfPointer =
                                 laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
 
                         for (; i >= 1; i--) {
-                            laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
-                                    laserCloudCornerArray[i - 1 + laserCloudWidth*j + laserCloudWidth * laserCloudHeight * k];
                             laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                                     laserCloudSurfArray[i - 1 + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
                         }
-
-                        laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
-                                laserCloudCubeCornerPointer;
                         laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                                 laserCloudCubeSurfPointer;
-                        laserCloudCubeCornerPointer->clear();
                         laserCloudCubeSurfPointer->clear();
                     }
                 }
@@ -473,24 +432,17 @@ int main(int argc, char** argv)
                 for (int j = 0; j < laserCloudHeight; j++) {
                     for (int k = 0; k < laserCloudDepth; k++) {
                         int i = 0;
-                        pcl::PointCloud<PointType>::Ptr laserCloudCubeCornerPointer =
-                                laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
                         pcl::PointCloud<PointType>::Ptr laserCloudCubeSurfPointer =
                                 laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
 
                         for (; i < laserCloudWidth - 1; i++)
                         {
-                            laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
-                                    laserCloudCornerArray[i + 1 + laserCloudWidth*j + laserCloudWidth * laserCloudHeight * k];
                             laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                                     laserCloudSurfArray[i + 1 + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
                         }
 
-                        laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
-                                laserCloudCubeCornerPointer;
                         laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                                 laserCloudCubeSurfPointer;
-                        laserCloudCubeCornerPointer->clear();
                         laserCloudCubeSurfPointer->clear();
                     }
                 }
@@ -503,22 +455,15 @@ int main(int argc, char** argv)
                 for (int i = 0; i < laserCloudWidth; i++) {
                     for (int k = 0; k < laserCloudDepth; k++) {
                         int j = laserCloudHeight - 1;
-                        pcl::PointCloud<PointType>::Ptr laserCloudCubeCornerPointer =
-                                laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
                         pcl::PointCloud<PointType>::Ptr laserCloudCubeSurfPointer =
                                 laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
 
                         for (; j >= 1; j--) {
-                            laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
-                                    laserCloudCornerArray[i + laserCloudWidth*(j - 1) + laserCloudWidth * laserCloudHeight*k];
                             laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                                     laserCloudSurfArray[i + laserCloudWidth * (j - 1) + laserCloudWidth * laserCloudHeight*k];
                         }
-                        laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
-                                laserCloudCubeCornerPointer;
                         laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                                 laserCloudCubeSurfPointer;
-                        laserCloudCubeCornerPointer->clear();
                         laserCloudCubeSurfPointer->clear();
                     }
                 }
@@ -531,22 +476,15 @@ int main(int argc, char** argv)
                 for (int i = 0; i < laserCloudWidth; i++) {
                     for (int k = 0; k < laserCloudDepth; k++) {
                         int j = 0;
-                        pcl::PointCloud<PointType>::Ptr laserCloudCubeCornerPointer =
-                                laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
                         pcl::PointCloud<PointType>::Ptr laserCloudCubeSurfPointer =
                                 laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
 
                         for (; j < laserCloudHeight - 1; j++) {
-                            laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
-                                    laserCloudCornerArray[i + laserCloudWidth*(j + 1) + laserCloudWidth * laserCloudHeight*k];
                             laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                                     laserCloudSurfArray[i + laserCloudWidth * (j + 1) + laserCloudWidth * laserCloudHeight*k];
                         }
-                        laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
-                                laserCloudCubeCornerPointer;
                         laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                                 laserCloudCubeSurfPointer;
-                        laserCloudCubeCornerPointer->clear();
                         laserCloudCubeSurfPointer->clear();
                     }
                 }
@@ -559,22 +497,15 @@ int main(int argc, char** argv)
                 for (int i = 0; i < laserCloudWidth; i++) {
                     for (int j = 0; j < laserCloudHeight; j++) {
                         int k = laserCloudDepth - 1;
-                        pcl::PointCloud<PointType>::Ptr laserCloudCubeCornerPointer =
-                                laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
                         pcl::PointCloud<PointType>::Ptr laserCloudCubeSurfPointer =
                                 laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
 
                         for (; k >= 1; k--) {
-                            laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
-                                    laserCloudCornerArray[i + laserCloudWidth*j + laserCloudWidth * laserCloudHeight*(k - 1)];
                             laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                                     laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight*(k - 1)];
                         }
-                        laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
-                                laserCloudCubeCornerPointer;
                         laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                                 laserCloudCubeSurfPointer;
-                        laserCloudCubeCornerPointer->clear();
                         laserCloudCubeSurfPointer->clear();
                     }
                 }
@@ -590,24 +521,17 @@ int main(int argc, char** argv)
                     for (int j = 0; j < laserCloudHeight; j++)
                     {
                         int k = 0;
-                        pcl::PointCloud<PointType>::Ptr laserCloudCubeCornerPointer =
-                                laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
                         pcl::PointCloud<PointType>::Ptr laserCloudCubeSurfPointer =
                                 laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
                     
                         for (; k < laserCloudDepth - 1; k++)
                         {
-                            laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
-                                    laserCloudCornerArray[i + laserCloudWidth*j + laserCloudWidth * laserCloudHeight*(k + 1)];
                             laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                                     laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight*(k + 1)];
                         }
 
-                        laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
-                                laserCloudCubeCornerPointer;
                         laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                                 laserCloudCubeSurfPointer;
-                        laserCloudCubeCornerPointer->clear();
                         laserCloudCubeSurfPointer->clear();
                     }
                 }
@@ -684,7 +608,6 @@ int main(int argc, char** argv)
                 }
             }
 
-            laserCloudCornerFromMap->clear();
             laserCloudSurfFromMap->clear();
             
             for (int i = 0; i < laserCloudValidNum; i++)
@@ -698,27 +621,6 @@ int main(int argc, char** argv)
             laserCloudSurfLast->clear();
             laserCloudSurf_down->clear();
             pcl::fromROSMsg(LaserCloudSurfaceBuff.front(), *laserCloudSurfLast);
-            /* float cent_point[3] = {0.0};
-            int num = 0;
-            for (int i = 0; i < laserCloudSurfLast->points.size(); i += 100)
-            {
-                num ++;
-                // std::cout<<"cent_point[0] "<<cent_point[0]<<cent_point[1]<<cent_point[2];
-                // std::cout<<" point: "<<laserCloudSurfLast->points[i]<<std::endl;
-                cent_point[0] += (laserCloudSurfLast->points[i].x - cent_point[0]) / num;
-                cent_point[1] += (laserCloudSurfLast->points[i].y - cent_point[1]) / num;
-                cent_point[2] += (laserCloudSurfLast->points[i].z - cent_point[2]) / num;                
-            }
-
-            float center_dist = std::sqrt(cent_point[0] * cent_point[0] + cent_point[1] * cent_point[1] 
-                                            + cent_point[2] * cent_point[2]);
-            double filter_size_surf, filter_size_map;
-            filter_size_surf = double(center_dist - 5.0) / 100.0 * (0.5 - filter_size_surf_min) + filter_size_surf_min;
-            filter_size_surf = CONSTRAIN(filter_size_surf, filter_size_surf_min, 0.4);
-            filter_size_map  = filter_size_surf * 1.3333;
-            downSizeFilterSurf.setLeafSize(filter_size_surf, filter_size_surf, filter_size_surf);
-            downSizeFilterMap.setLeafSize(filter_size_map, filter_size_map, filter_size_map);
-            std::cout<<"center distance: "<<center_dist<<" surf size: "<<filter_size_surf<<" map size: "<<filter_size_map<<std::endl; */
 
             downSizeFilterSurf.setInputCloud(laserCloudSurfLast);
             downSizeFilterSurf.filter(*laserCloudSurf_down);
@@ -726,14 +628,6 @@ int main(int argc, char** argv)
             downSizeFilterMap.setInputCloud(laserCloudSurfFromMap);
             downSizeFilterMap.filter(*laserCloudSurfFromMap);
 
-#ifdef USING_CORNER
-            laserCloudCornerLast_down->clear();
-            downSizeFilterCorner.setInputCloud(laserCloudCornerLast);
-            downSizeFilterCorner.filter(*laserCloudCornerLast_down);
-            int laserCloudCornerFromMapNum = laserCloudCornerFromMap->points.size();
-            std::cout<<"DEBUG MAPPING CornerLast_down : "<<laserCloudCornerLast_down->points.size()<<" corner full: "
-            <<laserCloudCornerLast->points.size()<<std::endl;
-#endif
             int laserCloudSurfFromMapNum = laserCloudSurfFromMap->points.size();
             int laserCloudSurf_down_size = laserCloudSurf_down->points.size();
 
@@ -742,154 +636,27 @@ int main(int argc, char** argv)
             std::cout<<"DEBUG MAPPING laserCloudValidNum : "<<laserCloudValidNum<<" laserCloudSurfFromMapNum : "
             <<laserCloudSurfFromMapNum<<std::endl;
 
-            
-
             pcl::PointCloud<PointType>::Ptr coeffSel_tmpt
                 (new pcl::PointCloud<PointType>(*laserCloudSurf_down));
             pcl::PointCloud<PointType>::Ptr laserCloudSurf_down_updated
                 (new pcl::PointCloud<PointType>(*laserCloudSurf_down));
 
-            t2 = omp_get_wtime();
-
-#ifdef USING_CORNER
-            if (laserCloudCornerFromMapNum > 10 && laserCloudSurfFromMapNum > 100)
-            {
-                match_start = omp_get_wtime();
-                kdtreeCornerFromMap->setInputCloud(laserCloudCornerFromMap);
-#else
             if (laserCloudSurfFromMapNum > 100)
-            {  
-                match_start = omp_get_wtime();
-#endif
-                pcl::KdTreeFLANN<PointType> kdtreeSurfFromMap_tmpt;
-                kdtreeSurfFromMap_tmpt.setInputCloud(laserCloudSurfFromMap);
-                std::vector<int> pointSearchInd_corner;
-                std::vector<float> pointSearchSqDis_corner;
+            {
+                // pcl::KdTreeFLANN<PointType> kdtreeSurfFromMap;
+                kdtreeSurfFromMap->setInputCloud(laserCloudSurfFromMap);
+                t2 = omp_get_wtime();
                 std::vector<bool> point_selected_surf(laserCloudSurf_down_size, true);
                 std::vector<std::vector<int>> pointSearchInd_surf(laserCloudSurf_down_size);
-
+                
                 int  rematch_num = 0;
                 bool rematch_en = 0;
                 
                 for (iterCount = 0; iterCount < NUM_MAX_ITERATIONS; iterCount++) 
                 {
+                    match_start = omp_get_wtime();
                     laserCloudOri->clear();
                     coeffSel->clear();
-                    /** closest line search and selection **/
-#ifdef USING_CORNER
-                    for (int i = 0; i < laserCloudCornerLast->points.size(); i++) {
-                        pointOri = laserCloudCornerLast->points[i];
-
-                        pointAssociateToMap(&pointOri, &pointSel);
-                        //find the closest 5 points
-                        if (iterCount == 0 || rematch_en)
-                        {
-                            kdtreeCornerFromMap->nearestKSearch(pointSel, 5, pointSearchInd_corner, pointSearchSqDis_corner);
-                        }
-
-                        if (pointSearchSqDis_corner[4] < 1.5) {
-                            float cx = 0;
-                            float cy = 0;
-                            float cz = 0;
-                            for (int j = 0; j < 5; j++) {
-                                cx += laserCloudCornerFromMap->points[pointSearchInd_corner[j]].x;
-                                cy += laserCloudCornerFromMap->points[pointSearchInd_corner[j]].y;
-                                cz += laserCloudCornerFromMap->points[pointSearchInd_corner[j]].z;
-                            }
-                            cx /= 5;
-                            cy /= 5;
-                            cz /= 5;
-                            //mean square error
-                            float a11 = 0;
-                            float a12 = 0;
-                            float a13 = 0;
-                            float a22 = 0;
-                            float a23 = 0;
-                            float a33 = 0;
-                            for (int j = 0; j < 5; j++) {
-                                float ax = laserCloudCornerFromMap->points[pointSearchInd_corner[j]].x - cx;
-                                float ay = laserCloudCornerFromMap->points[pointSearchInd_corner[j]].y - cy;
-                                float az = laserCloudCornerFromMap->points[pointSearchInd_corner[j]].z - cz;
-
-                                a11 += ax * ax;
-                                a12 += ax * ay;
-                                a13 += ax * az;
-                                a22 += ay * ay;
-                                a23 += ay * az;
-                                a33 += az * az;
-                            }
-                            a11 /= 5;
-                            a12 /= 5;
-                            a13 /= 5;
-                            a22 /= 5;
-                            a23 /= 5;
-                            a33 /= 5;
-
-                            matA1.at<float>(0, 0) = a11;
-                            matA1.at<float>(0, 1) = a12;
-                            matA1.at<float>(0, 2) = a13;
-                            matA1.at<float>(1, 0) = a12;
-                            matA1.at<float>(1, 1) = a22;
-                            matA1.at<float>(1, 2) = a23;
-                            matA1.at<float>(2, 0) = a13;
-                            matA1.at<float>(2, 1) = a23;
-                            matA1.at<float>(2, 2) = a33;
-
-                            cv::eigen(matA1, matD1, matV1);
-
-                            if (matD1.at<float>(0, 0) > 3 * matD1.at<float>(0, 1)) {
-
-                                float x0 = pointSel.x;
-                                float y0 = pointSel.y;
-                                float z0 = pointSel.z;
-                                float x1 = cx + 0.1 * matV1.at<float>(0, 0);
-                                float y1 = cy + 0.1 * matV1.at<float>(0, 1);
-                                float z1 = cz + 0.1 * matV1.at<float>(0, 2);
-                                float x2 = cx - 0.1 * matV1.at<float>(0, 0);
-                                float y2 = cy - 0.1 * matV1.at<float>(0, 1);
-                                float z2 = cz - 0.1 * matV1.at<float>(0, 2);
-
-                                //OA = (x0 - x1, y0 - y1, z0 - z1),OB = (x0 - x2, y0 - y2, z0 - z2)，AB = （x1 - x2, y1 - y2, z1 - z2）
-                                //cross:
-                                //|  i      j      k  |
-                                //|x0-x1  y0-y1  z0-z1|
-                                //|x0-x2  y0-y2  z0-z2|
-                                float a012 = sqrt(((x0 - x1)*(y0 - y2) - (x0 - x2)*(y0 - y1))
-                                                    * ((x0 - x1)*(y0 - y2) - (x0 - x2)*(y0 - y1))
-                                                    + ((x0 - x1)*(z0 - z2) - (x0 - x2)*(z0 - z1))
-                                                    * ((x0 - x1)*(z0 - z2) - (x0 - x2)*(z0 - z1))
-                                                    + ((y0 - y1)*(z0 - z2) - (y0 - y2)*(z0 - z1))
-                                                    * ((y0 - y1)*(z0 - z2) - (y0 - y2)*(z0 - z1)));
-
-                                float l12 = sqrt((x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2) + (z1 - z2)*(z1 - z2));
-
-                                float la = ((y1 - y2)*((x0 - x1)*(y0 - y2) - (x0 - x2)*(y0 - y1))
-                                            + (z1 - z2)*((x0 - x1)*(z0 - z2) - (x0 - x2)*(z0 - z1))) / a012 / l12;
-
-                                float lb = -((x1 - x2)*((x0 - x1)*(y0 - y2) - (x0 - x2)*(y0 - y1))
-                                                - (z1 - z2)*((y0 - y1)*(z0 - z2) - (y0 - y2)*(z0 - z1))) / a012 / l12;
-
-                                float lc = -((x1 - x2)*((x0 - x1)*(z0 - z2) - (x0 - x2)*(z0 - z1))
-                                                + (y1 - y2)*((y0 - y1)*(z0 - z2) - (y0 - y2)*(z0 - z1))) / a012 / l12;
-
-                                float ld2 = a012 / l12;
-                                //if(fabs(ld2) > 1) continue;
-
-                                float s = 1 - 0.9 * fabs(ld2);
-
-                                coeff.x = s * la;
-                                coeff.y = s * lb;
-                                coeff.z = s * lc;
-                                coeff.intensity = s * ld2;
-
-                                if (s > 0.1) {
-                                    laserCloudOri->push_back(pointOri);
-                                    coeffSel->push_back(coeff);
-                                }
-                            }
-                        }
-                    }
-#endif
                     /** closest surface search and seclection **/
                     omp_set_num_threads(4);
                     #pragma omp parallel for
@@ -904,7 +671,7 @@ int main(int argc, char** argv)
                         if (iterCount == 0 || rematch_en)
                         {
                             /** Rematch (Reprojection) **/
-                            kdtreeSurfFromMap_tmpt.nearestKSearch(pointSel_tmpt, NUM_MATCH_POINTS, points_near, pointSearchSqDis_surf);
+                            kdtreeSurfFromMap->nearestKSearch(pointSel_tmpt, NUM_MATCH_POINTS, points_near, pointSearchSqDis_surf);
                             if (pointSearchSqDis_surf[NUM_MATCH_POINTS - 1] < 5.0)
                             {
                                 point_selected_surf[i] = true;
@@ -1120,6 +887,7 @@ int main(int argc, char** argv)
                     {
                         rematch_en = true;
                         rematch_num ++;
+                        std::cout<<"Rematching!"<<std::endl;
                     }
 
                     /*** End Judgements and Covariance Update ***/
@@ -1148,30 +916,8 @@ int main(int argc, char** argv)
             {
                 timeLaserCloudSurfLast = LaserCloudSurfaceBuff.front().header.stamp.toSec();
             }
-
-#ifdef USING_CORNER
-            for (int i = 0; i < laserCloudCornerLast->points.size(); i++)
-            {
-                pointAssociateToMap(&laserCloudCornerLast->points[i], &pointSel);
-
-                int cubeI = int((pointSel.x + 25.0) / 50.0) + laserCloudCenWidth;
-                int cubeJ = int((pointSel.y + 25.0) / 50.0) + laserCloudCenHeight;
-                int cubeK = int((pointSel.z + 25.0) / 50.0) + laserCloudCenDepth;
-
-                if (pointSel.x + 25.0 < 0) cubeI--;
-                if (pointSel.y + 25.0 < 0) cubeJ--;
-                if (pointSel.z + 25.0 < 0) cubeK--;
-
-                if (cubeI >= 0 && cubeI < laserCloudWidth &&
-                        cubeJ >= 0 && cubeJ < laserCloudHeight &&
-                        cubeK >= 0 && cubeK < laserCloudDepth)
-                {
-                    int cubeInd = cubeI + laserCloudWidth * cubeJ + laserCloudWidth * laserCloudHeight * cubeK;
-                    laserCloudCornerArray[cubeInd]->push_back(pointSel);
-                }
-            }
-#endif
             
+            bool if_cube_updated[laserCloudNum] = {0};
             for (int i = 0; i < laserCloudSurf_down_size; i++)
             {
                 PointType &pointSel = laserCloudSurf_down_updated->points[i];
@@ -1189,12 +935,20 @@ int main(int argc, char** argv)
                         cubeK >= 0 && cubeK < laserCloudDepth) {
                     int cubeInd = cubeI + laserCloudWidth * cubeJ + laserCloudWidth * laserCloudHeight * cubeK;
                     laserCloudSurfArray[cubeInd]->push_back(pointSel);
+                    if_cube_updated[cubeInd] = true;
                 }
             }
 
+            for(int i = 0; i < laserCloudNum; i ++) {if(if_cube_updated[i]) std::cout<<"--------updated cube number: " <<i<<std::endl;}
+
+            // omp_set_num_threads(4);
+            // #pragma omp parallel for
             for (int i = 0; i < laserCloudValidNum; i++)
             {
                 int ind = laserCloudValidInd[i];
+
+                if(if_cube_updated[ind])
+                {
                 laserCloudSurfArray2[ind]->clear();
                 downSizeFilterSurf.setInputCloud(laserCloudSurfArray[ind]);
                 downSizeFilterSurf.filter(*laserCloudSurfArray2[ind]);
@@ -1202,18 +956,9 @@ int main(int argc, char** argv)
                 pcl::PointCloud<PointType>::Ptr laserCloudTemp = laserCloudSurfArray[ind];
                 laserCloudSurfArray[ind] = laserCloudSurfArray2[ind];
                 laserCloudSurfArray2[ind] = laserCloudTemp;
+                }
 
-                #ifdef USING_CORNER
-                laserCloudCornerArray2[ind]->clear();
-                downSizeFilterCorner.setInputCloud(laserCloudCornerArray[ind]);
-                downSizeFilterCorner.filter(*laserCloudCornerArray2[ind]);
-
-                laserCloudTemp = laserCloudCornerArray[ind];
-                laserCloudCornerArray[ind] = laserCloudCornerArray2[ind];
-                laserCloudCornerArray2[ind] = laserCloudTemp;
-                #endif
             }
-
             t3 = omp_get_wtime();
 
             /******* Publish Lidar states *******/
@@ -1232,11 +977,9 @@ int main(int argc, char** argv)
 
             /******* Publish current frame points in world coordinates:  *******/
             laserCloudSurround2->clear();
-            laserCloudSurround2_corner->clear();
 
             for (int i = 0; i < laserCloudSurroundNum; i++) {
                 int ind = laserCloudSurroundInd[i];
-                *laserCloudSurround2_corner += *laserCloudCornerArray[ind];
                 *laserCloudSurround2 += *laserCloudSurfArray[ind];
             }
             
@@ -1257,22 +1000,22 @@ int main(int argc, char** argv)
 
             sensor_msgs::PointCloud2 laserCloudFullRes3;
             pcl::toROSMsg(*laserCloudFullResColor, laserCloudFullRes3);
-            laserCloudFullRes3.header.stamp = ros::Time().fromSec(timeLaserCloudCornerLast);
+            laserCloudFullRes3.header.stamp = ros::Time().fromSec(timeLaserCloudSurfLast);
             laserCloudFullRes3.header.frame_id = "/camera_init";
             pubLaserCloudFullRes.publish(laserCloudFullRes3);
 
             /******* Publish Maps:  *******/
-            // sensor_msgs::PointCloud2 laserCloudMap;
-            // pcl::toROSMsg(*laserCloudSurfFromMap, laserCloudMap);
-            // laserCloudMap.header.stamp = ros::Time::now();//ros::Time().fromSec(timeLaserCloudCornerLast);
-            // laserCloudMap.header.frame_id = "/camera_init";
-            // pubLaserCloudMap.publish(laserCloudMap);
+            sensor_msgs::PointCloud2 laserCloudMap;
+            pcl::toROSMsg(*laserCloudSurfFromMap, laserCloudMap);
+            laserCloudMap.header.stamp = ros::Time::now();//ros::Time().fromSec(timeLaserCloudSurfLast);
+            laserCloudMap.header.frame_id = "/camera_init";
+            pubLaserCloudMap.publish(laserCloudMap);
 
             /******* Publish Odometry ******/
             geometry_msgs::Quaternion geoQuat = tf::createQuaternionMsgFromRollPitchYaw
                     (transformAftMapped[2], - transformAftMapped[0], - transformAftMapped[1]);
 
-            odomAftMapped.header.stamp = ros::Time::now();//ros::Time().fromSec(timeLaserCloudCornerLast);
+            odomAftMapped.header.stamp = ros::Time::now();//ros::Time().fromSec(timeLaserCloudSurfLast);
             odomAftMapped.pose.pose.orientation.x = -geoQuat.y;
             odomAftMapped.pose.pose.orientation.y = -geoQuat.z;
             odomAftMapped.pose.pose.orientation.z = geoQuat.x;
@@ -1299,7 +1042,7 @@ int main(int argc, char** argv)
             /*** save debug variables ***/
             t4 = omp_get_wtime();
             frame_num ++;
-            aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t4 - t1) / frame_num;
+            aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t3 - t1) / frame_num;
             // aver_time_consu = aver_time_consu * 0.5 + (t4 - t1) * 0.5;
             T1.push_back(timeLaserCloudSurfLast);
             s_plot.push_back(aver_time_consu);
@@ -1323,7 +1066,6 @@ int main(int argc, char** argv)
     // keyframe_file.close();
     pcl::PointCloud<pcl::PointXYZI> surf_points, corner_points;
     surf_points = *laserCloudSurfFromMap;
-    corner_points = *laserCloudCornerFromMap;
     fout_out.close();
     fout_pre.close();
     if (surf_points.size() > 0 && corner_points.size() > 0) 
@@ -1335,7 +1077,7 @@ int main(int argc, char** argv)
     }
     else
     {
-        #ifdef DEBUG_PRINT
+        // #ifdef DEBUG_PRINT
         if (!T1.empty())
         {
             plt::named_plot("time consumed",T1,s_plot);
@@ -1348,7 +1090,7 @@ int main(int argc, char** argv)
             // plt::save("/home/xw/catkin_like_loam/src/LIEK_LOAM/a.png");
         }
         std::cout << "no points saved";
-        #endif
+        // #endif
     }
     //--------------------------
     //  loss_output.close();
