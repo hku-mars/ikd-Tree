@@ -33,13 +33,6 @@
   <param name="filter_size_map" type="double" value="0.2" />
   </node>
 
-  <!-- <node pkg="fast_lio" type="loam_scanRegistration_horizon" name="scanRegistration_horizon" output="screen">
-  </node>
-
-  <node pkg="fast_lio" type="livox_repub" name="livox_repub" output="screen" >
-  <remap from="/livox/lidar" to="/livox/lidar" />
-  </node> -->
-
   <group if="$(arg rviz)">
     <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find fast_lio)/rviz_cfg/loam_livox.rviz" />
   </group>

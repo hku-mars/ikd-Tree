@@ -6,4 +6,4 @@ float64[] bias_gyr     # gyroscope bias
 float64[] bias_acc     # accelerator bias
 float64[] gravity      # the estimated gravity acceleration
 float64[] cov          # 18 * 18
-Pose6D[] pose6D        # 6D pose at each imu measurements
+Pose6D[] IMUpose        # 6D pose at each imu measurements

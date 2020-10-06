@@ -3,7 +3,7 @@
 
 #include <Eigen/Eigen>
 #include <eigen_conversions/eigen_msg.h>
-#include <fast_lio/KeyPointPose.h>
+#include <fast_lio/States.h>
 #include <nav_msgs/Odometry.h>
 #include <tf/transform_broadcaster.h>
 
@@ -13,6 +13,7 @@
 #define G_m_s2 (9.8099)         // Gravaty const in GuangDong/China
 #define DIM_OF_STATES (18)      // Dimension of states (Let Dim(SO(3)) = 3)
 #define DIM_OF_PROC_N (12)      // Dimension of process noise (Let Dim(SO(3)) = 3)
+#define CUBE_LEN  (10.0)
 
 #define DIM_OF_STATES_SQUARE (18*18)
 
@@ -31,8 +32,8 @@ Eigen::Matrix3f Eye3f(Eigen::Matrix3f::Identity());
 Eigen::Vector3d Zero3d(0, 0, 0);
 Eigen::Vector3f Zero3f(0, 0, 0);
 
-typedef fast_lio::KeyPointPoseConstPtr KPPoseConstPtr;
-typedef fast_lio::KeyPointPose KPPose;
+typedef fast_lio::StatesConstPtr StatesConstPtr;
+typedef fast_lio::States States;
 typedef fast_lio::Pose6D Pose6D;
 typedef geometry_msgs::Vector3 Vec3;
 
@@ -55,7 +56,7 @@ auto set_pose6d(const double t, const Eigen::Matrix<T, 3, 1> &a, const Eigen::Ma
 }
 
 template<typename T>
-void save_states(KPPose &states, \
+void save_states(States &states, \
                 const Eigen::Matrix<T, 3, 1> &gravity, const Eigen::Matrix<T, 3, 1> &bg, \
                 const Eigen::Matrix<T, 3, 1> &ba, const Eigen::Matrix<T, 3, 1> &p, \
                 const Eigen::Matrix<T, 3, 1> &v,  const Eigen::Matrix<T, 3, 3> &R, \
@@ -72,7 +73,7 @@ void save_states(KPPose &states, \
 }
 
 template<typename T>
-void save_states(KPPose &states, \
+void save_states(States &states, \
                 const Eigen::Matrix<T, DIM_OF_STATES, 1> &state_vec, \
                 const Eigen::Matrix<T, DIM_OF_STATES, DIM_OF_STATES> &cov)
 {

@@ -25,7 +25,7 @@
 
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/PointCloud2.h>
-#include <fast_lio/KeyPointPose.h>
+#include <fast_lio/States.h>
 #include <geometry_msgs/Vector3.h>
 
 /// *************Preconfiguration
@@ -60,7 +60,7 @@ class ImuProcess
   ImuProcess();
   ~ImuProcess();
 
-  void Process(const MeasureGroup &meas, const KPPoseConstPtr &state_in);
+  void Process(const MeasureGroup &meas, const StatesConstPtr &state_in);
   void Reset();
   void IMU_Initial(const MeasureGroup &meas, int &N);
 
@@ -68,7 +68,7 @@ class ImuProcess
 
   void IntegrateGyr(const std::vector<sensor_msgs::Imu::ConstPtr> &v_imu);
 
-  void UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &state_in, PointCloudXYZI &pcl_in_out);
+  void UndistortPcl(const MeasureGroup &meas, const StatesConstPtr &state_in, PointCloudXYZI &pcl_in_out);
 
   ros::NodeHandle nh;
 
@@ -118,7 +118,7 @@ class ImuProcess
   std::deque<sensor_msgs::ImuConstPtr> v_imu_;
   std::vector<Eigen::Matrix3d> v_rot_pcl_;
 
-  fast_lio::KeyPointPose v_rot_kp_;
+  std::vector<Pose6D> IMUpose;
 };
 
 ImuProcess::ImuProcess()
@@ -177,14 +177,13 @@ void ImuProcess::Reset()
   //gyr_int_.Reset(-1, nullptr);
   start_timestamp_ = -1;
   v_imu_.clear();
-  v_rot_pcl_.clear();
-  v_rot_kp_.pose6D.clear();
+  IMUpose.clear();
 
   cur_pcl_in_.reset(new PointCloudXYZI());
   cur_pcl_un_.reset(new PointCloudXYZI());
 
   fout.close();
-  fout.open(DEBUG_FILE_DIR("imu.txt"),std::ios::out);
+  // fout.open(DEBUG_FILE_DIR("imu.txt"),std::ios::out);
 }
 
 void ImuProcess::IMU_Initial(const MeasureGroup &meas, int &N)
@@ -223,7 +222,7 @@ void ImuProcess::IMU_Initial(const MeasureGroup &meas, int &N)
   bias_gyr    = mean_gyr;
 }
 
-void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &state_in, PointCloudXYZI &pcl_in_out)
+void ImuProcess::UndistortPcl(const MeasureGroup &meas, const StatesConstPtr &state_in, PointCloudXYZI &pcl_in_out)
 {
   /*** add the imu of the last frame-tail to the of current frame-head ***/
   auto v_imu = meas.imu;
@@ -242,7 +241,8 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
   /*** get last states ***/
   if (state_in != NULL)
   {
-    KPPose state(*state_in);
+    std::cout<<"Got updated states"<<std::endl;
+    States state(*state_in);
     Gravity_acc<<VEC_FROM_ARRAY(state.gravity);
     bias_gyr<<VEC_FROM_ARRAY(state.bias_gyr);
     bias_acc<<VEC_FROM_ARRAY(state.bias_acc);
@@ -256,11 +256,10 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
     // std::cout<<"!!!! Got pose: R: "<<euler_cur.transpose()<<" T: "<<pos_last.transpose()<<std::endl;
     #endif
   }
-  v_rot_kp_.header  = meas.lidar->header;
-  v_rot_kp_.pose6D.clear();
-  v_rot_kp_.pose6D.push_back(set_pose6d(0.0, Zero3d, Zero3d, vel_last, pos_last, R_last));
-  v_rot_pcl_.clear();
-  v_rot_pcl_.push_back(Eye3d);
+  fast_lio::States states_pre;
+  states_pre.header  = meas.lidar->header;
+  IMUpose.clear();
+  IMUpose.push_back(set_pose6d(0.0, Zero3d, Zero3d, vel_last, pos_last, R_last));
 
   /*** forward propagation at each imu point ***/
   Eigen::Vector3d acc_kp, angvel_avr, acc_avr, vel_liD(vel_last), vel_e, pos_liD(pos_last), pos_e, pos_relat;
@@ -286,7 +285,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
     vel_imu     = vel_liD - R_liD * angvel_last.cross(Lidar_offset_to_IMU);
 
     #ifdef DEBUG_PRINT
-    fout<<head->header.stamp.toSec()<<" "<<angvel_avr.transpose()<<" "<<acc_avr.transpose()<<std::endl;
+    // fout<<head->header.stamp.toSec()<<" "<<angvel_avr.transpose()<<" "<<acc_avr.transpose()<<std::endl;
     #endif
     dt = tail->header.stamp.toSec() - head->header.stamp.toSec();
     
@@ -299,9 +298,9 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
 
     F_x.block<3,3>(0,0)  = Exp_f;
     F_x.block<3,3>(0,9)  = - Eye3d * dt;
-    F_x.block<3,3>(3,0)  = R_liD * off_vel_skew * dt;
+    // F_x.block<3,3>(3,0)  = R_liD * off_vel_skew * dt;
     F_x.block<3,3>(3,6)  = Eye3d * dt;
-    F_x.block<3,3>(6,0)  = R_liD * acc_avr_skew * dt;
+    // F_x.block<3,3>(6,0)  = R_liD * acc_avr_skew * dt;
     F_x.block<3,3>(6,12) = - R_liD * dt;
     F_x.block<3,3>(6,15) = Eye3d * dt;
 
@@ -333,7 +332,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
     /* save the Lidar poses at each IMU measurements */
     angvel_last = angvel_avr;
     double &&offs_t = tail->header.stamp.toSec() - pcl_beg_time;
-    v_rot_kp_.pose6D.push_back(set_pose6d(offs_t, acc_imu, angvel_avr, vel_liD, pos_liD, R_liD));
+    IMUpose.push_back(set_pose6d(offs_t, acc_imu, angvel_avr, vel_liD, pos_liD, R_liD));
   }
 
   /*** calculated the pos and attitude at the frame End (the lase lidar point) ***/
@@ -342,17 +341,28 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
   pos_e = pos_liD + vel_liD * dt + 0.5 * acc_kp * dt * dt;
   R_e   = R_liD * Exp(angvel_avr, dt);
 
-  v_rot_kp_.gravity  = STD_VEC_FROM_EIGEN(Gravity_acc);
-  v_rot_kp_.bias_gyr = STD_VEC_FROM_EIGEN(bias_gyr);
-  v_rot_kp_.bias_acc = STD_VEC_FROM_EIGEN(bias_acc);
-  v_rot_kp_.pos_end  = STD_VEC_FROM_EIGEN(pos_e);
-  v_rot_kp_.vel_end  = STD_VEC_FROM_EIGEN(vel_e);
-  v_rot_kp_.rot_end  = STD_VEC_FROM_EIGEN(R_e);
-  v_rot_kp_.cov      = STD_VEC_FROM_EIGEN(cov_state_last);
+  #ifdef DEBUG_PRINT
+    std::cout<<"[ IMU Process ]: states: "<<vel_e.transpose()<<" "<<pos_e.transpose()<<std::endl;
+  #endif
+
+  states_pre.gravity  = STD_VEC_FROM_EIGEN(Gravity_acc);
+  states_pre.bias_gyr = STD_VEC_FROM_EIGEN(bias_gyr);
+  states_pre.bias_acc = STD_VEC_FROM_EIGEN(bias_acc);
+  states_pre.pos_end  = STD_VEC_FROM_EIGEN(pos_e);
+  states_pre.vel_end  = STD_VEC_FROM_EIGEN(vel_e);
+  states_pre.rot_end  = STD_VEC_FROM_EIGEN(R_e);
+  states_pre.cov      = STD_VEC_FROM_EIGEN(cov_state_last);
+
+  static ros::Publisher pub_States =
+        nh.advertise<fast_lio::States>("/States_propogated", 100);
+  #ifdef DEBUG_PRINT
+  std::cout<<"[ IMU Process ]: Publishe Prediction "<<states_pre.header<<std::endl;
+  #endif
+  pub_States.publish(states_pre);
 
   /*** undistort each lidar point (backward iterated computation) ***/
   auto it_pcl = pcl_in_out.points.end() - 1;
-  auto &kps = v_rot_kp_.pose6D;
+  auto &kps = IMUpose;
   for (auto it_kp = kps.end() - 1; it_kp != kps.begin(); it_kp--)
   {
     auto head = it_kp - 1;
@@ -382,13 +392,12 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const KPPoseConstPtr &st
       it_pcl->y = P_compensate(1);
       it_pcl->z = P_compensate(2);
 
-      v_rot_pcl_.push_back(R_i);
       if (it_pcl == pcl_in_out.points.begin()) break;
     }
   }
 }
 
-void ImuProcess::Process(const MeasureGroup &meas, const KPPoseConstPtr &state_in)
+void ImuProcess::Process(const MeasureGroup &meas, const StatesConstPtr &state_in)
 {
   double process_start, t1,t2,t3;
   t1 = omp_get_wtime();
@@ -458,11 +467,15 @@ void ImuProcess::Process(const MeasureGroup &meas, const KPPoseConstPtr &state_i
     pub_UndistortPcl.publish(pcl_out_msg);
   }
 
-  {
-    static ros::Publisher pub_KeyPointPose6D =
-        nh.advertise<fast_lio::KeyPointPose>("/States_propogated", 100);
-    pub_KeyPointPose6D.publish(v_rot_kp_);
-  }
+  // {
+  //   static ros::Publisher pub_States =
+  //       nh.advertise<fast_lio::States>("/States_propogated", 100);
+  //   #ifdef DEBUG_PRINT
+  //   std::cout<<"[ IMU Process ]: Publishe Prediction "<<states_pre.header<<std::endl;
+  //   #endif
+  //   pub_States.publish(states_pre);
+    
+  // }
 
   /// Record last measurements
   last_lidar_ = pcl_in_msg;
@@ -493,7 +506,7 @@ double last_timestamp_pose  = -1;
 
 std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer;
 std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer;
-std::deque<fast_lio::KeyPointPoseConstPtr> pose_buffer;
+std::deque<fast_lio::StatesConstPtr> pose_buffer;
 
 void SigHandle(int sig)
 {
@@ -545,14 +558,14 @@ void imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in)
   sig_buffer.notify_all();
 }
 
-void pose_cbk(const KPPoseConstPtr& KeyPointPose)
+void pose_cbk(const StatesConstPtr& States)
 {
     b_first = false;
-    pose_buffer.push_back(KeyPointPose);
+    pose_buffer.push_back(States);
     last_timestamp_pose = pose_buffer.front()->header.stamp.toSec();
 }
 
-bool SyncMeasure(MeasureGroup &measgroup, KPPoseConstPtr& state_in) 
+bool SyncMeasure(MeasureGroup &measgroup, StatesConstPtr& state_in) 
 {
   if (lidar_buffer.empty() || imu_buffer.empty() || (pose_buffer.empty() && (!b_first))) {
     /// Note: this will happen
@@ -606,7 +619,7 @@ void ProcessLoop(std::shared_ptr<ImuProcess> p_imu)
   while (ros::ok())
   {
     MeasureGroup meas;
-    KPPoseConstPtr state_in;
+    StatesConstPtr state_in;
     std::unique_lock<std::mutex> lk(mtx_buffer);
     // ROS_INFO("wait imu");
     sig_buffer.wait(lk,
@@ -638,7 +651,7 @@ int main(int argc, char **argv)
 
   ros::Subscriber sub_pcl = nh.subscribe("/laser_cloud_flat", 100, pointcloud_cbk);
   ros::Subscriber sub_imu = nh.subscribe("/livox/imu", 100, imu_cbk);
-  ros::Subscriber sub_pose = nh.subscribe("/Pose6D_Solved", 10, pose_cbk);
+  ros::Subscriber sub_pose = nh.subscribe("/States_updated", 10, pose_cbk);
   std::shared_ptr<ImuProcess> p_imu(new ImuProcess());
 
   /// for debug

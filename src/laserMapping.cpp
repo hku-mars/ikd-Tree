@@ -54,7 +54,7 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <tf/transform_datatypes.h>
 #include <tf/transform_broadcaster.h>
-#include <fast_lio/KeyPointPose.h>
+#include <fast_lio/States.h>
 #include <geometry_msgs/Vector3.h>
 #include "Exp_mat.h"
 
@@ -63,7 +63,7 @@
 namespace plt = matplotlibcpp;
 // #endif
 
-#define INIT_TIME           (2.0)
+#define INIT_TIME           (3.0)
 #define LASER_POINT_COV     (0.0010)
 #define NUM_MATCH_POINTS    (5)
 #define NUM_MAX_ITERATIONS  (15)
@@ -109,9 +109,8 @@ pcl::PointCloud<PointType>::Ptr laserCloudSurfFromMap(new pcl::PointCloud<PointT
 
 std::vector< Eigen::Matrix<float,7,1> > keyframe_pose;
 std::vector< Eigen::Matrix4f > pose_map;
-std::deque< fast_lio::KeyPointPose > rot_kp_imu_buff;
+std::deque< fast_lio::States > rot_kp_imu_buff;
 //all points
-pcl::PointCloud<PointType>::Ptr laserCloudFullRes(new pcl::PointCloud<PointType>());
 pcl::PointCloud<PointType>::Ptr laserCloudFullRes2(new pcl::PointCloud<PointType>());
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr laserCloudFullResColor(new pcl::PointCloud<pcl::PointXYZRGB>());
 
@@ -224,22 +223,15 @@ void laserCloudSurfLastHandler(const sensor_msgs::PointCloud2ConstPtr& laserClou
     timeLaserCloudSurfLast = LaserCloudSurfaceBuff.front().header.stamp.toSec();
 
     newLaserCloudSurfLast = true;
+
+    std::cout<<"|||||||laser came: time "<<timeLaserCloudSurfLast<<" size "<<LaserCloudSurfaceBuff.size()<<std::endl;
 }
 
-void laserCloudFullResHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudFullRes2)
+void StatesHandler(const fast_lio::StatesConstPtr& States)
 {
-    laserCloudFullRes->clear();
-    laserCloudFullResColor->clear();
-    pcl::fromROSMsg(*laserCloudFullRes2, *laserCloudFullRes);
+    rot_kp_imu_buff.push_back(*States);
 
-    timeLaserCloudFullRes = laserCloudFullRes2->header.stamp.toSec();
-
-    newLaserCloudFullRes = true;
-}
-
-void KeyPointPose6DHandler(const fast_lio::KeyPointPoseConstPtr& KeyPointPose)
-{
-    rot_kp_imu_buff.push_back(*KeyPointPose);
+    std::cout<<"|||||||IMUpre came: time "<<rot_kp_imu_buff.front().header.stamp.toSec()<<" size "<<rot_kp_imu_buff.size()<<std::endl;
 }
 
 bool sync_packages()
@@ -256,39 +248,23 @@ int main(int argc, char** argv)
     ros::init(argc, argv, "laserMapping");
     ros::NodeHandle nh;
 
-#ifdef USING_CORNER
-    ros::Subscriber subLaserCloudCornerLast = nh.subscribe<sensor_msgs::PointCloud2>
-            ("/laser_cloud_sharp", 100, laserCloudCornerLastHandler);
-    ros::Subscriber subLaserCloudFullRes = nh.subscribe<sensor_msgs::PointCloud2>
-            ("/livox_cloud", 100, laserCloudFullResHandler);
-#else
-    ros::Subscriber subLaserCloudFullRes = nh.subscribe<sensor_msgs::PointCloud2>
-            ("/livox_undistort", 100, laserCloudFullResHandler);
-#endif
-
     ros::Subscriber subLaserCloudSurfLast = nh.subscribe<sensor_msgs::PointCloud2>
             ("/livox_undistort", 100, laserCloudSurfLastHandler);
-    ros::Subscriber KeyPointPose6D = nh.subscribe<fast_lio::KeyPointPose>
-            ("/States_propogated", 100, KeyPointPose6DHandler);
+    ros::Subscriber States = nh.subscribe<fast_lio::States>
+            ("/States_propogated", 100, StatesHandler);
 
-    // ros::Subscriber subIMUOri = nh.subscribe<sensor_msgs::>
-
-    ros::Publisher pubLaserCloudSurround = nh.advertise<sensor_msgs::PointCloud2>
-            ("/laser_cloud_surround", 100);
-    ros::Publisher pubLaserCloudSurround_corner = nh.advertise<sensor_msgs::PointCloud2>
-            ("/laser_cloud_surround_corner", 100);
     ros::Publisher pubLaserCloudFullRes = nh.advertise<sensor_msgs::PointCloud2>
             ("/cloud_registered", 100);
     ros::Publisher pubLaserCloudMap = nh.advertise<sensor_msgs::PointCloud2>
             ("/Laser_map", 100);
-    ros::Publisher pubSolvedPose6D = nh.advertise<fast_lio::KeyPointPose>
-            ("/Pose6D_Solved", 100);
-    
-    ros::Publisher pubOdomAftMapped = nh.advertise<nav_msgs::Odometry> ("/aft_mapped_to_init", 10);
+    ros::Publisher pubSolvedPose6D = nh.advertise<fast_lio::States>
+            ("/States_updated", 100);
+    ros::Publisher pubOdomAftMapped = nh.advertise<nav_msgs::Odometry> 
+            ("/aft_mapped_to_init", 10);
+
     nav_msgs::Odometry odomAftMapped;
     odomAftMapped.header.frame_id = "/camera_init";
     odomAftMapped.child_frame_id = "/aft_mapped";
-    fast_lio::KeyPointPose Pose6D_Solved;
 
     std::string map_file_path;
     bool dense_map_en;
@@ -334,7 +310,7 @@ int main(int argc, char** argv)
     else
         std::cout << "~~~~"<<ROOT_DIR<<" doesn't exist" << std::endl;
     
-    ros::Rate rate(1000);
+    ros::Rate rate(500);
     bool status = ros::ok();
     while (status)
     {
@@ -342,7 +318,6 @@ int main(int argc, char** argv)
 
         while(!LaserCloudSurfaceBuff.empty() && !rot_kp_imu_buff.empty() && sync_packages()) 
         {
-            static int degenerate_count = 0;
             static double first_lidar_time = LaserCloudSurfaceBuff.front().header.stamp.toSec();
             bool Need_Init = ((timeLaserCloudSurfLast - first_lidar_time) < INIT_TIME) ? true : false;
             if(Need_Init) {std::cout<<"||||||||||Initiallizing LiDar||||||||||"<<std::endl;}
@@ -364,14 +339,14 @@ int main(int argc, char** argv)
             std::cout<<"DEBUG mapping start "<<std::endl;
 
             PointType pointOnYAxis;
-            pointOnYAxis.x = 0.0;
-            pointOnYAxis.y = 10.0;
+            pointOnYAxis.x = 10.0;
+            pointOnYAxis.y = 0.0;
             pointOnYAxis.z = 0.0;
             
             /** Get the propagated states **/
             Eigen::Vector3d gravity, bias_g, bias_a;
             Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> cov_stat_cur;
-            auto &states_propagted = rot_kp_imu_buff.front();
+            auto states_propagted = rot_kp_imu_buff.front();
             gravity<<VEC_FROM_ARRAY(states_propagted.gravity);
             bias_g<<VEC_FROM_ARRAY(states_propagted.bias_gyr);
             bias_a<<VEC_FROM_ARRAY(states_propagted.bias_acc);
@@ -603,10 +578,13 @@ int main(int argc, char** argv)
                             laserCloudSurroundInd[laserCloudSurroundNum] = i + laserCloudWidth * j
                                     + laserCloudWidth * laserCloudHeight * k;
                             laserCloudSurroundNum ++;
+                            
                         }
                     }
                 }
             }
+
+            std::cout<<"+++++++++points X 10: "<<pointOnYAxis.x<<" "<<pointOnYAxis.y<<" "<<pointOnYAxis.z<<std::endl;
 
             laserCloudSurfFromMap->clear();
             
@@ -962,9 +940,10 @@ int main(int argc, char** argv)
             t3 = omp_get_wtime();
 
             /******* Publish Lidar states *******/
+            fast_lio::States Pose6D_Solved;
             save_states(Pose6D_Solved, gravity, bias_g, bias_a, \
                         T_global_cur, V_global_cur, R_global_cur, cov_stat_cur); //std::cout<<"!!!! Sent pose:"<<T_global_cur.transpose()<<std::endl;
-            // Pose6D_Solved.pose6D.clear();
+            // Pose6D_Solved.IMUpose.clear();
             pubSolvedPose6D.publish(Pose6D_Solved);
 
             V_global_last = V_global_cur;
@@ -984,13 +963,13 @@ int main(int argc, char** argv)
             }
             
             laserCloudFullRes2->clear();
-            // *laserCloudFullRes2 = *laserCloudFullRes;
-            // *laserCloudFullRes2 = dense_map_en ? (*laserCloudSurfLast) : (* laserCloudSurf_down);
-            *laserCloudFullRes2 = dense_map_en ? (*laserCloudFullRes) : (* laserCloudSurf_down);
+            *laserCloudFullRes2 = dense_map_en ? (*laserCloudSurfLast) : (* laserCloudSurf_down);
+            // *laserCloudFullRes2 = dense_map_en ? (*laserCloudFullRes) : (* laserCloudSurf_down);
 
             int laserCloudFullResNum = laserCloudFullRes2->points.size();
 
             pcl::PointXYZRGB temp_point;
+            laserCloudFullResColor->clear();
 
             for (int i = 0; i < laserCloudFullResNum; i++)
             {
