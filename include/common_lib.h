@@ -4,6 +4,7 @@
 #include <Eigen/Eigen>
 #include <eigen_conversions/eigen_msg.h>
 #include <fast_lio/States.h>
+#include <fast_lio/Pose6D.h>
 #include <nav_msgs/Odometry.h>
 #include <tf/transform_broadcaster.h>
 
@@ -13,7 +14,7 @@
 #define G_m_s2 (9.8099)         // Gravaty const in GuangDong/China
 #define DIM_OF_STATES (18)      // Dimension of states (Let Dim(SO(3)) = 3)
 #define DIM_OF_PROC_N (12)      // Dimension of process noise (Let Dim(SO(3)) = 3)
-#define CUBE_LEN  (40.0)
+#define CUBE_LEN  (6.0)
 #define LIDAR_SP_LEN    (2)
 
 #define DIM_OF_STATES_SQUARE (18*18)
@@ -63,7 +64,6 @@ void save_states(States &states, \
                 const Eigen::Matrix<T, 3, 1> &v,  const Eigen::Matrix<T, 3, 3> &R, \
                 const Eigen::Matrix<T, DIM_OF_STATES, DIM_OF_STATES> &cov)
 {
-    std::cout<<"0"<<std::endl;
     states.gravity  = std::vector<T> (ARRAY_FROM_EIGEN(gravity));
     states.bias_gyr = std::vector<T> (ARRAY_FROM_EIGEN(bg));
     states.bias_acc = std::vector<T> (ARRAY_FROM_EIGEN(ba));

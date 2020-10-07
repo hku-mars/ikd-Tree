@@ -299,7 +299,7 @@ void horizon_handler(const livox_ros_driver::CustomMsg::ConstPtr &msg)
   pub_func(pl_full, pub_full, ct);
   pub_func(pl_surf, pub_surf, ct);
   pub_func(pl_corn, pub_corn, ct);
-  std::cout<<"+++++feature time: "<< omp_get_wtime() - t1<<std::endl;
+  std::cout<<"[ Feature Extract ]: time: "<< omp_get_wtime() - t1<<std::endl;
 }
 
 void velo16_handler(const sensor_msgs::PointCloud2::ConstPtr &msg)

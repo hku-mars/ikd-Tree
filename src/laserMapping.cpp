@@ -224,14 +224,14 @@ void laserCloudSurfLastHandler(const sensor_msgs::PointCloud2ConstPtr& laserClou
 
     newLaserCloudSurfLast = true;
 
-    std::cout<<"|||||||laser came: time "<<timeLaserCloudSurfLast<<" size "<<LaserCloudSurfaceBuff.size()<<std::endl;
+    // std::cout<<"|||||||laser came: time "<<timeLaserCloudSurfLast<<" size "<<LaserCloudSurfaceBuff.size()<<std::endl;
 }
 
 void StatesHandler(const fast_lio::StatesConstPtr& States)
 {
     rot_kp_imu_buff.push_back(*States);
 
-    std::cout<<"|||||||IMUpre came: time "<<rot_kp_imu_buff.front().header.stamp.toSec()<<" size "<<rot_kp_imu_buff.size()<<std::endl;
+    // std::cout<<"|||||||IMUpre came: time "<<rot_kp_imu_buff.front().header.stamp.toSec()<<" size "<<rot_kp_imu_buff.size()<<std::endl;
 }
 
 bool sync_packages()
@@ -321,7 +321,7 @@ int main(int argc, char** argv)
             static double first_lidar_time = LaserCloudSurfaceBuff.front().header.stamp.toSec();
             bool Need_Init = ((timeLaserCloudSurfLast - first_lidar_time) < INIT_TIME) ? true : false;
             if(Need_Init) {std::cout<<"||||||||||Initiallizing LiDar||||||||||"<<std::endl;}
-            std::cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~frame buff size: "<<LaserCloudSurfaceBuff.size()<<" time of this frame: "<<timeLaserCloudSurfLast<<std::endl;
+            // std::cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~frame buff size: "<<LaserCloudSurfaceBuff.size()<<" time of this frame: "<<timeLaserCloudSurfLast<<std::endl;
             double t1,t2,t3,t4;
             double match_start, match_time, solve_start, solve_time, pca_time, svd_time;
 
@@ -335,8 +335,7 @@ int main(int argc, char** argv)
             newLaserCloudSurfLast = false;
             newLaserCloudFullRes = false;
 
-            //transformAssociateToMap();
-            std::cout<<"DEBUG mapping start "<<std::endl;
+            // std::cout<<"[ mapping ] mapping start "<<std::endl;
 
             PointType pointOnYAxis;
             pointOnYAxis.x = LIDAR_SP_LEN;//10.0;
@@ -626,7 +625,7 @@ int main(int argc, char** argv)
                 }
             }
 
-            std::cout<<"+++++++++points X 10: "<<pointOnYAxis.x<<" "<<pointOnYAxis.y<<" "<<pointOnYAxis.z<<std::endl;
+            // std::cout<<"+++++++++points X 10: "<<pointOnYAxis.x<<" "<<pointOnYAxis.y<<" "<<pointOnYAxis.z<<std::endl;
 
             laserCloudSurfFromMap->clear();
             
@@ -651,10 +650,7 @@ int main(int argc, char** argv)
             int laserCloudSurfFromMapNum = laserCloudSurfFromMap->points.size();
             int laserCloudSurf_down_size = laserCloudSurf_down->points.size();
 
-            std::cout<<"DEBUG MAPPING laserCloudSurf_down : "<<laserCloudSurf_down_size<<" laserCloudSurf : "
-            <<laserCloudSurfLast->points.size()<<std::endl;
-            std::cout<<"DEBUG MAPPING laserCloudValidNum : "<<laserCloudValidNum<<" laserCloudSurfFromMapNum : "
-            <<laserCloudSurfFromMapNum<<std::endl;
+            std::cout<<"[ mapping ]: Raw feature num: "<<laserCloudSurfLast->points.size()<<" Map num: "<<laserCloudSurfFromMapNum<<std::endl;
 
             pcl::PointCloud<PointType>::Ptr coeffSel_tmpt
                 (new pcl::PointCloud<PointType>(*laserCloudSurf_down));
@@ -786,7 +782,7 @@ int main(int argc, char** argv)
                     int laserCloudSelNum = laserCloudOri->points.size();
                     double ave_residual = total_residual / laserCloudSelNum;
 
-                    if(iterCount == 1) std::cout << "DEBUG mapping select all points : " << coeffSel->size() << "  " << count_effect_point << std::endl;
+                    if(iterCount == 1) std::cout << "[ mapping ]: Effective feature num: "<<coeffSel->size()<<std::endl;
 
                     count_effect_point = 0;
 
@@ -903,11 +899,10 @@ int main(int argc, char** argv)
                     rematch_en = false;
 
                     /*** Rematch Judgement ***/
-                    if ((deltaR < 0.01 && deltaT < 0.01))
+                    if ((deltaR < 0.015 && deltaT < 0.015))
                     {
                         rematch_en = true;
                         rematch_num ++;
-                        std::cout<<"Rematching!"<<std::endl;
                     }
 
                     /*** End Judgements and Covariance Update ***/
@@ -924,7 +919,7 @@ int main(int argc, char** argv)
                     solve_time += omp_get_wtime() - solve_start;
                 }
 
-                std::cout<<" iteration count: "<<iterCount+1<<std::endl;
+                std::cout<<"[ mapping ]: iteration count: "<<iterCount+1<<std::endl;
                 transformUpdate();
             }
 
@@ -1068,7 +1063,7 @@ int main(int argc, char** argv)
             s_plot2.push_back(double(deltaR));
             s_plot3.push_back(double(deltaT));
 
-            std::cout<<"mapping time : selection "<<t2-t1 <<" match time: "<<match_time<<"  solve time: "<<solve_time<<" total with publish: "<<t4 - t1<<" no publish: "<<t3-t1<<std::endl;
+            std::cout<<"[ mapping ]: time: selection "<<t2-t1 <<" match "<<match_time<<" solve: "<<solve_time<<" total: "<<t3 - t1<<std::endl;
         }
         status = ros::ok();
         rate.sleep();

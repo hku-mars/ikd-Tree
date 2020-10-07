@@ -241,7 +241,6 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const StatesConstPtr &st
   /*** get last states ***/
   if (state_in != NULL)
   {
-    std::cout<<"Got updated states"<<std::endl;
     States state(*state_in);
     Gravity_acc<<VEC_FROM_ARRAY(state.gravity);
     bias_gyr<<VEC_FROM_ARRAY(state.bias_gyr);
@@ -485,7 +484,7 @@ void ImuProcess::Process(const MeasureGroup &meas, const StatesConstPtr &state_i
 
   t3 = omp_get_wtime();
   
-  std::cout<<"[ IMU Process ]: IMU Processing Time: undistort "<<t2 - t1<<" total "<<t3 - t1<<std::endl;
+  std::cout<<"[ IMU Process ]: Time: "<<t3 - t1<<std::endl;
 }
 
 /// *************ROS Node
