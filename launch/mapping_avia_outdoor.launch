@@ -31,6 +31,7 @@
   <param name="filter_size_corner" type="double" value="0.5" />
   <param name="filter_size_surf" type="double" value="0.4" />
   <param name="filter_size_map" type="double" value="0.5" />
+  <param name="cube_length" type="double" value="40.0" />
   </node>
 
   <!-- <node pkg="fast_lio" type="loam_scanRegistration_horizon" name="scanRegistration_horizon" output="screen">

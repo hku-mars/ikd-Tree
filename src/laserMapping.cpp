@@ -268,12 +268,14 @@ int main(int argc, char** argv)
 
     std::string map_file_path;
     bool dense_map_en;
-    double filter_size_corner_min, filter_size_surf_min, filter_size_map_min;
+    double filter_size_corner_min, filter_size_surf_min, filter_size_map_min, cube_len;
     ros::param::get("~dense_map_enable",dense_map_en);
     ros::param::get("~map_file_path",map_file_path);
     ros::param::get("~filter_size_corner",filter_size_corner_min);
     ros::param::get("~filter_size_surf",filter_size_surf_min);
     ros::param::get("~filter_size_map",filter_size_map_min);
+    ros::param::get("~cube_length",cube_len);
+    
 
     PointType pointOri, pointSel, coeff;
 
@@ -299,12 +301,13 @@ int main(int argc, char** argv)
     std::vector<double> T1, s_plot, s_plot2, s_plot3;
     double aver_time_consu = 0;
     double frame_num = 0;
+    int effect_feat_num = 0;
 
 //------------------------------------------------------------------------------------------------------
     std::ofstream fout_pre, fout_out;
     
     fout_pre.open(DEBUG_FILE_DIR("mat_pre.txt"),std::ios::out);
-    fout_out.open(DEBUG_FILE_DIR("mat_out.txt"),std::ios::out);
+    fout_out.open(DEBUG_FILE_DIR("mat_out_time.txt"),std::ios::out);
     if (fout_pre && fout_out)
         std::cout << "~~~~"<<ROOT_DIR<<" file opened" << std::endl;
     else
@@ -370,13 +373,13 @@ int main(int argc, char** argv)
             
             pointAssociateToMap(&pointOnYAxis, &pointOnYAxis);
 
-            int centerCubeI = int((transformTobeMapped[3] + 0.5 * CUBE_LEN) / CUBE_LEN) + laserCloudCenWidth;
-            int centerCubeJ = int((transformTobeMapped[4] + 0.5 * CUBE_LEN) / CUBE_LEN) + laserCloudCenHeight;
-            int centerCubeK = int((transformTobeMapped[5] + 0.5 * CUBE_LEN) / CUBE_LEN) + laserCloudCenDepth;
+            int centerCubeI = int((transformTobeMapped[3] + 0.5 * cube_len) / cube_len) + laserCloudCenWidth;
+            int centerCubeJ = int((transformTobeMapped[4] + 0.5 * cube_len) / cube_len) + laserCloudCenHeight;
+            int centerCubeK = int((transformTobeMapped[5] + 0.5 * cube_len) / cube_len) + laserCloudCenDepth;
 
-            if (transformTobeMapped[3] + 0.5 * CUBE_LEN < 0) centerCubeI--;
-            if (transformTobeMapped[4] + 0.5 * CUBE_LEN < 0) centerCubeJ--;
-            if (transformTobeMapped[5] + 0.5 * CUBE_LEN < 0) centerCubeK--;
+            if (transformTobeMapped[3] + 0.5 * cube_len < 0) centerCubeI--;
+            if (transformTobeMapped[4] + 0.5 * cube_len < 0) centerCubeJ--;
+            if (transformTobeMapped[5] + 0.5 * cube_len < 0) centerCubeK--;
 
             while (centerCubeI < 3)
             {
@@ -528,9 +531,9 @@ int main(int argc, char** argv)
                                 k >= 0 && k < laserCloudDepth) 
                         {
 
-                            float centerX = CUBE_LEN * (i - laserCloudCenWidth);
-                            float centerY = CUBE_LEN * (j - laserCloudCenHeight);
-                            float centerZ = CUBE_LEN * (k - laserCloudCenDepth);
+                            float centerX = cube_len * (i - laserCloudCenWidth);
+                            float centerY = cube_len * (j - laserCloudCenHeight);
+                            float centerZ = cube_len * (k - laserCloudCenDepth);
 
                             float check1, check2;
                             float squaredSide1, squaredSide2;
@@ -545,9 +548,9 @@ int main(int argc, char** argv)
                                     for (int kk = -1; (kk <= 1) && (!isInLaserFOV); kk += 2) 
                                     {
 
-                                        float cornerX = centerX + 0.5 * CUBE_LEN * ii;
-                                        float cornerY = centerY + 0.5 * CUBE_LEN * jj;
-                                        float cornerZ = centerZ + 0.5 * CUBE_LEN * kk;
+                                        float cornerX = centerX + 0.5 * cube_len * ii;
+                                        float cornerY = centerY + 0.5 * cube_len * jj;
+                                        float cornerZ = centerZ + 0.5 * cube_len * kk;
 
                                         squaredSide1 = (transformTobeMapped[3] - cornerX)
                                                 * (transformTobeMapped[3] - cornerX)
@@ -559,16 +562,6 @@ int main(int argc, char** argv)
                                         squaredSide2 = (pointOnYAxis.x - cornerX) * (pointOnYAxis.x - cornerX)
                                                 + (pointOnYAxis.y - cornerY) * (pointOnYAxis.y - cornerY)
                                                 + (pointOnYAxis.z - cornerZ) * (pointOnYAxis.z - cornerZ);
-
-                                        /* check1 = LIDAR_SP_LEN * LIDAR_SP_LEN + squaredSide1 - squaredSide2
-                                                - LIDAR_SP_LEN * sqrt(3.0) * sqrt(squaredSide1);
-
-                                        check2 = LIDAR_SP_LEN * LIDAR_SP_LEN + squaredSide1 - squaredSide2
-                                                + LIDAR_SP_LEN * sqrt(3.0) * sqrt(squaredSide1);
-
-                                        if (check1 < 0 && check2 > 0) {
-                                            isInLaserFOV = true;
-                                        } */
 
                                         ang_cos = fabs(squaredSide1 <= 3) ? 1.0 :
                                             (LIDAR_SP_LEN * LIDAR_SP_LEN + squaredSide1 - squaredSide2) / (2 * LIDAR_SP_LEN * sqrt(squaredSide1));
@@ -591,7 +584,7 @@ int main(int argc, char** argv)
                                         + (transformTobeMapped[5] - cornerZ)
                                         * (transformTobeMapped[5] - cornerZ);
 
-                                if(squaredSide1 <= 0.4 * CUBE_LEN * CUBE_LEN)
+                                if(squaredSide1 <= 0.4 * cube_len * cube_len)
                                 {
                                     isInLaserFOV = true;
                                 }
@@ -600,7 +593,7 @@ int main(int argc, char** argv)
                                         + (pointOnYAxis.y - cornerY) * (pointOnYAxis.y - cornerY)
                                         + (pointOnYAxis.z - cornerZ) * (pointOnYAxis.z - cornerZ);
                                 
-                                ang_cos = fabs(squaredSide2 <= 0.5 * CUBE_LEN) ? 1.0 :
+                                ang_cos = fabs(squaredSide2 <= 0.5 * cube_len) ? 1.0 :
                                     (LIDAR_SP_LEN * LIDAR_SP_LEN + squaredSide1 - squaredSide2) / (2 * LIDAR_SP_LEN * sqrt(squaredSide1));
                                 
                                 if(ang_cos > 0.5) isInLaserFOV = true;
@@ -782,7 +775,8 @@ int main(int argc, char** argv)
                     int laserCloudSelNum = laserCloudOri->points.size();
                     double ave_residual = total_residual / laserCloudSelNum;
 
-                    if(iterCount == 1) std::cout << "[ mapping ]: Effective feature num: "<<coeffSel->size()<<std::endl;
+                    effect_feat_num = coeffSel->size();
+                    if(iterCount == 1) std::cout << "[ mapping ]: Effective feature num: "<<effect_feat_num<<std::endl;
 
                     count_effect_point = 0;
 
@@ -937,13 +931,13 @@ int main(int argc, char** argv)
             {
                 PointType &pointSel = laserCloudSurf_down_updated->points[i];
 
-                int cubeI = int((pointSel.x + 0.5 * CUBE_LEN) / CUBE_LEN) + laserCloudCenWidth;
-                int cubeJ = int((pointSel.y + 0.5 * CUBE_LEN) / CUBE_LEN) + laserCloudCenHeight;
-                int cubeK = int((pointSel.z + 0.5 * CUBE_LEN) / CUBE_LEN) + laserCloudCenDepth;
+                int cubeI = int((pointSel.x + 0.5 * cube_len) / cube_len) + laserCloudCenWidth;
+                int cubeJ = int((pointSel.y + 0.5 * cube_len) / cube_len) + laserCloudCenHeight;
+                int cubeK = int((pointSel.z + 0.5 * cube_len) / cube_len) + laserCloudCenDepth;
 
-                if (pointSel.x + 0.5 * CUBE_LEN < 0) cubeI--;
-                if (pointSel.y + 0.5 * CUBE_LEN < 0) cubeJ--;
-                if (pointSel.z + 0.5 * CUBE_LEN < 0) cubeK--;
+                if (pointSel.x + 0.5 * cube_len < 0) cubeI--;
+                if (pointSel.y + 0.5 * cube_len < 0) cubeJ--;
+                if (pointSel.z + 0.5 * cube_len < 0) cubeK--;
 
                 if (cubeI >= 0 && cubeI < laserCloudWidth &&
                         cubeJ >= 0 && cubeJ < laserCloudHeight &&
@@ -984,10 +978,6 @@ int main(int argc, char** argv)
             V_global_last = V_global_cur;
             T_global_last = T_global_cur;
             R_global_last = R_global_cur;
-
-            #ifdef DEBUG_PRINT
-                fout_out << std::setw(10) << timeLaserCloudSurfLast << " " << euler_cur.transpose()*57.3 << " " << T_global_last.transpose() << " " << V_global_last.transpose() << std::endl;
-            #endif
 
             /******* Publish current frame points in world coordinates:  *******/
             laserCloudSurround2->clear();
@@ -1064,6 +1054,7 @@ int main(int argc, char** argv)
             s_plot3.push_back(double(deltaT));
 
             std::cout<<"[ mapping ]: time: selection "<<t2-t1 <<" match "<<match_time<<" solve: "<<solve_time<<" total: "<<t3 - t1<<std::endl;
+            fout_out << std::setw(10) << timeLaserCloudSurfLast << " " << t3-t1 << " " << effect_feat_num << std::endl;
         }
         status = ros::ok();
         rate.sleep();
