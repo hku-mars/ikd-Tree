@@ -59,8 +59,10 @@
 #include "Exp_mat.h"
 
 // #ifdef DEBUG_PRINT
+#ifndef DEPLOY
 #include "matplotlibcpp.h"
 namespace plt = matplotlibcpp;
+#endif
 // #endif
 
 #define INIT_TIME           (3.0)
@@ -1083,6 +1085,7 @@ int main(int argc, char** argv)
     else
     {
         // #ifdef DEBUG_PRINT
+        #ifndef DEPLOY
         if (!T1.empty())
         {
             plt::named_plot("time consumed",T1,s_plot);
@@ -1096,6 +1099,7 @@ int main(int argc, char** argv)
         }
         std::cout << "no points saved";
         // #endif
+        #endif
     }
     //--------------------------
     //  loss_output.close();
