@@ -268,6 +268,10 @@ int main(int argc, char** argv)
     odomAftMapped.header.frame_id = "/camera_init";
     odomAftMapped.child_frame_id = "/aft_mapped";
 
+#ifdef DEPLOY
+    ros::Publisher mavros_pose_publisher = nh.advertise<geometry_msgs::PoseStamped>("/mavros/vision_pose/pose", 10);
+    geometry_msgs::PoseStamped msg_body_pose;
+#endif
     std::string map_file_path;
     bool dense_map_en;
     double filter_size_corner_min, filter_size_surf_min, filter_size_map_min, cube_len;
@@ -1044,6 +1048,21 @@ int main(int argc, char** argv)
             q.setZ( odomAftMapped.pose.pose.orientation.z );
             transform.setRotation( q );
             br.sendTransform( tf::StampedTransform( transform, odomAftMapped.header.stamp, "/camera_init", "/aft_mapped" ) );
+
+#ifdef DEPLOY
+            // Create odometry msgs to be sent to mavros
+            msg_body_pose.header.stamp = ros::Time::now();
+            msg_body_pose.header.frame_id = "/camera_odom_frame";
+            // msg_body_pose.header.child_frame_id = "/camera_link";
+            msg_body_pose.pose.position.x = transformAftMapped[3];
+            msg_body_pose.pose.position.y = - transformAftMapped[4];
+            msg_body_pose.pose.position.z = - transformAftMapped[5];
+            msg_body_pose.pose.orientation.x = - geoQuat.y;
+            msg_body_pose.pose.orientation.y = - geoQuat.z;
+            msg_body_pose.pose.orientation.z = geoQuat.x;
+            msg_body_pose.pose.orientation.w = geoQuat.w;
+            mavros_pose_publisher.publish(msg_body_pose);
+#endif
 
             /*** save debug variables ***/
             t4 = omp_get_wtime();
