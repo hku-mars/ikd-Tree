@@ -68,7 +68,6 @@ namespace plt = matplotlibcpp;
 #define NUM_MATCH_POINTS    (5)
 #define NUM_MAX_ITERATIONS  (15)
 #define LASER_FRAME_INTEVAL (0.1)
-#define STR2(a)             #a
 
 typedef pcl::PointXYZI PointType;
 
@@ -161,7 +160,7 @@ void transformUpdate()
 void pointAssociateToMap(PointType const * const pi, PointType * const po)
 {
     Eigen::Vector3d p_body(pi->x, pi->y, pi->z);
-    Eigen::Vector3d p_global(R_global_cur * p_body + T_global_cur);
+    Eigen::Vector3d p_global(R_global_cur * (p_body + Lidar_offset_to_IMU) + T_global_cur);
     
     po->x = p_global(0);
     po->y = p_global(1);
@@ -172,7 +171,7 @@ void pointAssociateToMap(PointType const * const pi, PointType * const po)
 void RGBpointAssociateToMap(PointType const * const pi, pcl::PointXYZRGB * const po)
 {
     Eigen::Vector3d p_body(pi->x, pi->y, pi->z);
-    Eigen::Vector3d p_global(R_global_cur * p_body + T_global_cur);
+    Eigen::Vector3d p_global(R_global_cur * (p_body + Lidar_offset_to_IMU) + T_global_cur);
     
     po->x = p_global(0);
     po->y = p_global(1);
@@ -617,8 +616,6 @@ int main(int argc, char** argv)
                     }
                 }
             }
-
-            // std::cout<<"+++++++++points X 10: "<<pointOnYAxis.x<<" "<<pointOnYAxis.y<<" "<<pointOnYAxis.z<<std::endl;
 
             laserCloudSurfFromMap->clear();
             
