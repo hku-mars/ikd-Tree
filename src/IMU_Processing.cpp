@@ -329,7 +329,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const StatesConstPtr &st
     angvel_last = angvel_avr;
     acc_s_last  = acc_imu;
     double &&offs_t = tail->header.stamp.toSec() - pcl_beg_time;
-    std::cout<<"head imu acc pre: "<<acc_imu.transpose()<<std::endl;
+    // std::cout<<"head imu acc pre: "<<acc_imu.transpose()<<std::endl;
     IMUpose.push_back(set_pose6d(offs_t, acc_imu, angvel_avr, vel_imu, pos_imu, R_imu));
   }
 
@@ -360,7 +360,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const StatesConstPtr &st
     auto tail = it_kp;
     R_imu<<MAT_FROM_ARRAY(head->rot);
     acc_imu<<VEC_FROM_ARRAY(head->acc);
-    std::cout<<"head imu acc: "<<acc_imu.transpose()<<std::endl;
+    // std::cout<<"head imu acc: "<<acc_imu.transpose()<<std::endl;
     vel_imu<<VEC_FROM_ARRAY(head->vel);
     pos_imu<<VEC_FROM_ARRAY(head->pos);
     angvel_avr<<VEC_FROM_ARRAY(head->gyr);

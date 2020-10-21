@@ -60,7 +60,7 @@ bool edge_jump_judge(const pcl::PointCloud<PointType> &pl, vector<orgtype> &type
 
 int main(int argc, char **argv)
 {
-  ros::init(argc, argv, "unity_feature");
+  ros::init(argc, argv, "feature_extract");
   ros::NodeHandle n;
 
   // lidar_type = MID;

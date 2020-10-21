@@ -8,7 +8,7 @@
 #include <nav_msgs/Odometry.h>
 #include <tf/transform_broadcaster.h>
 
-#define DEBUG_PRINT
+// #define DEBUG_PRINT
 
 #define PI_M (3.14159265358)
 #define G_m_s2 (9.8099)         // Gravaty const in GuangDong/China
@@ -33,8 +33,8 @@ Eigen::Matrix3d Eye3d(Eigen::Matrix3d::Identity());
 Eigen::Matrix3f Eye3f(Eigen::Matrix3f::Identity());
 Eigen::Vector3d Zero3d(0, 0, 0);
 Eigen::Vector3f Zero3f(0, 0, 0);
-// Eigen::Vector3d Lidar_offset_to_IMU(0.05512, 0.02226, 0.0297); // Horizon
-Eigen::Vector3d Lidar_offset_to_IMU(0.04165, 0.02326, -0.0284); // Avia
+Eigen::Vector3d Lidar_offset_to_IMU(0.05512, 0.02226, 0.0297); // Horizon
+// Eigen::Vector3d Lidar_offset_to_IMU(0.04165, 0.02326, -0.0284); // Avia
 
 typedef fast_lio::StatesConstPtr StatesConstPtr;
 typedef fast_lio::States States;
