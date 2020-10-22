@@ -42,6 +42,18 @@ typedef fast_lio::Pose6D Pose6D;
 typedef geometry_msgs::Vector3 Vec3;
 
 template<typename T>
+T rad2deg(T radians)
+{
+  return radians * 180.0 / M_PI;
+}
+
+template<typename T>
+T deg2rad(T degrees)
+{
+  return degrees * M_PI / 180.0;
+}
+
+template<typename T>
 auto set_pose6d(const double t, const Eigen::Matrix<T, 3, 1> &a, const Eigen::Matrix<T, 3, 1> &g, \
                 const Eigen::Matrix<T, 3, 1> &v, const Eigen::Matrix<T, 3, 1> &p, const Eigen::Matrix<T, 3, 3> &R)
 {

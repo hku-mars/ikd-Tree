@@ -484,7 +484,7 @@ void ImuProcess::Process(const MeasureGroup &meas, const StatesConstPtr &state_i
 }
 
 /// *************ROS Node
-/// To notify new data
+/// IMU relative variables
 std::mutex mtx_buffer;
 std::condition_variable sig_buffer;
 pcl::PointCloud<PointType> v_pcl;
