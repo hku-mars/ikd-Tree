@@ -842,7 +842,8 @@ int main(int argc, char** argv)
                     euler_cur = correct_pi(R_global_cur.eulerAngles(1, 0, 2));
 
                     #ifdef DEBUG_PRINT
-                    std::cout<<"***new stat: "<<euler_cur.transpose()*57.3<<" "<<T_global_cur.transpose()<<"dR & dT: "<<deltaR<<" "<<deltaT<<" bias: "<<bias_a.transpose()<<" G: "<<gravity.transpose()<<" average meas_vec: "<<total_residual/laserCloudSelNum<<std::endl;
+                    std::cout<<"***new stat: "<<euler_cur.transpose()*57.3<<" p "<<T_global_cur.transpose()<<" v "<<V_global_cur.transpose()<<" ba "<<bias_a.transpose()<<" G "<<gravity.transpose()<<std::endl;
+                    std::cout<<"dR & dT: "<<deltaR<<" "<<deltaT<<std::endl;
                     #endif
 
                     rematch_en = false;
@@ -901,7 +902,6 @@ int main(int argc, char** argv)
                     if_cube_updated[cubeInd] = true;
                 }
             }
-
             for (int i = 0; i < laserCloudValidNum; i++)
             {
                 int ind = laserCloudValidInd[i];

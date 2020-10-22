@@ -216,8 +216,8 @@ Visualization Manager:
         - Alpha: 0.20000000298023224
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 6.966212272644043
-            Min Value: -0.607113778591156
+            Max Value: 7.901107311248779
+            Min Value: -0.5793987512588501
             Value: true
           Axis: Z
           Channel Name: intensity
@@ -258,7 +258,7 @@ Visualization Manager:
           Enabled: false
           Invert Rainbow: false
           Max Color: 255; 0; 0
-          Max Intensity: 163
+          Max Intensity: 152
           Min Color: 255; 0; 0
           Min Intensity: 0
           Name: PointCloud2
@@ -607,7 +607,7 @@ Visualization Manager:
         Shaft Length: 0.10000000149011612
         Shaft Radius: 0.10000000149011612
         Value: Arrow
-      Topic: /mavros/odometry/in
+      Topic: /aft_mapped_to_init
       Unreliable: false
       Value: true
     - Class: rviz/Marker
@@ -656,25 +656,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 29.26703643798828
+      Distance: 27.685314178466797
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 1.69582200050354
-        Y: -1.3535796403884888
-        Z: 1.3586957454681396
+        X: 9.381099700927734
+        Y: -5.700046539306641
+        Z: 3.676637887954712
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.22479718923568726
+      Pitch: -0.155203178524971
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 2.782499313354492
+      Yaw: 2.3224973678588867
     Saved: ~
 Window Geometry:
   Displays:

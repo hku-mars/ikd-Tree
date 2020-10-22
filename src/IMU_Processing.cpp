@@ -9,20 +9,17 @@
 #include "Exp_mat.h"
 #include <Eigen/Eigen>
 #include <common_lib.h>
-#include <eigen_conversions/eigen_msg.h>
-#include <condition_variable>
-
-// #include <opencv2/opencv.hpp>
-#include <nav_msgs/Odometry.h>
-#include <tf/transform_broadcaster.h>
-
 #include <pcl/common/io.h>
+
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
+#include <condition_variable>
+#include <nav_msgs/Odometry.h>
 #include <pcl/common/transforms.h>
 #include <pcl/kdtree/kdtree_flann.h>
+#include <tf/transform_broadcaster.h>
+#include <eigen_conversions/eigen_msg.h>
 #include <pcl_conversions/pcl_conversions.h>
-
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <fast_lio/States.h>
@@ -36,8 +33,7 @@
 inline double rad2deg(double radians) { return radians * 180.0 / M_PI; }
 inline double deg2rad(double degrees) { return degrees * M_PI / 180.0; }
 
-pcl::PointCloud<pcl::PointXYZINormal>::Ptr laserCloudtmp(
-    new pcl::PointCloud<pcl::PointXYZINormal>());
+
 
 typedef pcl::PointXYZINormal PointType;
 typedef pcl::PointCloud<PointType> PointCloudXYZI;
@@ -304,10 +300,10 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const StatesConstPtr &st
     Eigen::Matrix3d cov_acc_diag(Eye3d), cov_gyr_diag(Eye3d);
     cov_acc_diag.diagonal() = cov_acc;
     cov_gyr_diag.diagonal() = cov_gyr;
-    cov_w.block<3,3>(0,0).diagonal()   = cov_gyr * dt * dt * 10000;
-    cov_w.block<3,3>(3,3)              = R_imu * cov_gyr_diag * R_imu.transpose() * dt * dt * 10000;
-    cov_w.block<3,3>(6,6)              = R_imu * cov_acc_diag * R_imu.transpose() * dt * dt * 10000;
-    cov_w.block<3,3>(9,9).diagonal()   = Eigen::Vector3d(0.01, 0.01, 0.01) * dt * dt; // bias gyro covariance
+    cov_w.block<3,3>(0,0).diagonal()   = cov_gyr * dt * dt * 100;
+    cov_w.block<3,3>(3,3)              = R_imu * cov_gyr_diag * R_imu.transpose() * dt * dt * 100;
+    cov_w.block<3,3>(6,6)              = R_imu * cov_acc_diag * R_imu.transpose() * dt * dt * 100;
+    cov_w.block<3,3>(9,9).diagonal()   = Eigen::Vector3d(0.001, 0.001, 0.001) * dt * dt; // bias gyro covariance
     cov_w.block<3,3>(12,12).diagonal() = Eigen::Vector3d(0.001, 0.001, 0.001) * dt * dt; // bias acc covariance
 
     cov_state_last = F_x * cov_state_last * F_x.transpose() + cov_w;
@@ -341,7 +337,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const StatesConstPtr &st
   Eigen::Vector3d pos_liD_e = pos_imu_e + R_imu_e * Lidar_offset_to_IMU;
 
   #ifdef DEBUG_PRINT
-    std::cout<<"[ IMU Process ]: states: "<<vel_imu_e.transpose()<<" "<<pos_imu_e.transpose()<<std::endl;
+    std::cout<<"[ IMU Process ]: vel "<<vel_imu_e.transpose()<<" pos "<<pos_imu_e.transpose()<<" ba "<<bias_acc.transpose()<<std::endl;
   #endif
 
   states_pre.gravity  = STD_VEC_FROM_EIGEN(Gravity_acc);
@@ -392,9 +388,6 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, const StatesConstPtr &st
 
   static ros::Publisher pub_States =
         nh.advertise<fast_lio::States>("/States_propogated", 100);
-  #ifdef DEBUG_PRINT
-  // std::cout<<"[ IMU Process ]: Publishe Prediction "<<states_pre.header<<std::endl;
-  #endif
   pub_States.publish(states_pre);
 }
 
@@ -441,6 +434,7 @@ void ImuProcess::Process(const MeasureGroup &meas, const StatesConstPtr &state_i
     static ros::Publisher pub_UndistortPcl =
         nh.advertise<sensor_msgs::PointCloud2>("/livox_first_point", 100);
     sensor_msgs::PointCloud2 pcl_out_msg;
+    pcl::PointCloud<PointType>::Ptr laserCloudtmp(new pcl::PointCloud<PointType>());
     pcl::toROSMsg(*laserCloudtmp, pcl_out_msg);
     pcl_out_msg.header = pcl_in_msg->header;
     pcl_out_msg.header.frame_id = "/livox";
@@ -502,8 +496,6 @@ bool b_first = true;
 double lidar_end_time = 0.0;
 double last_timestamp_lidar = -1;
 double last_timestamp_imu   = -1;
-double last_timestamp_odo   = -1;
-double last_timestamp_pose  = -1;
 
 std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer;
 std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer;
@@ -563,7 +555,6 @@ void pose_cbk(const StatesConstPtr& States)
 {
     b_first = false;
     pose_buffer.push_back(States);
-    last_timestamp_pose = pose_buffer.front()->header.stamp.toSec();
 }
 
 bool SyncMeasure(MeasureGroup &measgroup, StatesConstPtr& state_in) 
