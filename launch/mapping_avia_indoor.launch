@@ -2,7 +2,7 @@
 
   <arg name="rviz" default="true" />
 
-  <node pkg="fast_lio" type="imu_process" name="imu_process" output="screen"/>
+  <!-- <node pkg="fast_lio" type="imu_process" name="imu_process" output="screen"/> -->
 
   <param name="lidar_type" type="int" value="1"/>
 	<param name="blind" type="double" value="0.5"/>

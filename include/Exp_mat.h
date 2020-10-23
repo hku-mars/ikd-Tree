@@ -4,10 +4,12 @@
 #include <math.h>
 #include <Eigen/Core>
 #include <opencv/cv.h>
-#include <common_lib.h>
+// #include <common_lib.h>
+
+#define SKEW_SYM_MATRX(v) 0.0,-v[2],v[1],v[2],0.0,-v[0],-v[1],v[0],0.0
 
 template<typename T>
-auto Exp(const Eigen::Matrix<T, 3, 1> &ang)
+Eigen::Matrix<T, 3, 3> Exp(const Eigen::Matrix<T, 3, 1> &&ang)
 {
     T ang_norm = ang.norm();
     Eigen::Matrix<T, 3, 3> Eye3 = Eigen::Matrix<T, 3, 3>::Identity();
@@ -17,7 +19,7 @@ auto Exp(const Eigen::Matrix<T, 3, 1> &ang)
         Eigen::Matrix<T, 3, 3> K;
         K << SKEW_SYM_MATRX(r_axis);
         /// Roderigous Tranformation
-        return Eigen::Matrix<T, 3, 3>(Eye3 + std::sin(ang_norm) * K + (1.0 - std::cos(ang_norm)) * K * K);
+        return Eye3 + std::sin(ang_norm) * K + (1.0 - std::cos(ang_norm)) * K * K;
     }
     else
     {
@@ -26,7 +28,7 @@ auto Exp(const Eigen::Matrix<T, 3, 1> &ang)
 }
 
 template<typename T, typename Ts>
-auto Exp(const Eigen::Matrix<T, 3, 1> &ang_vel, const Ts &dt)
+Eigen::Matrix<T, 3, 3> Exp(const Eigen::Matrix<T, 3, 1> &ang_vel, const Ts &dt)
 {
     T ang_vel_norm = ang_vel.norm();
     Eigen::Matrix<T, 3, 3> Eye3 = Eigen::Matrix<T, 3, 3>::Identity();
@@ -41,7 +43,7 @@ auto Exp(const Eigen::Matrix<T, 3, 1> &ang_vel, const Ts &dt)
         T r_ang = ang_vel_norm * dt;
 
         /// Roderigous Tranformation
-        return Eigen::Matrix<T, 3, 3>(Eye3 + std::sin(r_ang) * K + (1.0 - std::cos(r_ang)) * K * K);
+        return Eye3 + std::sin(r_ang) * K + (1.0 - std::cos(r_ang)) * K * K;
     }
     else
     {

@@ -72,8 +72,8 @@ catkin_package(
   INCLUDE_DIRS
 )
 
-add_executable(imu_process src/IMU_Processing.cpp)
-target_link_libraries(imu_process ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+# add_executable(imu_process src/IMU_Processing.cpp)
+# target_link_libraries(imu_process ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable(loam_feat_extract src/feature_extract.cpp)
 target_link_libraries(loam_feat_extract ${catkin_LIBRARIES} ${PCL_LIBRARIES})
