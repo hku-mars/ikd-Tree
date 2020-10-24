@@ -89,8 +89,6 @@ const int laserCloudHeight = 11;
 const int laserCloudDepth  = 21;
 const int laserCloudNum = laserCloudWidth * laserCloudHeight * laserCloudDepth;//4851
 
-float timeLaserCloudSurfLast   = 0;
-
 /// IMU relative variables
 std::mutex mtx_buffer;
 std::condition_variable sig_buffer;
@@ -107,7 +105,6 @@ double last_timestamp_imu   = -1;
 
 std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer;
 std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer;
-std::deque<sensor_msgs::PointCloud2> LaserCloudSurfaceBuff;
 
 //surf feature in map
 PointCloudXYZI::Ptr featsFromMap(new PointCloudXYZI());
@@ -199,6 +196,7 @@ void lasermap_fov_segment()
     pointOnYAxis.y = 0.0;
     pointOnYAxis.z = 0.0;
     pointBodyToWorld(&pointOnYAxis, &pointOnYAxis);
+    std::cout<<"special point:"<<pointOnYAxis.x<<" "<<pointOnYAxis.y<<" "<<pointOnYAxis.z<<" "<<std::endl;
 
     int centerCubeI = int((state.pos_end(0) + 0.5 * cube_len) / cube_len) + laserCloudCenWidth;
     int centerCubeJ = int((state.pos_end(1) + 0.5 * cube_len) / cube_len) + laserCloudCenHeight;
@@ -394,7 +392,7 @@ void lasermap_fov_segment()
                             }
                         }
                     }
-
+                    
                     if(!isInLaserFOV)
                     {
                         float cornerX = centerX;
@@ -422,6 +420,8 @@ void lasermap_fov_segment()
                         
                         if(ang_cos > 0.5) isInLaserFOV = true;
                     }
+
+                    std::cout<<"cent point: "<<centerX<<" "<<centerY<<" "<<centerZ<<" infov? "<<isInLaserFOV<<std::endl;
                     
                     if (isInLaserFOV)
                     {
@@ -451,7 +451,6 @@ void feat_points_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg)
 {
     mtx_buffer.lock();
     std::cout<<"got feature"<<std::endl;
-
     if (msg->header.stamp.toSec() < last_timestamp_lidar)
     {
         ROS_ERROR("lidar loop back, clear buffer");
@@ -509,8 +508,14 @@ bool sync_packages(MeasureGroup &meas)
         lidar_pushed = true;
     }
 
+    if ((imu_buffer.back()->header.stamp.toSec() - lidar_end_time) < -0.003)
+    {
+        return false;
+    }
+
     /*** push imu data, and pop from buffer ***/
     double imu_time;
+    meas.imu.clear();
     while ((!imu_buffer.empty()) && (imu_time < lidar_end_time))
     {
         imu_time = imu_buffer.front()->header.stamp.toSec();
@@ -518,16 +523,10 @@ bool sync_packages(MeasureGroup &meas)
         imu_buffer.pop_front();
     }
 
-    // std::cout<<"3333"<<std::endl;
-
-    if ((imu_time - lidar_end_time) > -0.003)
-    {
-        lidar_buffer.pop_front();
-        lidar_pushed = false;
-        std::cout<<"[IMU Sycned]: "<<imu_time<<" "<<lidar_end_time<<std::endl;
-        return true;
-    }
-    return false;
+    lidar_buffer.pop_front();
+    lidar_pushed = false;
+    std::cout<<"[IMU Sycned]: "<<imu_time<<" "<<lidar_end_time<<std::endl;
+    return true;
 }
 
 int main(int argc, char** argv)
@@ -618,15 +617,23 @@ int main(int argc, char** argv)
                 continue;
             }
 
-            std::cout<<"start preint 0000"<<std::endl;
+            double t1,t2,t3,t4,match_start, match_time, solve_start, solve_time, pca_time, svd_time;
+            match_time = 0;
+            solve_time = 0;
+            pca_time   = 0;
+            svd_time   = 0;
+            t1 = omp_get_wtime();
 
             p_imu->Process(Measures, state, feats_undistort);
 
-            if (feats_undistort->empty() || (feats_undistort == NULL)) {std::cout<<"not ready for odometry"<<std::endl;continue;}
+            if (feats_undistort->empty() || (feats_undistort == NULL))
+            {
+                first_lidar_time = last_timestamp_lidar;
+                std::cout<<"not ready for odometry"<<std::endl;
+                continue;
+            }
 
-            if (b_first) first_lidar_time = LaserCloudSurfaceBuff.front().header.stamp.toSec();
-
-            if ((timeLaserCloudSurfLast - first_lidar_time) < INIT_TIME)
+            if ((last_timestamp_lidar - first_lidar_time) < INIT_TIME)
             {
                 Need_Init = true;
                 std::cout<<"||||||||||Initiallizing LiDar||||||||||"<<std::endl;
@@ -635,18 +642,12 @@ int main(int argc, char** argv)
             {
                 Need_Init = false;
             }
-
-            double t1,t2,t3,t4,match_start, match_time, solve_start, solve_time, pca_time, svd_time;
-            match_time = 0;
-            solve_time = 0;
-            pca_time   = 0;
-            svd_time   = 0;
-            t1 = omp_get_wtime();
             
             /*** Compute the euler angle ***/
             Eigen::Vector3d euler_cur = correct_pi(state.rot_end.eulerAngles(1, 0, 2));
             #ifdef DEBUG_PRINT
-            fout_pre << std::setw(10) << timeLaserCloudSurfLast << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() << std::endl;
+            fout_pre << std::setw(10) << last_timestamp_lidar << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() << std::endl;
+            std::cout<<"current lidar time "<<last_timestamp_lidar<<" "<<"first lidar time "<<first_lidar_time<<std::endl;
             std::cout<<"pre-integrated states: "<<euler_cur.transpose()*57.3<<" "<<state.pos_end.transpose()<<" "<<state.vel_end.transpose()<<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<std::endl;
             #endif
             
@@ -654,17 +655,15 @@ int main(int argc, char** argv)
             lasermap_fov_segment();
             
             /*** downsample the features and maps ***/
-            feats_undistort->clear();
-            feats_down->clear();
-
+            std::cout<<"leaf size params "<<filter_size_surf_min<<" actual size "<<downSizeFilterSurf.getLeafSize()<<std::endl;
             downSizeFilterSurf.setInputCloud(feats_undistort);
-            downSizeFilterMap.setInputCloud(featsFromMap);
             downSizeFilterSurf.filter(*feats_down);
+            downSizeFilterMap.setInputCloud(featsFromMap);
             downSizeFilterMap.filter(*featsFromMap);
 
             int featsFromMapNum = featsFromMap->points.size();
             int feats_down_size = feats_down->points.size();
-            std::cout<<"[ mapping ]: Raw feature num: "<<feats_undistort->points.size()<<" Map num: "<<featsFromMapNum<<std::endl;
+            std::cout<<"[ mapping ]: Raw feature num: "<<feats_undistort->points.size()<<" downsamp num "<<feats_down_size<<" Map num: "<<featsFromMapNum<<" laserCloudValidNum "<<laserCloudValidNum<<std::endl;
 
             /*** ICP and iterated Kalman filter update ***/
             PointCloudXYZI::Ptr coeffSel_tmpt (new PointCloudXYZI(*feats_down));
@@ -953,14 +952,14 @@ int main(int argc, char** argv)
 
             sensor_msgs::PointCloud2 laserCloudFullRes3;
             pcl::toROSMsg(*laserCloudFullResColor, laserCloudFullRes3);
-            laserCloudFullRes3.header.stamp = ros::Time().fromSec(timeLaserCloudSurfLast);
+            laserCloudFullRes3.header.stamp = ros::Time().fromSec(last_timestamp_lidar);
             laserCloudFullRes3.header.frame_id = "/camera_init";
             pubLaserCloudFullRes.publish(laserCloudFullRes3);
 
             /******* Publish Maps:  *******/
             sensor_msgs::PointCloud2 laserCloudMap;
             pcl::toROSMsg(*featsFromMap, laserCloudMap);
-            laserCloudMap.header.stamp = ros::Time::now();//ros::Time().fromSec(timeLaserCloudSurfLast);
+            laserCloudMap.header.stamp = ros::Time::now();//ros::Time().fromSec(last_timestamp_lidar);
             laserCloudMap.header.frame_id = "/camera_init";
             pubLaserCloudMap.publish(laserCloudMap);
 
@@ -969,7 +968,7 @@ int main(int argc, char** argv)
                     (euler_cur(2), - euler_cur(0), - euler_cur(1));
             odomAftMapped.header.frame_id = "/camera_init";
             odomAftMapped.child_frame_id = "/aft_mapped";
-            odomAftMapped.header.stamp = ros::Time::now();//ros::Time().fromSec(timeLaserCloudSurfLast);
+            odomAftMapped.header.stamp = ros::Time::now();//ros::Time().fromSec(last_timestamp_lidar);
             odomAftMapped.pose.pose.orientation.x = -geoQuat.y;
             odomAftMapped.pose.pose.orientation.y = -geoQuat.z;
             odomAftMapped.pose.pose.orientation.z = geoQuat.x;
@@ -1011,13 +1010,13 @@ int main(int argc, char** argv)
             frame_num ++;
             aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t3 - t1) / frame_num;
             // aver_time_consu = aver_time_consu * 0.5 + (t4 - t1) * 0.5;
-            T1.push_back(timeLaserCloudSurfLast);
+            T1.push_back(last_timestamp_lidar);
             s_plot.push_back(aver_time_consu);
             s_plot2.push_back(double(deltaR));
             s_plot3.push_back(double(deltaT));
 
             std::cout<<"[ mapping ]: time: selection "<<t2-t1 <<" match "<<match_time<<" solve: "<<solve_time<<" total: "<<t3 - t1<<std::endl;
-            fout_out << std::setw(10) << timeLaserCloudSurfLast << " " << t3-t1 << " " << effect_feat_num << std::endl;
+            fout_out << std::setw(10) << last_timestamp_lidar << " " << t3-t1 << " " << effect_feat_num << std::endl;
         }
         status = ros::ok();
         rate.sleep();
