@@ -327,8 +327,6 @@ void ImuProcess::Process(const MeasureGroup &meas, StatesGroup &stat, PointCloud
   if(meas.imu.empty()) {std::cout<<"no imu data"<<std::endl;return;};
   ROS_ASSERT(meas.lidar != nullptr);
 
-  auto pcl_in_msg = meas.lidar;
-
   if (imu_need_init_)
   {
     /// The very first lidar frame
@@ -355,19 +353,18 @@ void ImuProcess::Process(const MeasureGroup &meas, StatesGroup &stat, PointCloud
 
   t2 = omp_get_wtime();
 
-  {
-    static ros::Publisher pub_UndistortPcl =
-        nh.advertise<sensor_msgs::PointCloud2>("/livox_undistort", 100);
-    sensor_msgs::PointCloud2 pcl_out_msg;
-    pcl::toROSMsg(*cur_pcl_un_, pcl_out_msg);
-    pcl_out_msg.header.stamp = ros::Time().fromSec(meas.lidar_beg_time);
-    pcl_out_msg.header.frame_id = "/livox";
-    pub_UndistortPcl.publish(pcl_out_msg);
-  }
+  // {
+  //   static ros::Publisher pub_UndistortPcl =
+  //       nh.advertise<sensor_msgs::PointCloud2>("/livox_undistort", 100);
+  //   sensor_msgs::PointCloud2 pcl_out_msg;
+  //   pcl::toROSMsg(*cur_pcl_un_, pcl_out_msg);
+  //   pcl_out_msg.header.stamp = ros::Time().fromSec(meas.lidar_beg_time);
+  //   pcl_out_msg.header.frame_id = "/livox";
+  //   pub_UndistortPcl.publish(pcl_out_msg);
+  // }
 
   /// Record last measurements
   last_imu_   = meas.imu.back();
-  cur_pcl_un_.reset(new PointCloudXYZI());
 
   t3 = omp_get_wtime();
   

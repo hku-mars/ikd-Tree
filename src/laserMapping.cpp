@@ -70,7 +70,7 @@ namespace plt = matplotlibcpp;
 #define INIT_TIME           (3.0)
 #define LASER_POINT_COV     (0.0010)
 #define NUM_MATCH_POINTS    (5)
-#define NUM_MAX_ITERATIONS  (15)
+#define NUM_MAX_ITERATIONS  (14)
 #define LASER_FRAME_INTEVAL (0.1)
 
 std::string root_dir = ROOT_DIR;
@@ -388,7 +388,7 @@ void lasermap_fov_segment()
                                 ang_cos = fabs(squaredSide1 <= 3) ? 1.0 :
                                     (LIDAR_SP_LEN * LIDAR_SP_LEN + squaredSide1 - squaredSide2) / (2 * LIDAR_SP_LEN * sqrt(squaredSide1));
                                 
-                                if(ang_cos > 0.7) isInLaserFOV = true;
+                                if(ang_cos > COS_40_DEG) isInLaserFOV = true;
                             }
                         }
                     }
@@ -418,10 +418,10 @@ void lasermap_fov_segment()
                         ang_cos = fabs(squaredSide2 <= 0.5 * cube_len) ? 1.0 :
                             (LIDAR_SP_LEN * LIDAR_SP_LEN + squaredSide1 - squaredSide2) / (2 * LIDAR_SP_LEN * sqrt(squaredSide1));
                         
-                        if(ang_cos > 0.5) isInLaserFOV = true;
+                        if(ang_cos > COS_40_DEG) isInLaserFOV = true;
                     }
 
-                    std::cout<<"cent point: "<<centerX<<" "<<centerY<<" "<<centerZ<<" infov? "<<isInLaserFOV<<std::endl;
+                    // std::cout<<"cent point: "<<centerX<<" "<<centerY<<" "<<centerZ<<" infov? "<<isInLaserFOV<<std::endl;
                     
                     if (isInLaserFOV)
                     {
@@ -572,8 +572,6 @@ int main(int argc, char** argv)
     PointCloudXYZI::Ptr coeffSel(new PointCloudXYZI());
     pcl::VoxelGrid<PointType> downSizeFilterSurf;
     pcl::VoxelGrid<PointType> downSizeFilterMap;
-    downSizeFilterSurf.setLeafSize(filter_size_surf_min, filter_size_surf_min, filter_size_surf_min);
-    downSizeFilterMap.setLeafSize(filter_size_map_min, filter_size_map_min, filter_size_map_min);
 
     /*** variables initialize ***/
     ros::param::get("~dense_map_enable",dense_map_en);
@@ -586,6 +584,9 @@ int main(int argc, char** argv)
     {
         featsArray[i].reset(new PointCloudXYZI());
     }
+
+    downSizeFilterSurf.setLeafSize(filter_size_surf_min, filter_size_surf_min, filter_size_surf_min);
+    downSizeFilterMap.setLeafSize(filter_size_map_min, filter_size_map_min, filter_size_map_min);
 
     std::shared_ptr<ImuProcess> p_imu(new ImuProcess());
 
@@ -653,6 +654,8 @@ int main(int argc, char** argv)
             
             /*** Segment the map in lidar FOV ***/
             lasermap_fov_segment();
+
+            t2 = omp_get_wtime();
             
             /*** downsample the features and maps ***/
             std::cout<<"leaf size params "<<filter_size_surf_min<<" actual size "<<downSizeFilterSurf.getLeafSize()<<std::endl;
@@ -671,8 +674,8 @@ int main(int argc, char** argv)
 
             if (featsFromMapNum > 100)
             {
+                
                 kdtreeSurfFromMap->setInputCloud(featsFromMap);
-                t2 = omp_get_wtime();
                 std::vector<bool> point_selected_surf(feats_down_size, true);
                 std::vector<std::vector<int>> pointSearchInd_surf(feats_down_size);
                 
@@ -686,8 +689,8 @@ int main(int argc, char** argv)
                     coeffSel->clear();
 
                     /** closest surface search and residual computation **/
-                    omp_set_num_threads(4);
-                    #pragma omp parallel for
+                    // omp_set_num_threads(4);
+                    // #pragma omp parallel for
                     for (int i = 0; i < feats_down_size; i++)
                     {
                         PointType &pointOri_tmpt = feats_down->points[i];
@@ -865,6 +868,9 @@ int main(int argc, char** argv)
                         
                         state += solution;
 
+                        rot_add = solution.block<3,1>(0,0);
+                        t_add   = solution.block<3,1>(3,0);
+
                         deltaR = rot_add.norm() * 57.3;
                         deltaT = t_add.norm() * 100.0;
                     }
@@ -872,13 +878,14 @@ int main(int argc, char** argv)
                     euler_cur = correct_pi(state.rot_end.eulerAngles(1, 0, 2));
 
                     #ifdef DEBUG_PRINT
+                    std::cout<<"solution: "<<solution.transpose()<<std::endl;
                     std::cout<<"***new stat: "<<euler_cur.transpose()*57.3<<" p "<<state.pos_end.transpose()<<" v "<<state.vel_end.transpose()<<" ba "<<state.bias_a.transpose()<<" G "<<state.gravity.transpose()<<std::endl;
                     std::cout<<"dR & dT: "<<deltaR<<" "<<deltaT<<std::endl;
                     #endif
 
                     /*** Rematch Judgement ***/
                     rematch_en = false;
-                    if ((deltaR < 0.015 && deltaT < 0.015))
+                    if ((deltaR < 0.07 && deltaT < 0.015))
                     {
                         rematch_en = true;
                         rematch_num ++;
@@ -1015,7 +1022,7 @@ int main(int argc, char** argv)
             s_plot2.push_back(double(deltaR));
             s_plot3.push_back(double(deltaT));
 
-            std::cout<<"[ mapping ]: time: selection "<<t2-t1 <<" match "<<match_time<<" solve: "<<solve_time<<" total: "<<t3 - t1<<std::endl;
+            std::cout<<"[ mapping ]: time: selection "<<t2-t1 <<" match "<<match_time<<" pca "<<pca_time<<" solve "<<solve_time<<" total "<<t3 - t1<<std::endl;
             fout_out << std::setw(10) << last_timestamp_lidar << " " << t3-t1 << " " << effect_feat_num << std::endl;
         }
         status = ros::ok();

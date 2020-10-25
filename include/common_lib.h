@@ -13,16 +13,16 @@
 #include <eigen_conversions/eigen_msg.h>
 
 
-#define DEBUG_PRINT
+// #define DEBUG_PRINT
 
 #define PI_M (3.14159265358)
+#define COS_40_DEG (0.766)
 #define G_m_s2 (9.8099)         // Gravaty const in GuangDong/China
 #define DIM_OF_STATES (18)      // Dimension of states (Let Dim(SO(3)) = 3)
 #define DIM_OF_PROC_N (12)      // Dimension of process noise (Let Dim(SO(3)) = 3)
 #define CUBE_LEN  (6.0)
 #define LIDAR_SP_LEN    (2)
 #define INIT_COV  (0.0001)
-
 #define DIM_OF_STATES_SQUARE (18*18)
 
 #define MAT_FROM_ARRAY(v) v[0],v[1],v[2],v[3],v[4],v[5],v[6],v[7],v[8]
