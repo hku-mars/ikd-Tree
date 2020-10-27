@@ -68,9 +68,9 @@ namespace plt = matplotlibcpp;
 #endif
 
 #define INIT_TIME           (3.0)
-#define LASER_POINT_COV     (0.0010)
+#define LASER_POINT_COV     (0.001)
 #define NUM_MATCH_POINTS    (5)
-#define NUM_MAX_ITERATIONS  (14)
+#define NUM_MAX_ITERATIONS  (10)
 #define LASER_FRAME_INTEVAL (0.1)
 
 std::string root_dir = ROOT_DIR;
@@ -196,7 +196,7 @@ void lasermap_fov_segment()
     pointOnYAxis.y = 0.0;
     pointOnYAxis.z = 0.0;
     pointBodyToWorld(&pointOnYAxis, &pointOnYAxis);
-    std::cout<<"special point:"<<pointOnYAxis.x<<" "<<pointOnYAxis.y<<" "<<pointOnYAxis.z<<" "<<std::endl;
+    // std::cout<<"special point:"<<pointOnYAxis.x<<" "<<pointOnYAxis.y<<" "<<pointOnYAxis.z<<" "<<std::endl;
 
     int centerCubeI = int((state.pos_end(0) + 0.5 * cube_len) / cube_len) + laserCloudCenWidth;
     int centerCubeJ = int((state.pos_end(1) + 0.5 * cube_len) / cube_len) + laserCloudCenHeight;
@@ -450,14 +450,14 @@ void lasermap_fov_segment()
 void feat_points_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg) 
 {
     mtx_buffer.lock();
-    std::cout<<"got feature"<<std::endl;
+    // std::cout<<"got feature"<<std::endl;
     if (msg->header.stamp.toSec() < last_timestamp_lidar)
     {
         ROS_ERROR("lidar loop back, clear buffer");
         lidar_buffer.clear();
     }
 
-    ROS_INFO("get point cloud at time: %.6f", msg->header.stamp.toSec());
+    // ROS_INFO("get point cloud at time: %.6f", msg->header.stamp.toSec());
     lidar_buffer.push_back(msg);
     last_timestamp_lidar = msg->header.stamp.toSec();
 
@@ -525,7 +525,7 @@ bool sync_packages(MeasureGroup &meas)
 
     lidar_buffer.pop_front();
     lidar_pushed = false;
-    std::cout<<"[IMU Sycned]: "<<imu_time<<" "<<lidar_end_time<<std::endl;
+    // std::cout<<"[IMU Sycned]: "<<imu_time<<" "<<lidar_end_time<<std::endl;
     return true;
 }
 
@@ -602,7 +602,7 @@ int main(int argc, char** argv)
 
 //------------------------------------------------------------------------------------------------------
     signal(SIGINT, SigHandle);
-    ros::Rate rate(500);
+    ros::Rate rate(5000);
     bool status = ros::ok();
     while (status)
     {
@@ -658,7 +658,6 @@ int main(int argc, char** argv)
             t2 = omp_get_wtime();
             
             /*** downsample the features and maps ***/
-            std::cout<<"leaf size params "<<filter_size_surf_min<<" actual size "<<downSizeFilterSurf.getLeafSize()<<std::endl;
             downSizeFilterSurf.setInputCloud(feats_undistort);
             downSizeFilterSurf.filter(*feats_down);
             downSizeFilterMap.setInputCloud(featsFromMap);
@@ -689,8 +688,8 @@ int main(int argc, char** argv)
                     coeffSel->clear();
 
                     /** closest surface search and residual computation **/
-                    // omp_set_num_threads(4);
-                    // #pragma omp parallel for
+                    omp_set_num_threads(4);
+                    #pragma omp parallel for
                     for (int i = 0; i < feats_down_size; i++)
                     {
                         PointType &pointOri_tmpt = feats_down->points[i];
@@ -938,7 +937,6 @@ int main(int argc, char** argv)
                     downSizeFilterSurf.setInputCloud(featsArray[ind]);
                     downSizeFilterSurf.filter(*featsArray[ind]);
                 }
-
             }
             t3 = omp_get_wtime();
 
@@ -999,7 +997,7 @@ int main(int argc, char** argv)
             transform.setRotation( q );
             br.sendTransform( tf::StampedTransform( transform, odomAftMapped.header.stamp, "/camera_init", "/aft_mapped" ) );
 
-#ifdef DEPLOY
+            #ifdef DEPLOY
             msg_body_pose.header.stamp = ros::Time::now();
             msg_body_pose.header.frame_id = "/camera_odom_frame";
             msg_body_pose.pose.position.x = state.pos_end(0);
@@ -1010,7 +1008,7 @@ int main(int argc, char** argv)
             msg_body_pose.pose.orientation.z = geoQuat.x;
             msg_body_pose.pose.orientation.w = geoQuat.w;
             mavros_pose_publisher.publish(msg_body_pose);
-#endif
+            #endif
 
             /*** save debug variables ***/
             t4 = omp_get_wtime();
@@ -1019,11 +1017,11 @@ int main(int argc, char** argv)
             // aver_time_consu = aver_time_consu * 0.5 + (t4 - t1) * 0.5;
             T1.push_back(last_timestamp_lidar);
             s_plot.push_back(aver_time_consu);
-            s_plot2.push_back(double(deltaR));
-            s_plot3.push_back(double(deltaT));
+            // s_plot2.push_back(double(deltaR));
+            // s_plot3.push_back(double(deltaT));
 
-            std::cout<<"[ mapping ]: time: selection "<<t2-t1 <<" match "<<match_time<<" pca "<<pca_time<<" solve "<<solve_time<<" total "<<t3 - t1<<std::endl;
-            fout_out << std::setw(10) << last_timestamp_lidar << " " << t3-t1 << " " << effect_feat_num << std::endl;
+            std::cout<<"[ mapping ]: time: selection "<<t2-t1 <<" match "<<match_time<<" pca "<<pca_time<<" solve "<<solve_time<<" total "<<t4 - t1<<std::endl;
+            // fout_out << std::setw(10) << last_timestamp_lidar << " " << t3-t1 << " " << effect_feat_num << std::endl;
         }
         status = ros::ok();
         rate.sleep();

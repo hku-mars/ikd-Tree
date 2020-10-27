@@ -42,8 +42,8 @@ Eigen::Matrix3d Eye3d(Eigen::Matrix3d::Identity());
 Eigen::Matrix3f Eye3f(Eigen::Matrix3f::Identity());
 Eigen::Vector3d Zero3d(0, 0, 0);
 Eigen::Vector3f Zero3f(0, 0, 0);
-Eigen::Vector3d Lidar_offset_to_IMU(0.05512, 0.02226, 0.0297); // Horizon
-// Eigen::Vector3d Lidar_offset_to_IMU(0.04165, 0.02326, -0.0284); // Avia
+// Eigen::Vector3d Lidar_offset_to_IMU(0.05512, 0.02226, 0.0297); // Horizon
+Eigen::Vector3d Lidar_offset_to_IMU(0.04165, 0.02326, -0.0284); // Avia
 
 struct MeasureGroup     // Lidar data and imu dates for the curent process
 {
