@@ -240,22 +240,22 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, StatesGroup &state_inout
     Eigen::Matrix3d cov_acc_diag(Eye3d), cov_gyr_diag(Eye3d);
     cov_acc_diag.diagonal() = cov_acc;
     cov_gyr_diag.diagonal() = cov_gyr;
-    cov_w.block<3,3>(0,0).diagonal()   = cov_gyr * dt * dt * 100;
-    cov_w.block<3,3>(3,3)              = R_imu * cov_gyr_diag * R_imu.transpose() * dt * dt * 100;
-    cov_w.block<3,3>(6,6)              = R_imu * cov_acc_diag * R_imu.transpose() * dt * dt * 1000;
-    cov_w.block<3,3>(9,9).diagonal()   = Eigen::Vector3d(0.001, 0.001, 0.001) * dt * dt; // bias gyro covariance
-    cov_w.block<3,3>(12,12).diagonal() = Eigen::Vector3d(0.01, 0.01, 0.01) * dt * dt; // bias acc covariance
+    cov_w.block<3,3>(0,0).diagonal()   = cov_gyr * dt * dt * 10000;
+    cov_w.block<3,3>(3,3)              = R_imu * cov_gyr_diag * R_imu.transpose() * dt * dt * 10000;
+    cov_w.block<3,3>(6,6)              = R_imu * cov_acc_diag * R_imu.transpose() * dt * dt * 10000;
+    cov_w.block<3,3>(9,9).diagonal()   = Eigen::Vector3d(0.01, 0.01, 0.01) * dt * dt; // bias gyro covariance
+    cov_w.block<3,3>(12,12).diagonal() = Eigen::Vector3d(0.0001, 0.0001, 0.0001) * dt * dt; // bias acc covariance
 
     state_inout.cov = F_x * state_inout.cov * F_x.transpose() + cov_w;
 
-    /* propogation of Lidar attitude */
+    /* propogation of IMU attitude */
     R_imu = R_imu * Exp_f;
 
-    /* Specific acceleration (global frame) at the IMU origin point (considering the offset of Lidar to IMU) */
+    /* Specific acceleration (global frame) of IMU */
     acc_imu = R_imu * acc_avr + state_inout.gravity;
     // acc_kp  = acc_imu + R_imu * angvel_avr.cross(angvel_avr.cross(Lidar_offset_to_IMU));
 
-    /* propogation of IMU position */
+    /* propogation of IMU */
     pos_imu = pos_imu + vel_imu * dt + 0.5 * acc_imu * dt * dt;
 
     /* velocity of IMU */
@@ -265,7 +265,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, StatesGroup &state_inout
     angvel_last = angvel_avr;
     acc_s_last  = acc_imu;
     double &&offs_t = tail->header.stamp.toSec() - pcl_beg_time;
-    // std::cout<<"head imu acc pre: "<<acc_imu.transpose()<<std::endl;
+    // std::cout<<"acc "<<acc_imu.transpose()<<"vel "<<acc_imu.transpose()<<"vel "<<pos_imu.transpose()<<std::endl;
     IMUpose.push_back(set_pose6d(offs_t, acc_imu, angvel_avr, vel_imu, pos_imu, R_imu));
   }
 
@@ -278,7 +278,8 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, StatesGroup &state_inout
   auto pos_liD_e = state_inout.pos_end + state_inout.rot_end * Lidar_offset_to_IMU;
 
   #ifdef DEBUG_PRINT
-    std::cout<<"[ IMU Process ]: vel "<<state_inout.vel_end.transpose()<<" pos "<<state_inout.pos_end.transpose()<<" ba "<<state_inout.bias_a.transpose()<<std::endl;
+    std::cout<<"[ IMU Process ]: vel "<<state_inout.vel_end.transpose()<<" pos "<<state_inout.pos_end.transpose()<<" ba"<<state_inout.bias_a.transpose()<<" bg "<<state_inout.bias_g.transpose()<<std::endl;
+    std::cout<<"propagated cov: "<<state_inout.cov.diagonal().transpose()<<std::endl;
   #endif
 
   /*** undistort each lidar point (backward propagation) ***/

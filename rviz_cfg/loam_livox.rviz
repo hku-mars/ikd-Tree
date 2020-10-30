@@ -8,6 +8,7 @@ Panels:
         - /Axes1
         - /odometry1/odomPath1
         - /mapping1
+        - /mapping1/surround1
         - /mapping1/currPoints1
         - /mapping1/PointCloud21
         - /Debug1/PointCloud21
@@ -205,7 +206,7 @@ Visualization Manager:
           Position Transformer: XYZ
           Queue Size: 1
           Selectable: false
-          Size (Pixels): 2
+          Size (Pixels): 4
           Size (m): 0.05000000074505806
           Style: Points
           Topic: /cloud_registered
@@ -216,8 +217,8 @@ Visualization Manager:
         - Alpha: 0.5
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 0.7790262699127197
-            Min Value: -2.771803140640259
+            Max Value: 7.594245910644531
+            Min Value: -0.6588758230209351
             Value: true
           Axis: Z
           Channel Name: intensity
@@ -656,25 +657,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 46.38764953613281
+      Distance: 25.355966567993164
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 4.273827075958252
-        Y: 8.332508087158203
-        Z: -1.4329588413238525
+        X: 5.727165699005127
+        Y: 1.1731948852539062
+        Z: 0.35962751507759094
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
-      Invert Z Axis: true
+      Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.1997966170310974
+      Pitch: 0.12479694932699203
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 1.7324965000152588
+      Yaw: 3.397498369216919
     Saved: ~
 Window Geometry:
   Displays:

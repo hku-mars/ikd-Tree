@@ -16,7 +16,7 @@
 // #define DEBUG_PRINT
 
 #define PI_M (3.14159265358)
-#define COS_40_DEG (0.766)
+#define COS_40_DEG (0.7)
 #define G_m_s2 (9.8099)         // Gravaty const in GuangDong/China
 #define DIM_OF_STATES (18)      // Dimension of states (Let Dim(SO(3)) = 3)
 #define DIM_OF_PROC_N (12)      // Dimension of process noise (Let Dim(SO(3)) = 3)
@@ -91,13 +91,13 @@ struct StatesGroup
 template<typename T>
 T rad2deg(T radians)
 {
-  return radians * 180.0 / M_PI;
+  return radians * 180.0 / PI_M;
 }
 
 template<typename T>
 T deg2rad(T degrees)
 {
-  return degrees * M_PI / 180.0;
+  return degrees * PI_M / 180.0;
 }
 
 template<typename T>
@@ -131,6 +131,28 @@ Eigen::Matrix<T, 3, 1> correct_pi(const Eigen::Matrix<T, 3, 1> &v)
         g[i] = CORRECR_PI(T(v[i]));
     }
     return g;
+}
+
+template<typename T>
+Eigen::Matrix<T, 3, 1> RotMtoEuler(const Eigen::Matrix<T, 3, 3> &rot)
+{
+    T sy = sqrt(rot(0,0)*rot(0,0) + rot(1,0)*rot(1,0));
+    bool singular = sy < 1e-6;
+    T x, y, z;
+    if(!singular)
+    {
+        x = atan2(rot(2, 1), rot(2, 2));
+        y = atan2(-rot(2, 0), sy);   
+        z = atan2(rot(1, 0), rot(0, 0));  
+    }
+    else
+    {    
+        x = atan2(-rot(1, 2), rot(1, 1));    
+        y = atan2(-rot(2, 0), sy);    
+        z = 0;
+    }
+    Eigen::Matrix<T, 3, 1> ang(x, y, z);
+    return ang;
 }
 
 #endif

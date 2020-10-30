@@ -56,7 +56,7 @@ Eigen::Matrix<T, 3, 3> Exp(const T &v1, const T &v2, const T &v3)
 {
     T &&norm = sqrt(v1 * v1 + v2 * v2 + v3 * v3);
     Eigen::Matrix<T, 3, 3> Eye3 = Eigen::Matrix<T, 3, 3>::Identity();
-    if (norm > 0.001)
+    if (norm > 0.00001)
     {
         T r_ang[3] = {v1 / norm, v2 / norm, v3 / norm};
         Eigen::Matrix<T, 3, 3> K;

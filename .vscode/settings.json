@@ -71,7 +71,8 @@
         "typeindex": "cpp",
         "typeinfo": "cpp",
         "core": "cpp",
-        "eigen": "cpp"
+        "eigen": "cpp",
+        "bit": "cpp"
     },
     "python.analysis.extraPaths": [
         "/home/xw/catkin_loam/devel/lib/python2.7/dist-packages",

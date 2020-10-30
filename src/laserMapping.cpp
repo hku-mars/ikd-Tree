@@ -67,8 +67,8 @@
 namespace plt = matplotlibcpp;
 #endif
 
-#define INIT_TIME           (3.0)
-#define LASER_POINT_COV     (0.001)
+#define INIT_TIME           (1.0)
+#define LASER_POINT_COV     (0.005)
 #define NUM_MATCH_POINTS    (5)
 #define NUM_MAX_ITERATIONS  (10)
 #define LASER_FRAME_INTEVAL (0.1)
@@ -76,11 +76,11 @@ namespace plt = matplotlibcpp;
 std::string root_dir = ROOT_DIR;
 
 int iterCount = 0;
-int laserCloudCenWidth  = 10;
-int laserCloudCenHeight = 5;
-int laserCloudCenDepth  = 10;
-int laserCloudValidInd[125];
-int laserCloudSurroundInd[125];
+int laserCloudCenWidth  = 14;
+int laserCloudCenHeight = 7;
+int laserCloudCenDepth  = 14;
+int laserCloudValidInd[250];
+int laserCloudSurroundInd[250];
 int laserCloudValidNum    = 0;
 int laserCloudSurroundNum = 0;
 
@@ -470,8 +470,6 @@ void imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in)
     sensor_msgs::Imu::Ptr msg(new sensor_msgs::Imu(*msg_in));
 
     double timestamp = msg->header.stamp.toSec();
-    
-    // ROS_DEBUG("get imu at time: %.6f", timestamp);
 
     mtx_buffer.lock();
 
@@ -496,7 +494,6 @@ bool sync_packages(MeasureGroup &meas)
     if (lidar_buffer.empty() || imu_buffer.empty()) {
         return false;
     }
-    // std::cout<<"1111"<<std::endl;
 
     /*** push lidar frame ***/
     if(!lidar_pushed)
@@ -508,13 +505,13 @@ bool sync_packages(MeasureGroup &meas)
         lidar_pushed = true;
     }
 
-    if ((imu_buffer.back()->header.stamp.toSec() - lidar_end_time) < -0.003)
+    if (last_timestamp_imu < lidar_end_time)
     {
         return false;
     }
 
     /*** push imu data, and pop from buffer ***/
-    double imu_time;
+    double imu_time = imu_buffer.front()->header.stamp.toSec();
     meas.imu.clear();
     while ((!imu_buffer.empty()) && (imu_time < lidar_end_time))
     {
@@ -534,8 +531,8 @@ int main(int argc, char** argv)
     ros::init(argc, argv, "laserMapping");
     ros::NodeHandle nh;
 
-    ros::Subscriber sub_pcl = nh.subscribe("/laser_cloud_flat", 100, feat_points_cbk);
-    ros::Subscriber sub_imu = nh.subscribe("/livox/imu", 100, imu_cbk);
+    ros::Subscriber sub_pcl = nh.subscribe("/laser_cloud_flat", 20000, feat_points_cbk);
+    ros::Subscriber sub_imu = nh.subscribe("/livox/imu", 20000, imu_cbk);
     // ros::Subscriber subLaserCloudSurfLast = nh.subscribe<sensor_msgs::PointCloud2>
     //         ("/livox_undistort", 100, featsLastHandler);
     ros::Publisher pubLaserCloudFullRes = nh.advertise<sensor_msgs::PointCloud2>
@@ -593,7 +590,7 @@ int main(int argc, char** argv)
     /*** debug record ***/
     std::ofstream fout_pre, fout_out;
     fout_pre.open(DEBUG_FILE_DIR("mat_pre.txt"),std::ios::out);
-    fout_out.open(DEBUG_FILE_DIR("mat_out_time.txt"),std::ios::out);
+    fout_out.open(DEBUG_FILE_DIR("mat_out.txt"),std::ios::out);
     if (fout_pre && fout_out)
         std::cout << "~~~~"<<ROOT_DIR<<" file opened" << std::endl;
     else
@@ -629,12 +626,12 @@ int main(int argc, char** argv)
 
             if (feats_undistort->empty() || (feats_undistort == NULL))
             {
-                first_lidar_time = last_timestamp_lidar;
+                first_lidar_time = Measures.lidar_beg_time;
                 std::cout<<"not ready for odometry"<<std::endl;
                 continue;
             }
 
-            if ((last_timestamp_lidar - first_lidar_time) < INIT_TIME)
+            if ((Measures.lidar_beg_time - first_lidar_time) < INIT_TIME)
             {
                 Need_Init = true;
                 std::cout<<"||||||||||Initiallizing LiDar||||||||||"<<std::endl;
@@ -645,17 +642,16 @@ int main(int argc, char** argv)
             }
             
             /*** Compute the euler angle ***/
-            Eigen::Vector3d euler_cur = correct_pi(state.rot_end.eulerAngles(1, 0, 2));
+            Eigen::Vector3d euler_cur = RotMtoEuler(state.rot_end);
             #ifdef DEBUG_PRINT
-            fout_pre << std::setw(10) << last_timestamp_lidar << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() << std::endl;
-            std::cout<<"current lidar time "<<last_timestamp_lidar<<" "<<"first lidar time "<<first_lidar_time<<std::endl;
+            fout_pre << std::setw(10) << Measures.lidar_beg_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
+            <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<< std::endl;
+            std::cout<<"current lidar time "<<Measures.lidar_beg_time<<" "<<"first lidar time "<<first_lidar_time<<std::endl;
             std::cout<<"pre-integrated states: "<<euler_cur.transpose()*57.3<<" "<<state.pos_end.transpose()<<" "<<state.vel_end.transpose()<<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<std::endl;
             #endif
             
             /*** Segment the map in lidar FOV ***/
             lasermap_fov_segment();
-
-            t2 = omp_get_wtime();
             
             /*** downsample the features and maps ***/
             downSizeFilterSurf.setInputCloud(feats_undistort);
@@ -673,13 +669,14 @@ int main(int argc, char** argv)
 
             if (featsFromMapNum > 100)
             {
-                
                 kdtreeSurfFromMap->setInputCloud(featsFromMap);
                 std::vector<bool> point_selected_surf(feats_down_size, true);
                 std::vector<std::vector<int>> pointSearchInd_surf(feats_down_size);
                 
                 int  rematch_num = 0;
                 bool rematch_en = 0;
+
+                t2 = omp_get_wtime();
                 
                 for (iterCount = 0; iterCount < NUM_MAX_ITERATIONS; iterCount++) 
                 {
@@ -704,7 +701,7 @@ int main(int argc, char** argv)
                         {
                             /** Find the closest surface/line in the map **/
                             kdtreeSurfFromMap->nearestKSearch(pointSel_tmpt, NUM_MATCH_POINTS, points_near, pointSearchSqDis_surf);
-                            if (pointSearchSqDis_surf[NUM_MATCH_POINTS - 1] < 5.0)
+                            if (pointSearchSqDis_surf[NUM_MATCH_POINTS - 1] < 3.0)
                             {
                                 point_selected_surf[i] = true;
                             }
@@ -797,6 +794,7 @@ int main(int argc, char** argv)
 
                     int laserCloudSelNum = laserCloudOri->points.size();
                     double ave_residual = total_residual / laserCloudSelNum;
+                    // ave_res_last 
 
                     effect_feat_num = coeffSel->size();
                     if(iterCount == 1) std::cout << "[ mapping ]: Effective feature num: "<<effect_feat_num<<std::endl;
@@ -809,8 +807,9 @@ int main(int argc, char** argv)
                     }
                     
                     /*** Computation of Measuremnt Jacobian matrix H and measurents vector ***/
-                    Eigen::MatrixXd H(laserCloudSelNum, DIM_OF_STATES) ;
+                    Eigen::MatrixXd H(laserCloudSelNum, DIM_OF_STATES);
                     Eigen::VectorXd meas_vec(laserCloudSelNum);
+                    H.setZero();
 
                     omp_set_num_threads(4);
                     #pragma omp parallel for
@@ -818,6 +817,7 @@ int main(int argc, char** argv)
                     {
                         const PointType &laser_p  = laserCloudOri->points[i];
                         Eigen::Vector3d point_this(laser_p.x, laser_p.y, laser_p.z);
+                        point_this += Lidar_offset_to_IMU;
                         Eigen::Matrix3d point_crossmat;
                         point_crossmat<<SKEW_SYM_MATRX(point_this);
 
@@ -827,7 +827,6 @@ int main(int argc, char** argv)
 
                         /*** calculate the Measuremnt Jacobian matrix H ***/
                         Eigen::Vector3d A(point_crossmat * state.rot_end.transpose() * norm_vec);
-                        H.row(i) = Eigen::Matrix<double, 1, DIM_OF_STATES>::Zero();
                         H.block<1,6>(i,0) << VEC_FROM_ARRAY(A), norm_p.x, norm_p.y, norm_p.z;
 
                         /*** Measuremnt: distance to the closest surface/corner ***/
@@ -864,6 +863,8 @@ int main(int argc, char** argv)
                         Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 = (H_T * H + (state.cov / LASER_POINT_COV).inverse()).inverse();
                         K = K_1 * H_T;
                         solution = K * meas_vec;
+
+                        // solution.setZero();
                         
                         state += solution;
 
@@ -874,12 +875,12 @@ int main(int argc, char** argv)
                         deltaT = t_add.norm() * 100.0;
                     }
 
-                    euler_cur = correct_pi(state.rot_end.eulerAngles(1, 0, 2));
+                    euler_cur = RotMtoEuler(state.rot_end);
 
                     #ifdef DEBUG_PRINT
-                    std::cout<<"solution: "<<solution.transpose()<<std::endl;
-                    std::cout<<"***new stat: "<<euler_cur.transpose()*57.3<<" p "<<state.pos_end.transpose()<<" v "<<state.vel_end.transpose()<<" ba "<<state.bias_a.transpose()<<" G "<<state.gravity.transpose()<<std::endl;
-                    std::cout<<"dR & dT: "<<deltaR<<" "<<deltaT<<std::endl;
+                    // std::cout<<"solution: "<<solution.transpose()<<std::endl;
+                    std::cout<<"update: R"<<euler_cur.transpose()*57.3<<" p "<<state.pos_end.transpose()<<" v "<<state.vel_end.transpose()<<" bg"<<state.bias_g.transpose()<<" ba"<<state.bias_a.transpose()<<std::endl;
+                    std::cout<<"dR & dT: "<<deltaR<<" "<<deltaT<<" res norm:"<<ave_residual<<std::endl;
                     #endif
 
                     /*** Rematch Judgement ***/
@@ -891,12 +892,13 @@ int main(int argc, char** argv)
                     }
 
                     /*** Convergence Judgements and Covariance Update ***/
-                    if (rematch_num >= 2)
+                    if (rematch_num >= 2 || (iterCount == NUM_MAX_ITERATIONS - 1))
                     {
                         if (!Need_Init)
                         {
                             /*** Covariance Update ***/
                             state.cov = (Eigen::MatrixXd::Identity(DIM_OF_STATES, DIM_OF_STATES) - K * H) * state.cov;
+                            // std::cout<<"propagated cov: "<<state.cov.diagonal().transpose()<<std::endl;
                         }
                         solve_time += omp_get_wtime() - solve_start;
                         break;
@@ -934,8 +936,8 @@ int main(int argc, char** argv)
 
                 if(if_cube_updated[ind])
                 {
-                    downSizeFilterSurf.setInputCloud(featsArray[ind]);
-                    downSizeFilterSurf.filter(*featsArray[ind]);
+                    downSizeFilterMap.setInputCloud(featsArray[ind]);
+                    downSizeFilterMap.filter(*featsArray[ind]);
                 }
             }
             t3 = omp_get_wtime();
@@ -957,7 +959,7 @@ int main(int argc, char** argv)
 
             sensor_msgs::PointCloud2 laserCloudFullRes3;
             pcl::toROSMsg(*laserCloudFullResColor, laserCloudFullRes3);
-            laserCloudFullRes3.header.stamp = ros::Time().fromSec(last_timestamp_lidar);
+            laserCloudFullRes3.header.stamp = ros::Time::now();//.fromSec(last_timestamp_lidar);
             laserCloudFullRes3.header.frame_id = "/camera_init";
             pubLaserCloudFullRes.publish(laserCloudFullRes3);
 
@@ -1015,13 +1017,15 @@ int main(int argc, char** argv)
             frame_num ++;
             aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t3 - t1) / frame_num;
             // aver_time_consu = aver_time_consu * 0.5 + (t4 - t1) * 0.5;
-            T1.push_back(last_timestamp_lidar);
+            T1.push_back(Measures.lidar_beg_time);
             s_plot.push_back(aver_time_consu);
             // s_plot2.push_back(double(deltaR));
             // s_plot3.push_back(double(deltaT));
 
             std::cout<<"[ mapping ]: time: selection "<<t2-t1 <<" match "<<match_time<<" pca "<<pca_time<<" solve "<<solve_time<<" total "<<t4 - t1<<std::endl;
-            // fout_out << std::setw(10) << last_timestamp_lidar << " " << t3-t1 << " " << effect_feat_num << std::endl;
+            fout_out << std::setw(10) << Measures.lidar_beg_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
+            <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<< std::endl;
+            // fout_out << std::setw(10) << Measures.lidar_beg_time << " " << t3-t1 << " " << effect_feat_num << std::endl;
         }
         status = ros::ok();
         rate.sleep();
