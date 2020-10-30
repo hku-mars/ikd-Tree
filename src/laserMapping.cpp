@@ -68,10 +68,9 @@ namespace plt = matplotlibcpp;
 #endif
 
 #define INIT_TIME           (1.0)
-#define LASER_POINT_COV     (0.005)
+#define LASER_POINT_COV     (0.001)
 #define NUM_MATCH_POINTS    (5)
-#define NUM_MAX_ITERATIONS  (10)
-#define LASER_FRAME_INTEVAL (0.1)
+#define NUM_MAX_ITERATIONS  (2)
 
 std::string root_dir = ROOT_DIR;
 
@@ -102,6 +101,7 @@ double cube_len = 0.0;
 double lidar_end_time = 0.0;
 double last_timestamp_lidar = -1;
 double last_timestamp_imu   = -1;
+double HALF_FOV_COS = 0.0;
 
 std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer;
 std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer;
@@ -388,7 +388,7 @@ void lasermap_fov_segment()
                                 ang_cos = fabs(squaredSide1 <= 3) ? 1.0 :
                                     (LIDAR_SP_LEN * LIDAR_SP_LEN + squaredSide1 - squaredSide2) / (2 * LIDAR_SP_LEN * sqrt(squaredSide1));
                                 
-                                if(ang_cos > COS_40_DEG) isInLaserFOV = true;
+                                if(ang_cos > HALF_FOV_COS) isInLaserFOV = true;
                             }
                         }
                     }
@@ -418,7 +418,7 @@ void lasermap_fov_segment()
                         ang_cos = fabs(squaredSide2 <= 0.5 * cube_len) ? 1.0 :
                             (LIDAR_SP_LEN * LIDAR_SP_LEN + squaredSide1 - squaredSide2) / (2 * LIDAR_SP_LEN * sqrt(squaredSide1));
                         
-                        if(ang_cos > COS_40_DEG) isInLaserFOV = true;
+                        if(ang_cos > HALF_FOV_COS) isInLaserFOV = true;
                     }
 
                     // std::cout<<"cent point: "<<centerX<<" "<<centerY<<" "<<centerZ<<" infov? "<<isInLaserFOV<<std::endl;
@@ -553,7 +553,12 @@ int main(int argc, char** argv)
     bool dense_map_en, Need_Init = true;
     std::string map_file_path;
     int effect_feat_num = 0, frame_num = 0;
-    double filter_size_corner_min, filter_size_surf_min, filter_size_map_min, deltaT, deltaR, aver_time_consu = 0, first_lidar_time = 0;
+    double filter_size_corner_min, filter_size_surf_min, filter_size_map_min, fov_deg,\
+           deltaT, deltaR, aver_time_consu = 0, first_lidar_time = 0;
+    Eigen::Matrix<double,DIM_OF_STATES,DIM_OF_STATES> G, H_T_H, I_STATE;
+    G.setZero();
+    H_T_H.setZero();
+    I_STATE.setIdentity();
 
     nav_msgs::Odometry odomAftMapped;
 
@@ -573,10 +578,14 @@ int main(int argc, char** argv)
     /*** variables initialize ***/
     ros::param::get("~dense_map_enable",dense_map_en);
     ros::param::get("~map_file_path",map_file_path);
+    ros::param::get("~fov_degree",fov_deg);
     ros::param::get("~filter_size_corner",filter_size_corner_min);
     ros::param::get("~filter_size_surf",filter_size_surf_min);
     ros::param::get("~filter_size_map",filter_size_map_min);
     ros::param::get("~cube_side_length",cube_len);
+
+    HALF_FOV_COS = std::cos((fov_deg + 10.0) * 0.5 * PI_M / 180.0);
+
     for (int i = 0; i < laserCloudNum; i++)
     {
         featsArray[i].reset(new PointCloudXYZI());
@@ -643,9 +652,9 @@ int main(int argc, char** argv)
             
             /*** Compute the euler angle ***/
             Eigen::Vector3d euler_cur = RotMtoEuler(state.rot_end);
-            #ifdef DEBUG_PRINT
             fout_pre << std::setw(10) << Measures.lidar_beg_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
             <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<< std::endl;
+            #ifdef DEBUG_PRINT
             std::cout<<"current lidar time "<<Measures.lidar_beg_time<<" "<<"first lidar time "<<first_lidar_time<<std::endl;
             std::cout<<"pre-integrated states: "<<euler_cur.transpose()*57.3<<" "<<state.pos_end.transpose()<<" "<<state.vel_end.transpose()<<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<std::endl;
             #endif
@@ -807,9 +816,9 @@ int main(int argc, char** argv)
                     }
                     
                     /*** Computation of Measuremnt Jacobian matrix H and measurents vector ***/
-                    Eigen::MatrixXd H(laserCloudSelNum, DIM_OF_STATES);
+                    Eigen::MatrixXd Hsub(laserCloudSelNum, 6);
                     Eigen::VectorXd meas_vec(laserCloudSelNum);
-                    H.setZero();
+                    Hsub.setZero();
 
                     omp_set_num_threads(4);
                     #pragma omp parallel for
@@ -827,7 +836,7 @@ int main(int argc, char** argv)
 
                         /*** calculate the Measuremnt Jacobian matrix H ***/
                         Eigen::Vector3d A(point_crossmat * state.rot_end.transpose() * norm_vec);
-                        H.block<1,6>(i,0) << VEC_FROM_ARRAY(A), norm_p.x, norm_p.y, norm_p.z;
+                        Hsub.row(i) << VEC_FROM_ARRAY(A), norm_p.x, norm_p.y, norm_p.z;
 
                         /*** Measuremnt: distance to the closest surface/corner ***/
                         meas_vec(i) = - norm_p.intensity;
@@ -835,7 +844,7 @@ int main(int argc, char** argv)
 
                     Eigen::Vector3d rot_add, t_add, v_add, bg_add, ba_add, g_add;
                     Eigen::VectorXd solution(DIM_OF_STATES);
-                    Eigen::MatrixXd K(DIM_OF_STATES, DIM_OF_STATES);
+                    Eigen::MatrixXd K(DIM_OF_STATES, laserCloudSelNum);
                     
                     /*** Iterative Kalman Filter Update ***/
                     if (Need_Init)
@@ -859,13 +868,11 @@ int main(int argc, char** argv)
                     }
                     else
                     {
-                        auto &&H_T = H.transpose();
-                        Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 = (H_T * H + (state.cov / LASER_POINT_COV).inverse()).inverse();
-                        K = K_1 * H_T;
+                        auto &&Hsub_T = Hsub.transpose();
+                        H_T_H.block<6,6>(0,0) = Hsub_T * Hsub;
+                        Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 = (H_T_H + (state.cov / LASER_POINT_COV).inverse()).inverse();
+                        K = K_1.block<DIM_OF_STATES,6>(0,0) * Hsub_T;
                         solution = K * meas_vec;
-
-                        // solution.setZero();
-                        
                         state += solution;
 
                         rot_add = solution.block<3,1>(0,0);
@@ -897,7 +904,8 @@ int main(int argc, char** argv)
                         if (!Need_Init)
                         {
                             /*** Covariance Update ***/
-                            state.cov = (Eigen::MatrixXd::Identity(DIM_OF_STATES, DIM_OF_STATES) - K * H) * state.cov;
+                            G.block<DIM_OF_STATES,6>(0,0) = K * Hsub;
+                            state.cov = (I_STATE - G) * state.cov;
                             // std::cout<<"propagated cov: "<<state.cov.diagonal().transpose()<<std::endl;
                         }
                         solve_time += omp_get_wtime() - solve_start;
@@ -964,11 +972,11 @@ int main(int argc, char** argv)
             pubLaserCloudFullRes.publish(laserCloudFullRes3);
 
             /******* Publish Maps:  *******/
-            sensor_msgs::PointCloud2 laserCloudMap;
-            pcl::toROSMsg(*featsFromMap, laserCloudMap);
-            laserCloudMap.header.stamp = ros::Time::now();//ros::Time().fromSec(last_timestamp_lidar);
-            laserCloudMap.header.frame_id = "/camera_init";
-            pubLaserCloudMap.publish(laserCloudMap);
+            // sensor_msgs::PointCloud2 laserCloudMap;
+            // pcl::toROSMsg(*featsFromMap, laserCloudMap);
+            // laserCloudMap.header.stamp = ros::Time::now();//ros::Time().fromSec(last_timestamp_lidar);
+            // laserCloudMap.header.frame_id = "/camera_init";
+            // pubLaserCloudMap.publish(laserCloudMap);
 
             /******* Publish Odometry ******/
             geometry_msgs::Quaternion geoQuat = tf::createQuaternionMsgFromRollPitchYaw

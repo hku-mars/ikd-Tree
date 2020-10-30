@@ -561,100 +561,100 @@ void give_feature(pcl::PointCloud<PointType> &pl, vector<orgtype> &types, pcl::P
   }
 
   plsize2 = plsize - 3;
-  for(uint i=head+3; i<plsize2; i++)
-  {
-    if(types[i].range<blind || types[i].ftype>=Real_Plane)
-    {
-      continue;
-    }
+  // for(uint i=head+3; i<plsize2; i++)
+  // {
+  //   if(types[i].range<blind || types[i].ftype>=Real_Plane)
+  //   {
+  //     continue;
+  //   }
 
-    if(types[i-1].dista<1e-16 || types[i].dista<1e-16)
-    {
-      continue;
-    }
+  //   if(types[i-1].dista<1e-16 || types[i].dista<1e-16)
+  //   {
+  //     continue;
+  //   }
 
-    Eigen::Vector3d vec_a(pl[i].x, pl[i].y, pl[i].z);
-    Eigen::Vector3d vecs[2];
+  //   Eigen::Vector3d vec_a(pl[i].x, pl[i].y, pl[i].z);
+  //   Eigen::Vector3d vecs[2];
 
-    for(int j=0; j<2; j++)
-    {
-      int m = -1;
-      if(j == 1)
-      {
-        m = 1;
-      }
+  //   for(int j=0; j<2; j++)
+  //   {
+  //     int m = -1;
+  //     if(j == 1)
+  //     {
+  //       m = 1;
+  //     }
 
-      if(types[i+m].range < blind)
-      {
-        if(types[i].range > inf_bound)
-        {
-          types[i].edj[j] = Nr_inf;
-        }
-        else
-        {
-          types[i].edj[j] = Nr_blind;
-        }
-        continue;
-      }
+  //     if(types[i+m].range < blind)
+  //     {
+  //       if(types[i].range > inf_bound)
+  //       {
+  //         types[i].edj[j] = Nr_inf;
+  //       }
+  //       else
+  //       {
+  //         types[i].edj[j] = Nr_blind;
+  //       }
+  //       continue;
+  //     }
 
-      vecs[j] = Eigen::Vector3d(pl[i+m].x, pl[i+m].y, pl[i+m].z);
-      vecs[j] = vecs[j] - vec_a;
+  //     vecs[j] = Eigen::Vector3d(pl[i+m].x, pl[i+m].y, pl[i+m].z);
+  //     vecs[j] = vecs[j] - vec_a;
       
-      types[i].angle[j] = vec_a.dot(vecs[j]) / vec_a.norm() / vecs[j].norm();
-      if(types[i].angle[j] < jump_up_limit)
-      {
-        types[i].edj[j] = Nr_180;
-      }
-      else if(types[i].angle[j] > jump_down_limit)
-      {
-        types[i].edj[j] = Nr_zero;
-      }
-    }
+  //     types[i].angle[j] = vec_a.dot(vecs[j]) / vec_a.norm() / vecs[j].norm();
+  //     if(types[i].angle[j] < jump_up_limit)
+  //     {
+  //       types[i].edj[j] = Nr_180;
+  //     }
+  //     else if(types[i].angle[j] > jump_down_limit)
+  //     {
+  //       types[i].edj[j] = Nr_zero;
+  //     }
+  //   }
 
-    types[i].intersect = vecs[Prev].dot(vecs[Next]) / vecs[Prev].norm() / vecs[Next].norm();
-    if(types[i].edj[Prev]==Nr_nor && types[i].edj[Next]==Nr_zero && types[i].dista>0.0225 && types[i].dista>4*types[i-1].dista)
-    {
-      if(types[i].intersect > cos160)
-      {
-        if(edge_jump_judge(pl, types, i, Prev))
-        {
-          types[i].ftype = Edge_Jump;
-        }
-      }
-    }
-    else if(types[i].edj[Prev]==Nr_zero && types[i].edj[Next]== Nr_nor && types[i-1].dista>0.0225 && types[i-1].dista>4*types[i].dista)
-    {
-      if(types[i].intersect > cos160)
-      {
-        if(edge_jump_judge(pl, types, i, Next))
-        {
-          types[i].ftype = Edge_Jump;
-        }
-      }
-    }
-    else if(types[i].edj[Prev]==Nr_nor && types[i].edj[Next]==Nr_inf)
-    {
-      if(edge_jump_judge(pl, types, i, Prev))
-      {
-        types[i].ftype = Edge_Jump;
-      }
-    }
-    else if(types[i].edj[Prev]==Nr_inf && types[i].edj[Next]==Nr_nor)
-    {
-      if(edge_jump_judge(pl, types, i, Next))
-      {
-        types[i].ftype = Edge_Jump;
-      }
+  //   types[i].intersect = vecs[Prev].dot(vecs[Next]) / vecs[Prev].norm() / vecs[Next].norm();
+  //   if(types[i].edj[Prev]==Nr_nor && types[i].edj[Next]==Nr_zero && types[i].dista>0.0225 && types[i].dista>4*types[i-1].dista)
+  //   {
+  //     if(types[i].intersect > cos160)
+  //     {
+  //       if(edge_jump_judge(pl, types, i, Prev))
+  //       {
+  //         types[i].ftype = Edge_Jump;
+  //       }
+  //     }
+  //   }
+  //   else if(types[i].edj[Prev]==Nr_zero && types[i].edj[Next]== Nr_nor && types[i-1].dista>0.0225 && types[i-1].dista>4*types[i].dista)
+  //   {
+  //     if(types[i].intersect > cos160)
+  //     {
+  //       if(edge_jump_judge(pl, types, i, Next))
+  //       {
+  //         types[i].ftype = Edge_Jump;
+  //       }
+  //     }
+  //   }
+  //   else if(types[i].edj[Prev]==Nr_nor && types[i].edj[Next]==Nr_inf)
+  //   {
+  //     if(edge_jump_judge(pl, types, i, Prev))
+  //     {
+  //       types[i].ftype = Edge_Jump;
+  //     }
+  //   }
+  //   else if(types[i].edj[Prev]==Nr_inf && types[i].edj[Next]==Nr_nor)
+  //   {
+  //     if(edge_jump_judge(pl, types, i, Next))
+  //     {
+  //       types[i].ftype = Edge_Jump;
+  //     }
      
-    }
-    else if(types[i].edj[Prev]>Nr_nor && types[i].edj[Next]>Nr_nor)
-    {
-      if(types[i].ftype == Nor)
-      {
-        types[i].ftype = Wire;
-      }
-    }
-  }
+  //   }
+  //   else if(types[i].edj[Prev]>Nr_nor && types[i].edj[Next]>Nr_nor)
+  //   {
+  //     if(types[i].ftype == Nor)
+  //     {
+  //       types[i].ftype = Wire;
+  //     }
+  //   }
+  // }
 
   plsize2 = plsize-1;
   double ratio;

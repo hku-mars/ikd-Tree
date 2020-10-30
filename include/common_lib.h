@@ -13,7 +13,7 @@
 #include <eigen_conversions/eigen_msg.h>
 
 
-// #define DEBUG_PRINT
+#define DEBUG_PRINT
 
 #define PI_M (3.14159265358)
 #define COS_40_DEG (0.7)
