@@ -13,24 +13,21 @@
 #include <eigen_conversions/eigen_msg.h>
 
 
-#define DEBUG_PRINT
+// #define DEBUG_PRINT
 
 #define PI_M (3.14159265358)
-#define COS_40_DEG (0.7)
 #define G_m_s2 (9.8099)         // Gravaty const in GuangDong/China
 #define DIM_OF_STATES (18)      // Dimension of states (Let Dim(SO(3)) = 3)
 #define DIM_OF_PROC_N (12)      // Dimension of process noise (Let Dim(SO(3)) = 3)
 #define CUBE_LEN  (6.0)
 #define LIDAR_SP_LEN    (2)
 #define INIT_COV  (0.0001)
-#define DIM_OF_STATES_SQUARE (18*18)
 
-#define MAT_FROM_ARRAY(v) v[0],v[1],v[2],v[3],v[4],v[5],v[6],v[7],v[8]
-#define VEC_FROM_ARRAY(v) v[0],v[1],v[2]
-#define CORRECR_PI(v)     ((v > PI_M) ? (v - PI_M) : ((v < -PI_M) ? (v + PI_M) : v))
-#define ARRAY_FROM_EIGEN(mat)  mat.data(), mat.data() + mat.rows() * mat.cols()
+#define VEC_FROM_ARRAY(v)        v[0],v[1],v[2]
+#define MAT_FROM_ARRAY(v)        v[0],v[1],v[2],v[3],v[4],v[5],v[6],v[7],v[8]
+#define CONSTRAIN(v,min,max)     ((v>min)?((v<max)?v:max):min)
+#define ARRAY_FROM_EIGEN(mat)    mat.data(), mat.data() + mat.rows() * mat.cols()
 #define STD_VEC_FROM_EIGEN(mat)  std::vector<decltype(mat)::Scalar> (mat.data(), mat.data() + mat.rows() * mat.cols())
-#define CONSTRAIN(v,min,max) ((v>min)?((v<max)?v:max):min)
 
 #define DEBUG_FILE_DIR(name)  (std::string(std::string(ROOT_DIR) + "Log/"+ name))
 
@@ -116,21 +113,6 @@ auto set_pose6d(const double t, const Eigen::Matrix<T, 3, 1> &a, const Eigen::Ma
     }
     // Eigen::Map<Eigen::Matrix3d>(rot_kp.rot, 3,3) = R;
     return std::move(rot_kp);
-}
-
-
-template<typename T>
-auto correct_pi(const T &v) {return CORRECR_PI(v);}
-
-template<typename T>
-Eigen::Matrix<T, 3, 1> correct_pi(const Eigen::Matrix<T, 3, 1> &v)
-{
-    Eigen::Matrix<T, 3, 1> g;
-    for(int i=0;i<3;i++)
-    {
-        g[i] = CORRECR_PI(T(v[i]));
-    }
-    return g;
 }
 
 template<typename T>

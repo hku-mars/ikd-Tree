@@ -188,11 +188,6 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, StatesGroup &state_inout
   std::cout<<"[ IMU Process ]: Process lidar from "<<pcl_beg_time<<" to "<<pcl_end_time<<", " \
            <<meas.imu.size()<<" imu msgs from "<<imu_beg_time<<" to "<<imu_end_time<<std::endl;
 
-  /*** get last states ***/
-  #ifdef DEBUG_PRINT
-    Eigen::Vector3d euler_cur = correct_pi(state_inout.rot_end.eulerAngles(1, 0, 2));
-  #endif
-
   /*** Initialize IMU pose ***/
   IMUpose.clear();
   // IMUpose.push_back(set_pose6d(0.0, Zero3d, Zero3d, state.vel_end, state.pos_end, state.rot_end));
@@ -243,7 +238,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, StatesGroup &state_inout
     cov_w.block<3,3>(0,0).diagonal()   = cov_gyr * dt * dt * 10000;
     cov_w.block<3,3>(3,3)              = R_imu * cov_gyr_diag * R_imu.transpose() * dt * dt * 10000;
     cov_w.block<3,3>(6,6)              = R_imu * cov_acc_diag * R_imu.transpose() * dt * dt * 10000;
-    cov_w.block<3,3>(9,9).diagonal()   = Eigen::Vector3d(0.01, 0.01, 0.01) * dt * dt; // bias gyro covariance
+    cov_w.block<3,3>(9,9).diagonal()   = Eigen::Vector3d(0.0001, 0.0001, 0.0001) * dt * dt; // bias gyro covariance
     cov_w.block<3,3>(12,12).diagonal() = Eigen::Vector3d(0.0001, 0.0001, 0.0001) * dt * dt; // bias acc covariance
 
     state_inout.cov = F_x * state_inout.cov * F_x.transpose() + cov_w;
@@ -253,7 +248,6 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, StatesGroup &state_inout
 
     /* Specific acceleration (global frame) of IMU */
     acc_imu = R_imu * acc_avr + state_inout.gravity;
-    // acc_kp  = acc_imu + R_imu * angvel_avr.cross(angvel_avr.cross(Lidar_offset_to_IMU));
 
     /* propogation of IMU */
     pos_imu = pos_imu + vel_imu * dt + 0.5 * acc_imu * dt * dt;
@@ -261,7 +255,7 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, StatesGroup &state_inout
     /* velocity of IMU */
     vel_imu = vel_imu + acc_imu * dt;
 
-    /* save the Lidar poses at each IMU measurements */
+    /* save the poses at each IMU measurements */
     angvel_last = angvel_avr;
     acc_s_last  = acc_imu;
     double &&offs_t = tail->header.stamp.toSec() - pcl_beg_time;
@@ -269,13 +263,14 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, StatesGroup &state_inout
     IMUpose.push_back(set_pose6d(offs_t, acc_imu, angvel_avr, vel_imu, pos_imu, R_imu));
   }
 
-  /*** calculated the pos and attitude prediction at the lase lidar point ***/
+  /*** calculated the pos and attitude prediction at the frame-end ***/
   dt = pcl_end_time - imu_end_time;
   state_inout.vel_end = vel_imu + acc_imu * dt;
   state_inout.rot_end = R_imu * Exp(angvel_avr, dt);
   state_inout.pos_end = pos_imu + vel_imu * dt + 0.5 * acc_imu * dt * dt;
 
   auto pos_liD_e = state_inout.pos_end + state_inout.rot_end * Lidar_offset_to_IMU;
+  // auto R_liD_e   = state_inout.rot_end * Lidar_R_to_IMU;
 
   #ifdef DEBUG_PRINT
     std::cout<<"[ IMU Process ]: vel "<<state_inout.vel_end.transpose()<<" pos "<<state_inout.pos_end.transpose()<<" ba"<<state_inout.bias_a.transpose()<<" bg "<<state_inout.bias_g.transpose()<<std::endl;

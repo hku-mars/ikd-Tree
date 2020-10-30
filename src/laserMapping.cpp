@@ -70,11 +70,11 @@ namespace plt = matplotlibcpp;
 #define INIT_TIME           (1.0)
 #define LASER_POINT_COV     (0.001)
 #define NUM_MATCH_POINTS    (5)
-#define NUM_MAX_ITERATIONS  (2)
 
 std::string root_dir = ROOT_DIR;
 
 int iterCount = 0;
+int NUM_MAX_ITERATIONS  = 0;
 int laserCloudCenWidth  = 14;
 int laserCloudCenHeight = 7;
 int laserCloudCenDepth  = 14;
@@ -577,6 +577,7 @@ int main(int argc, char** argv)
 
     /*** variables initialize ***/
     ros::param::get("~dense_map_enable",dense_map_en);
+    ros::param::get("~max_iteration",NUM_MAX_ITERATIONS);
     ros::param::get("~map_file_path",map_file_path);
     ros::param::get("~fov_degree",fov_deg);
     ros::param::get("~filter_size_corner",filter_size_corner_min);
