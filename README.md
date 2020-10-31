@@ -1,17 +1,15 @@
 ## FAST-LIO
-**FAST-LIO** (Fast LiDAR-Inertial Odometry) is a computational effiencient LiDAR-Inertial Odometry package based on tightly coupled iterative Kalman filter. (It has been tested in Livox Lidar and will support some other Lidar platforms in the future)
+**FAST-LIO** (Fast LiDAR-Inertial Odometry) is a computationally efficient and robust LiDAR-inertial odometry package. It fuses LiDAR feature points with IMU data using a tightly-coupled iterated extended Kalman filter to allow robust navigation in fast-motion, noisy or cluttered environments where degeneration occurs. To lower the computation load in the presence of large number of measurements, we present a new formula to compute the Kalman gain. The new formula has computation load depending on the state dimension instead of the measurement dimension. The proposed method and its implementation are tested in various indoor and outdoor environments. Our package address many key issues:
+1. Real-time tightly-coupled LiDAR-IMU Odometry and mapping;
+2. Can be automaticaly initialized at most steady environments;
+3. Robust feature extraction and surpports for different FOV.
+
+To know more about the details, please refer to our related paper:)
 
 <div align="center">
     <img src="doc/results/HKU_HW.png" width = 49% >
     <img src="doc/results/HKU_MB_001.png" width = 49% >
 </div>
-
-is a robust, low drift, and real time odometry and mapping package for Livox LiDARs, significant low cost and high performance LiDARs that are designed for massive industrials uses. Our package address many key issues: feature extraction and selection in a very limited FOV, robust outliers rejection, moving objects filtering, and motion distortion compensation. In addition, we also integrate other features like parallelable pipeline, point cloud management using cells and maps, loop closure, utilities for maps saving and reload, etc. To know more about the details, please refer to our related paper:)
-
-Our package address many key issues:
-1. Real-time tightly-coupled LiDAR-IMU Odometry and mapping;
-2. Can be automaticaly initialized at most steady environments;
-3. Robust feature extraction and .
 
 ## 1. Prerequisites
 ### 1.1 **Ubuntu** and **ROS**
@@ -86,7 +84,8 @@ rosbag play YOUR_DOWNLOADED.bag
 
 ### 4.3 High-rate rosbag (Livox Avia LiDAR sampled at 100Hz)
 
-Download [high_rate_avia](https://drive.google.com/file/d/1UM6O3PRN3b730ZeuvKKT3yuOLNQuz8Yf/view?usp=sharing)
+Download [high_rate_avia](https://drive.google.com/file/d/1UM6O3PRN3b730ZeuvKKT3yuOLNQuz8Yf/view?usp=sharing) and then
+```
 ```
 roslaunch fast_lio mapping_avia.launch
 rosbag play YOUR_DOWNLOADED.bag
