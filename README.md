@@ -6,7 +6,7 @@ FAST-LIO (Fast LiDAR-Inertial Odometry) is a computational effiencient LiDAR-Ine
     <img src="doc/results/HKU_MB_001.png" width = 49% >
 </div>
 
-Some key issues:
+Some key features:
 1. Real-time tightly-coupled LiDAR-IMU Odometry and mapping;
 2. Can be automaticaly initialized at almost any steady environments;
 3. Robust feature extraction.
