@@ -68,24 +68,24 @@ namespace plt = matplotlibcpp;
 #endif
 
 #define INIT_TIME           (1.0)
-#define LASER_POINT_COV     (0.001)
+#define LASER_POINT_COV     (0.0015)
 #define NUM_MATCH_POINTS    (5)
 
 std::string root_dir = ROOT_DIR;
 
 int iterCount = 0;
 int NUM_MAX_ITERATIONS  = 0;
-int laserCloudCenWidth  = 14;
-int laserCloudCenHeight = 7;
-int laserCloudCenDepth  = 14;
+int laserCloudCenWidth  = 20;
+int laserCloudCenHeight = 10;
+int laserCloudCenDepth  = 20;
 int laserCloudValidInd[250];
 int laserCloudSurroundInd[250];
 int laserCloudValidNum    = 0;
 int laserCloudSurroundNum = 0;
 
-const int laserCloudWidth  = 21;
-const int laserCloudHeight = 11;
-const int laserCloudDepth  = 21;
+const int laserCloudWidth  = 42;
+const int laserCloudHeight = 22;
+const int laserCloudDepth  = 42;
 const int laserCloudNum = laserCloudWidth * laserCloudHeight * laserCloudDepth;//4851
 
 /// IMU relative variables
