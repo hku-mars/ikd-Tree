@@ -1,14 +1,16 @@
 ## FAST-LIO
-FAST-LIO (Fast LiDAR-Inertial Odometry) is a computational effiencient LiDAR-Inertial Odometry package based on tightly coupled iterative Kalman filter. (It has been tested in Livox Lidar and will soon support some other Lidar platforms in the future)
+**FAST-LIO** (Fast LiDAR-Inertial Odometry) is a computational effiencient LiDAR-Inertial Odometry package based on tightly coupled iterative Kalman filter. (It has been tested in Livox Lidar and will support some other Lidar platforms in the future)
 
 <div align="center">
     <img src="doc/results/HKU_HW.png" width = 49% >
     <img src="doc/results/HKU_MB_001.png" width = 49% >
 </div>
 
-Some key features:
+is a robust, low drift, and real time odometry and mapping package for Livox LiDARs, significant low cost and high performance LiDARs that are designed for massive industrials uses. Our package address many key issues: feature extraction and selection in a very limited FOV, robust outliers rejection, moving objects filtering, and motion distortion compensation. In addition, we also integrate other features like parallelable pipeline, point cloud management using cells and maps, loop closure, utilities for maps saving and reload, etc. To know more about the details, please refer to our related paper:)
+
+Our package address many key issues:
 1. Real-time tightly-coupled LiDAR-IMU Odometry and mapping;
-2. Can be automaticaly initialized at almost any steady environments;
+2. Can be automaticaly initialized at most steady environments;
 3. Robust feature extraction.
 
 ## 1. Prerequisites
