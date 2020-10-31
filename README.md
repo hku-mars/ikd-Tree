@@ -11,7 +11,7 @@ is a robust, low drift, and real time odometry and mapping package for Livox LiD
 Our package address many key issues:
 1. Real-time tightly-coupled LiDAR-IMU Odometry and mapping;
 2. Can be automaticaly initialized at most steady environments;
-3. Robust feature extraction.
+3. Robust feature extraction and .
 
 ## 1. Prerequisites
 ### 1.1 **Ubuntu** and **ROS**
@@ -44,19 +44,20 @@ Clone the repository and catkin_make:
 *Remarks:*
 - If you want to save the pcd file please add map_file_path in launch file.
 ## 3. Directly run
-### 3.1 For outdoor environments
-Connect to your PC to Livox Avia LiDAR following [Livox-ros-driver installation](https://github.com/Livox-SDK/livox_ros_driver), then
-```
-    ....
-    roslaunch fast_lio mapping_avia_outdoor.launch
-    roslaunch livox_ros_driver livox_lidar_msg.launch
-    
-```
-### 3.2 For indoor environments or high LiDAR sample rate (20-100hz)
+### 3.1 For indoor environments and high LiDAR sample rate (20-100hz)
 Connect to your PC to Livox Avia LiDAR by following  [Livox-ros-driver installation](https://github.com/Livox-SDK/livox_ros_driver), then
 ```
     ....
     roslaunch fast_lio mapping_avia.launch
+    roslaunch livox_ros_driver livox_lidar_msg.launch
+    
+```
+
+### 3.2 For outdoor environments
+Connect to your PC to Livox Avia LiDAR following [Livox-ros-driver installation](https://github.com/Livox-SDK/livox_ros_driver), then
+```
+    ....
+    roslaunch fast_lio mapping_avia_outdoor.launch
     roslaunch livox_ros_driver livox_lidar_msg.launch
     
 ```
