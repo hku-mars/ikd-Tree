@@ -94,7 +94,6 @@ rosbag play YOUR_DOWNLOADED.bag
 
 Download [high_rate_avia](https://drive.google.com/file/d/1UM6O3PRN3b730ZeuvKKT3yuOLNQuz8Yf/view?usp=sharing) and then
 ```
-```
 roslaunch fast_lio mapping_avia.launch
 rosbag play YOUR_DOWNLOADED.bag
 ```
