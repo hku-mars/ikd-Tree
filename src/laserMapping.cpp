@@ -1025,8 +1025,8 @@ int main(int argc, char** argv)
             msg_body_pose.header.stamp = ros::Time::now();
             msg_body_pose.header.frame_id = "/camera_odom_frame";
             msg_body_pose.pose.position.x = state.pos_end(0);
-            msg_body_pose.pose.position.y = - state.pos_end(1);
-            msg_body_pose.pose.position.z = - state.pos_end(2);
+            msg_body_pose.pose.position.y = state.pos_end(1);
+            msg_body_pose.pose.position.z = state.pos_end(2);
             msg_body_pose.pose.orientation.x = - geoQuat.y;
             msg_body_pose.pose.orientation.y = - geoQuat.z;
             msg_body_pose.pose.orientation.z = geoQuat.x;

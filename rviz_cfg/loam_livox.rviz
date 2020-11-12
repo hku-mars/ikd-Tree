@@ -213,8 +213,8 @@ Visualization Manager:
         - Alpha: 0.30000001192092896
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 78.04481506347656
-            Min Value: -1.2491004467010498
+            Max Value: 8.647089958190918
+            Min Value: -0.4230107367038727
             Value: true
           Axis: Z
           Channel Name: intensity
@@ -683,25 +683,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 79.00204467773438
+      Distance: 35.04637908935547
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 41.85464859008789
-        Y: 7.452518463134766
-        Z: 6.782685279846191
+        X: 10.718994140625
+        Y: -5.658486366271973
+        Z: -3.953014373779297
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.3947965204715729
+      Pitch: 0.6797964572906494
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 2.134368419647217
+      Yaw: 2.51936936378479
     Saved: ~
 Window Geometry:
   Displays:
