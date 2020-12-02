@@ -1,0 +1,50 @@
+#include <pcl/point_types.h>
+
+using namespace std;
+
+typedef pcl::PointXYZINormal PointType;
+
+struct KD_TREE_NODE
+{
+    PointType point;
+    int division_axis;  
+    int TreeSize = 1;
+    int invalid_point_num = 0;
+    bool point_deleted = false;
+    bool tree_deleted = false;
+    bool delete_range_need_push_down = false;    
+    float node_range_x[2], node_range_y[2], node_range_z[2];
+    float delete_range_x[2], delete_range_y[2], delete_range_z[2];     // First index: 0~2 division axis x,y,z; Second index: 0~1 min max of the range
+    KD_TREE_NODE *left_son_ptr = nullptr;
+    KD_TREE_NODE *right_son_ptr = nullptr;
+};
+
+class KD_TREE
+{
+private:
+    float delete_criterion_param;
+    float balance_criterion_param;
+    KD_TREE_NODE * Root_Node;
+    vector<PointType> PCL_Storage;
+    void BuildTree(KD_TREE_NODE * root, int l, int r);
+    void Rebuild(KD_TREE_NODE * root);
+    void Delete_by_range(KD_TREE_NODE * root, float x_range[], float y_range[], float z_range[]);
+    void Delete_by_point(KD_TREE_NODE * root, PointType point);
+    void Add(KD_TREE_NODE * root, PointType point);
+    void Search(KD_TREE_NODE * root, int k_nearest);
+    bool Criterion_Check(KD_TREE_NODE * root);
+    void Push_Down(KD_TREE_NODE * root);
+    void Pull_Up(KD_TREE_NODE * root);
+    void update_range(KD_TREE_NODE * root);
+
+public:
+    KD_TREE(float delete_criterion_param = 0.50f, float balance_criterion_param = 0.70f);
+    void set_delete_criterion_param(float delete_param);
+    void set_balance_criterion_param(float balance_param);
+    void Build(vector<PointType> point_cloud);
+    void Nearest_Search(PointType point, int k_nearest, PointType * Nearest_Points);
+    void Add_Points(vector<PointType> PointToAdd, int PointNum);
+    void Delete_Points(vector<PointType> PointToDel, int PointNum);
+    void Delete_Point_Boxes(float box_x_range[][2], float box_y_range[][2], float box_z_range[][2], int Box_Number);
+    // void Compatibility_Check();
+};
