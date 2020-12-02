@@ -55,6 +55,8 @@ include_directories(
   ${PYTHON_INCLUDE_DIRS}
   include)
 
+ message(STATUS "PCL include dir: ${PCL_INCLUDE_DIRS}")
+
 add_message_files(
   FILES
   Pose6D.msg
