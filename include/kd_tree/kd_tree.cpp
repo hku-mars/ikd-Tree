@@ -69,9 +69,11 @@ void KD_TREE::Delete_Points(vector<PointType> PointToDel, int PointNum){
 }
 
 void KD_TREE::Delete_Point_Boxes(float box_x_range[][2], float box_y_range[][2], float box_z_range[][2], int Box_Number){
+    rebuild_counter = 0;
     for (int i=0;i<Box_Number;i++){
         Delete_by_range(Root_Node , box_x_range[i], box_y_range[i], box_z_range[i]);
     }
+    printf("Rebuild counter is %d, ", rebuild_counter);     
     return;
 }
 
@@ -126,32 +128,43 @@ void KD_TREE::Rebuild(KD_TREE_NODE * &root){
     // Clear the PCL_Storage vector and release memory
     vector<PointType> ().swap(PCL_Storage);
     traverse_for_rebuild(root);
+    delete_tree_nodes(root);
     BuildTree(root, 0, PCL_Storage.size()-1);
     rebuild_counter += 1;
     return;
 }
 
 void KD_TREE::Delete_by_range(KD_TREE_NODE * root, float x_range[], float y_range[], float z_range[]){
-    if (root == nullptr) return;
-    if (x_range[0] < root->node_range_x[0] && x_range[1] > root->node_range_x[1] && y_range[0] < root->node_range_y[0] && y_range[1] > root->node_range_y[1] && z_range[0] < root->node_range_z[0] && z_range[1] > root->node_range_z[1]){
+    Push_Down(root);     
+    if (root == nullptr || root->tree_deleted) return;
+    if (x_range[0]-EPS < root->node_range_x[0] && x_range[1]+EPS > root->node_range_x[1] && y_range[0]-EPS < root->node_range_y[0] && y_range[1]+EPS > root->node_range_y[1] && z_range[0]-EPS < root->node_range_z[0] && z_range[1]+EPS > root->node_range_z[1]){
+        //printf("Delete by range (%0.3f,%0.3f) (%0.3f,%0.3f) (%0.3f,%0.3f)\n",root->node_range_x[0],root->node_range_x[1],root->node_range_y[0],root->node_range_y[1],root->node_range_z[0],root->node_range_z[1]);
         root->tree_deleted = true;
         root->point_deleted = true;
         root->invalid_point_num = root->TreeSize;
         return;
     }
+    if (x_range[0]-EPS < root->point.x && x_range[1]+EPS > root->point.x && y_range[0]-EPS < root->point.y && y_range[1]+EPS > root->point.y && z_range[0]-EPS < root->point.z && z_range[1]+EPS > root->point.z){
+        //printf("Deleted points: (%0.3f,%0.3f,%0.3f)\n",root->point.x,root->point.y,root->point.z);
+        root->point_deleted = true;
+        root->invalid_point_num += 1;
+    }    
     Delete_by_range(root->left_son_ptr, x_range, y_range, z_range);
     Delete_by_range(root->right_son_ptr, x_range, y_range, z_range);
     Update(root);
     root->need_rebuild = Criterion_Check(root);
-    if (!root->need_rebuild){
+    if (!(root->need_rebuild)){
         if (root->left_son_ptr != nullptr & root->left_son_ptr->need_rebuild) Rebuild(root->left_son_ptr);
         if (root->right_son_ptr != nullptr & root->right_son_ptr->need_rebuild) Rebuild(root->right_son_ptr);
-    } else if (root == Root_Node) Rebuild(root);
+    } else if (root == Root_Node) {
+        Rebuild(root);
+    }
     return;
 }
 
 bool KD_TREE::Delete_by_point(KD_TREE_NODE * root, PointType point){
-    if (root == nullptr) return false;
+    Push_Down(root); 
+    if (root == nullptr || root->tree_deleted) return false;
     bool flag = false;
     if (same_point(root->point, point) && !root->point_deleted) {
         root->point_deleted = true;
@@ -188,6 +201,7 @@ bool KD_TREE::Delete_by_point(KD_TREE_NODE * root, PointType point){
 }
 
 void KD_TREE::Add(KD_TREE_NODE * &root, PointType point){
+    Push_Down(root);     
     if (root == nullptr){
         root = new KD_TREE_NODE;
         root->point = point;
@@ -223,6 +237,7 @@ void KD_TREE::Add(KD_TREE_NODE * &root, PointType point){
 }
 
 void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point){
+    Push_Down(root);
     if (root == nullptr || root->tree_deleted) return;
     search_counter += 1;
     if (!root->point_deleted){
@@ -267,6 +282,19 @@ bool KD_TREE::Criterion_Check(KD_TREE_NODE * root){
         return true;
     } 
     return false;
+}
+
+void KD_TREE::Push_Down(KD_TREE_NODE *root){
+    if (root == nullptr) return;
+    if (root->left_son_ptr != nullptr && root->tree_deleted) {
+        root->left_son_ptr->point_deleted = true;
+        root->left_son_ptr->tree_deleted = true;
+    } 
+    if (root->right_son_ptr != nullptr && root->tree_deleted){
+        root->right_son_ptr->point_deleted = true;
+        root->right_son_ptr->tree_deleted = true;
+    }
+    return;
 }
 
 void KD_TREE::Update(KD_TREE_NODE* root){
@@ -319,13 +347,15 @@ void KD_TREE::Update(KD_TREE_NODE* root){
 
 void KD_TREE::traverse_for_rebuild(KD_TREE_NODE * root){
     if (root == nullptr || root->tree_deleted) return;
-    if (!root->point_deleted) PCL_Storage.push_back(root->point);
+    if (!root->point_deleted) {
+        PCL_Storage.push_back(root->point);
+    }
     traverse_for_rebuild(root->left_son_ptr);
     traverse_for_rebuild(root->right_son_ptr);
     return;
 }
 
-void KD_TREE::delete_tree_nodes(KD_TREE_NODE * root){
+void KD_TREE::delete_tree_nodes(KD_TREE_NODE * &root){
     if (root == nullptr) return;
     delete_tree_nodes(root->left_son_ptr);
     delete_tree_nodes(root->right_son_ptr);

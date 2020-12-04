@@ -53,7 +53,7 @@ private:
     bool Criterion_Check(KD_TREE_NODE * root);
     void Push_Down(KD_TREE_NODE * root);
     void Update(KD_TREE_NODE * root); 
-    void delete_tree_nodes(KD_TREE_NODE * root);
+    void delete_tree_nodes(KD_TREE_NODE * &root);
     bool same_point(PointType a, PointType b);
     float calc_dist(PointType a, PointType b);
     float calc_box_dist(KD_TREE_NODE * node, PointType point);

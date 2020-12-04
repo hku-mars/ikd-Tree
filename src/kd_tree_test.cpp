@@ -7,27 +7,25 @@
 #include <algorithm>
 #include <chrono>
 
-#define X_MAX 1
-#define X_MIN -1
-#define Y_MAX 1
-#define Y_MIN -1
-#define Z_MAX 1
+#define X_MAX 10
+#define X_MIN -10
+#define Y_MAX 10
+#define Y_MIN -10
+#define Z_MAX 20
 #define Z_MIN 0
 
-#define Point_Num 100000
-#define New_Point_Num 200
+#define Point_Num 10000
+#define New_Point_Num 225
 #define Delete_Point_Num 200
 #define Nearest_Num 5
-#define Test_Time 10000
-#define Search_Time 400
+#define Test_Time 1000
+#define Search_Time 1
 
 vector<PointType> point_cloud;
 vector<PointType> cloud_increment;
 vector<PointType> cloud_decrement;
 vector<PointType> search_result;
 vector<PointType> raw_cmp_result;
-
-pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfFromMap(new pcl::KdTreeFLANN<PointType>());
 
 KD_TREE scapegoat_kd_tree(0.5,0.75);
 
@@ -59,6 +57,34 @@ void generate_increment_point_cloud(int num){
         cloud_increment.push_back(new_point);        
     }
     return;
+}
+
+void generate_box_decrement(float x_r[][2], float y_r[][2], float z_r[][2], float box_length, int box_num){
+    float d = box_length/2;
+    float x_p = rand_float(X_MIN, X_MAX);
+    float y_p = rand_float(Y_MIN, Y_MAX);
+    float z_p = rand_float(Z_MIN, Z_MAX);
+    for (int k=0;k<box_num;k++){
+        x_r[k][0] = x_p - d;
+        x_r[k][1] = x_p + d;
+        y_r[k][0] = y_p - d;
+        y_r[k][1] = y_p + d;    
+        z_r[k][0] = z_p - d;
+        z_r[k][1] = z_p + d;  
+        int n = point_cloud.size();
+        int counter = 0;
+        while (counter < n){
+            PointType tmp = point_cloud[point_cloud.size()-1];
+            point_cloud.pop_back();
+            if (tmp.x +EPS < x_r[k][0] || tmp.x - EPS > x_r[k][1] || tmp.y + EPS < y_r[k][0] || tmp.y - EPS > y_r[k][1] || tmp.z + EPS < z_r[k][0] || tmp.z - EPS > z_r[k][1]){
+                point_cloud.insert(point_cloud.begin(),tmp);
+            }
+            counter += 1;
+        }   
+    //printf("x:(%0.3f %0.3f) y:(%0.3f %0.3f) z:(%0.3f %0.3f)\n",x_r[0][0],x_r[0][1],y_r[0][0],y_r[0][1],z_r[0][0],z_r[0][1]); 
+
+    }
+
 }
 
 PointType generate_target_point(){
@@ -118,6 +144,7 @@ int main(int argc, char** argv){
     printf("Testing ...\n");
     int counter = 0;
     bool flag = true;
+    float x_r[1][2], y_r[1][2], z_r[1][2];
     PointType target; 
     // Initialize k-d tree
     generate_initial_point_cloud(Point_Num);
@@ -141,6 +168,15 @@ int main(int argc, char** argv){
         duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
         total_duration += duration;
         printf("Delete point time cost is %0.3f ms\n",float(duration)/1e3);      
+        // Box Decremental Operation
+        generate_box_decrement(x_r, y_r, z_r, 2, 1);
+        duration = duration - duration;   
+        t1 = chrono::high_resolution_clock::now();
+        scapegoat_kd_tree.Delete_Point_Boxes(x_r, y_r, z_r,1);
+        t2 = chrono::high_resolution_clock::now();
+        duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
+        total_duration += duration;
+        printf("Delete box points time cost is %0.3f ms\n",float(duration)/1e3);            
         // Search Operation  
         duration = duration - duration;               
         for (int k=0;k<Search_Time;k++){
@@ -161,7 +197,7 @@ int main(int argc, char** argv){
     // printf("Point Cloud Points:\n");
     // printf("Target Point is : (%0.3f, %0.3f, %0.3f)\n", target.x, target.y, target.z);
     FILE *fp;
-    if (!flag ){
+    if (!flag & (scapegoat_kd_tree.Root_Node==nullptr || scapegoat_kd_tree.Root_Node->TreeSize >=5)){
         printf("Find Dataset for debug!\n");
         fp = freopen("Data_for_fault.txt","w",stdout);
         for (int i=0;i<point_cloud.size();i++){
@@ -173,10 +209,10 @@ int main(int argc, char** argv){
         print_point_vec(search_result);
         printf("Points in kd_tree\n");
         vector<PointType> ().swap(scapegoat_kd_tree.PCL_Storage);
-        scapegoat_kd_tree.traverse_for_rebuild(scapegoat_kd_tree.Root_Node);
-        print_point_vec(scapegoat_kd_tree.PCL_Storage);
-        printf("Points deleted");
-        print_point_vec(scapegoat_kd_tree.Points_deleted);        
+        if (scapegoat_kd_tree.Root_Node != nullptr) scapegoat_kd_tree.traverse_for_rebuild(scapegoat_kd_tree.Root_Node);
+        print_point_vec(scapegoat_kd_tree.PCL_Storage);   
+        printf("Box deleted\n");
+        printf("x:(%0.3f %0.3f) y:(%0.3f %0.3f) z:(%0.3f %0.3f)\n",x_r[0][0],x_r[0][1],y_r[0][0],y_r[0][1],z_r[0][0],z_r[0][1]); 
         fclose(stdout);        
     } else {
         printf("Finished %d times test\n",counter);
