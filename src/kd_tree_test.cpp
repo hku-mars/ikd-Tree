@@ -171,14 +171,16 @@ int main(int argc, char** argv){
         total_duration += duration;
         printf("Delete point time cost is %0.3f ms\n",float(duration)/1e3);      
         // Box Decremental Operation
-        generate_box_decrement(x_r, y_r, z_r, Box_Length, Box_Num);
-        duration = duration - duration;   
-        t1 = chrono::high_resolution_clock::now();
-        scapegoat_kd_tree.Delete_Point_Boxes(x_r, y_r, z_r, Box_Num);
-        t2 = chrono::high_resolution_clock::now();
-        duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
-        total_duration += duration;
-        printf("Delete box points time cost is %0.3f ms\n",float(duration)/1e3);            
+        if (counter % 20  == 0 ){
+            generate_box_decrement(x_r, y_r, z_r, Box_Length, Box_Num);
+            duration = duration - duration;   
+            t1 = chrono::high_resolution_clock::now();
+            scapegoat_kd_tree.Delete_Point_Boxes(x_r, y_r, z_r, Box_Num);
+            t2 = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
+            total_duration += duration;
+            printf("Delete box points time cost is %0.3f ms\n",float(duration)/1e3); 
+        }
         // Search Operation  
         duration = duration - duration;               
         for (int k=0;k<Search_Time;k++){
