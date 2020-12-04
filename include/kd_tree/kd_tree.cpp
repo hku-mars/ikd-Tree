@@ -2,7 +2,7 @@
 
 /*
 Description: K-D Tree improved for a better data structure performance. 
-Author: Yixi CAI
+Author: Yixi Cai
 email: yixicai@connect.hku.hk
 */
 
@@ -70,9 +70,11 @@ void KD_TREE::Delete_Points(vector<PointType> PointToDel, int PointNum){
 
 void KD_TREE::Delete_Point_Boxes(float box_x_range[][2], float box_y_range[][2], float box_z_range[][2], int Box_Number){
     rebuild_counter = 0;
-    for (int i=0;i<Box_Number;i++){
+    delete_counter = 0;
+    for (int i=0;i < Box_Number;i++){
         Delete_by_range(Root_Node , box_x_range[i], box_y_range[i], box_z_range[i]);
     }
+    printf("Delete counter is %d, ", delete_counter);
     printf("Rebuild counter is %d, ", rebuild_counter);     
     return;
 }
@@ -137,17 +139,23 @@ void KD_TREE::Rebuild(KD_TREE_NODE * &root){
 void KD_TREE::Delete_by_range(KD_TREE_NODE * root, float x_range[], float y_range[], float z_range[]){
     Push_Down(root);     
     if (root == nullptr || root->tree_deleted) return;
+    if (x_range[1] + EPS < root->node_range_x[0] || x_range[0] - EPS > root->node_range_x[1]) return;
+    if (y_range[1] + EPS < root->node_range_y[0] || y_range[0] - EPS > root->node_range_y[1]) return;
+    if (z_range[1] + EPS < root->node_range_z[0] || z_range[0] - EPS > root->node_range_z[1]) return;
     if (x_range[0]-EPS < root->node_range_x[0] && x_range[1]+EPS > root->node_range_x[1] && y_range[0]-EPS < root->node_range_y[0] && y_range[1]+EPS > root->node_range_y[1] && z_range[0]-EPS < root->node_range_z[0] && z_range[1]+EPS > root->node_range_z[1]){
+        //printf("Delete in range (%0.3f,%0.3f) (%0.3f,%0.3f) (%0.3f,%0.3f)\n",x_range[0],x_range[1],y_range[0],y_range[1],z_range[0],z_range[1]);        
         //printf("Delete by range (%0.3f,%0.3f) (%0.3f,%0.3f) (%0.3f,%0.3f)\n",root->node_range_x[0],root->node_range_x[1],root->node_range_y[0],root->node_range_y[1],root->node_range_z[0],root->node_range_z[1]);
         root->tree_deleted = true;
         root->point_deleted = true;
         root->invalid_point_num = root->TreeSize;
+        delete_counter += root->TreeSize;
         return;
     }
     if (x_range[0]-EPS < root->point.x && x_range[1]+EPS > root->point.x && y_range[0]-EPS < root->point.y && y_range[1]+EPS > root->point.y && z_range[0]-EPS < root->point.z && z_range[1]+EPS > root->point.z){
         //printf("Deleted points: (%0.3f,%0.3f,%0.3f)\n",root->point.x,root->point.y,root->point.z);
         root->point_deleted = true;
         root->invalid_point_num += 1;
+        delete_counter += 1;
     }    
     Delete_by_range(root->left_son_ptr, x_range, y_range, z_range);
     Delete_by_range(root->right_son_ptr, x_range, y_range, z_range);

@@ -7,19 +7,21 @@
 #include <algorithm>
 #include <chrono>
 
-#define X_MAX 10
-#define X_MIN -10
-#define Y_MAX 10
-#define Y_MIN -10
-#define Z_MAX 20
+#define X_MAX 3
+#define X_MIN -3
+#define Y_MAX 3
+#define Y_MIN 0
+#define Z_MAX 2
 #define Z_MIN 0
 
-#define Point_Num 10000
-#define New_Point_Num 225
+#define Point_Num 50000
+#define New_Point_Num 250
 #define Delete_Point_Num 200
 #define Nearest_Num 5
-#define Test_Time 1000
-#define Search_Time 1
+#define Test_Time 10000
+#define Search_Time 400
+#define Box_Length 1
+#define Box_Num 1
 
 vector<PointType> point_cloud;
 vector<PointType> cloud_increment;
@@ -61,14 +63,15 @@ void generate_increment_point_cloud(int num){
 
 void generate_box_decrement(float x_r[][2], float y_r[][2], float z_r[][2], float box_length, int box_num){
     float d = box_length/2;
-    float x_p = rand_float(X_MIN, X_MAX);
-    float y_p = rand_float(Y_MIN, Y_MAX);
-    float z_p = rand_float(Z_MIN, Z_MAX);
-    for (int k=0;k<box_num;k++){
+    float x_p, y_p, z_p;
+    for (int k=0;k < box_num; k++){
+        x_p = rand_float(X_MIN, X_MAX);
+        y_p = rand_float(Y_MIN, Y_MAX);
+        z_p = rand_float(Z_MIN, Z_MAX);        
         x_r[k][0] = x_p - d;
         x_r[k][1] = x_p + d;
         y_r[k][0] = y_p - d;
-        y_r[k][1] = y_p + d;    
+        y_r[k][1] = y_p + d;  
         z_r[k][0] = z_p - d;
         z_r[k][1] = z_p + d;  
         int n = point_cloud.size();
@@ -81,8 +84,7 @@ void generate_box_decrement(float x_r[][2], float y_r[][2], float z_r[][2], floa
             }
             counter += 1;
         }   
-    //printf("x:(%0.3f %0.3f) y:(%0.3f %0.3f) z:(%0.3f %0.3f)\n",x_r[0][0],x_r[0][1],y_r[0][0],y_r[0][1],z_r[0][0],z_r[0][1]); 
-
+    //printf("x:(%0.3f %0.3f) y:(%0.3f %0.3f) z:(%0.3f %0.3f)\n",x_r[k][0],x_r[k][1],y_r[k][0],y_r[k][1],z_r[k][0],z_r[k][1]); 
     }
 
 }
@@ -144,7 +146,7 @@ int main(int argc, char** argv){
     printf("Testing ...\n");
     int counter = 0;
     bool flag = true;
-    float x_r[1][2], y_r[1][2], z_r[1][2];
+    float x_r[Box_Num][2], y_r[Box_Num][2], z_r[Box_Num][2];
     PointType target; 
     // Initialize k-d tree
     generate_initial_point_cloud(Point_Num);
@@ -169,10 +171,10 @@ int main(int argc, char** argv){
         total_duration += duration;
         printf("Delete point time cost is %0.3f ms\n",float(duration)/1e3);      
         // Box Decremental Operation
-        generate_box_decrement(x_r, y_r, z_r, 2, 1);
+        generate_box_decrement(x_r, y_r, z_r, Box_Length, Box_Num);
         duration = duration - duration;   
         t1 = chrono::high_resolution_clock::now();
-        scapegoat_kd_tree.Delete_Point_Boxes(x_r, y_r, z_r,1);
+        scapegoat_kd_tree.Delete_Point_Boxes(x_r, y_r, z_r, Box_Num);
         t2 = chrono::high_resolution_clock::now();
         duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
         total_duration += duration;

@@ -39,8 +39,9 @@ struct PointType_CMP{
 class KD_TREE
 {
 private:
-    int search_counter;
+    int search_counter = 0;
     int rebuild_counter = 0;
+    int delete_counter = 0;
     float delete_criterion_param = 0.5f;
     float balance_criterion_param = 0.7f;
     priority_queue<PointType_CMP> q;
