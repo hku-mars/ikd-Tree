@@ -147,12 +147,16 @@ int main(int argc, char** argv){
     int counter = 0;
     bool flag = true;
     float x_r[Box_Num][2], y_r[Box_Num][2], z_r[Box_Num][2];
+    float max_total_time = 0.0;
+    int max_point_num = 0;
+    int point_num_start = 0;
     PointType target; 
     // Initialize k-d tree
     generate_initial_point_cloud(Point_Num);
     scapegoat_kd_tree.Build(point_cloud);    
     while (flag && counter < Test_Time){
         printf("Test %d:\n",counter+1);
+        point_num_start = scapegoat_kd_tree.Root_Node->TreeSize;
         // Incremental Operation
         generate_increment_point_cloud(New_Point_Num);
         auto t1 = chrono::high_resolution_clock::now();
@@ -171,7 +175,7 @@ int main(int argc, char** argv){
         total_duration += duration;
         printf("Delete point time cost is %0.3f ms\n",float(duration)/1e3);      
         // Box Decremental Operation
-        if (counter % 20  == 0 ){
+        if ((counter+1) % 20  == 0 ){
             generate_box_decrement(x_r, y_r, z_r, Box_Length, Box_Num);
             duration = duration - duration;   
             t1 = chrono::high_resolution_clock::now();
@@ -194,6 +198,11 @@ int main(int argc, char** argv){
         printf("Search nearest point time cost is %0.3f ms\n",float(duration)/1e3);
         total_duration += duration;
         printf("Total time is %0.3f ms\n",total_duration/1e3);
+        if (float(total_duration) > max_total_time){
+            max_total_time = float(total_duration);
+            max_point_num = point_num_start;
+        }
+        max_total_time = max(max_total_time, float(total_duration));
         raw_cmp(target, Nearest_Num);    
         flag = cmp_point_vec(search_result, raw_cmp_result);      
         counter += 1;    
@@ -220,6 +229,8 @@ int main(int argc, char** argv){
         fclose(stdout);        
     } else {
         printf("Finished %d times test\n",counter);
+        printf("Max Total Time is: %0.3fms\n",max_total_time/1e3);
+        printf("Corresponding point number is: %d\n",max_point_num);
     }
     return 0;
 }
