@@ -83,6 +83,9 @@
     "python.linting.enabled": false,
     "jupyter.jupyterServerType": "local",
     "cSpell.words": [
-        "Yixi"
+        "Yixi",
+        "normal",
+        "point",
+        "xyzi"
     ]
 }
