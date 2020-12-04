@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <queue>
 
-#define EPS 1e-4
+#define EPS 1e-6
 
 
 using namespace std;
@@ -41,10 +41,8 @@ class KD_TREE
 private:
     int search_counter;
     int rebuild_counter = 0;
-    float delete_criterion_param = 0.5;
-    float balance_criterion_param = 0.7;
-    KD_TREE_NODE * Root_Node = nullptr;
-    vector<PointType> PCL_Storage;
+    float delete_criterion_param = 0.5f;
+    float balance_criterion_param = 0.7f;
     priority_queue<PointType_CMP> q;
     void BuildTree(KD_TREE_NODE * &root, int l, int r);
     void Rebuild(KD_TREE_NODE * &root);
@@ -54,8 +52,7 @@ private:
     void Search(KD_TREE_NODE * root, int k_nearest, PointType point);
     bool Criterion_Check(KD_TREE_NODE * root);
     void Push_Down(KD_TREE_NODE * root);
-    void Update(KD_TREE_NODE * root);
-    void traverse_for_rebuild(KD_TREE_NODE * root); 
+    void Update(KD_TREE_NODE * root); 
     void delete_tree_nodes(KD_TREE_NODE * root);
     bool same_point(PointType a, PointType b);
     float calc_dist(PointType a, PointType b);
@@ -74,6 +71,10 @@ public:
     void Add_Points(vector<PointType> PointToAdd, int PointNum);
     void Delete_Points(vector<PointType> PointToDel, int PointNum);
     void Delete_Point_Boxes(float box_x_range[][2], float box_y_range[][2], float box_z_range[][2], int Box_Number);
+    void traverse_for_rebuild(KD_TREE_NODE * root);
+    vector<PointType> PCL_Storage;     
+    vector<PointType> Points_deleted;   
+    KD_TREE_NODE * Root_Node = nullptr;    
     // void Compatibility_Check();
 };
 

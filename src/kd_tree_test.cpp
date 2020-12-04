@@ -7,20 +7,19 @@
 #include <algorithm>
 #include <chrono>
 
-#define X_MAX 10
-#define X_MIN -10
-#define Y_MAX 10
-#define Y_MIN -10
-#define Z_MAX 2
+#define X_MAX 1
+#define X_MIN -1
+#define Y_MAX 1
+#define Y_MIN -1
+#define Z_MAX 1
 #define Z_MIN 0
 
 #define Point_Num 100000
-#define New_Point_Num 400
-#define Delete_Point_Num 2
+#define New_Point_Num 200
+#define Delete_Point_Num 200
 #define Nearest_Num 5
-#define Test_Time 200
+#define Test_Time 10000
 #define Search_Time 400
-
 
 vector<PointType> point_cloud;
 vector<PointType> cloud_increment;
@@ -52,7 +51,7 @@ void generate_initial_point_cloud(int num){
 void generate_increment_point_cloud(int num){
     vector<PointType> ().swap(cloud_increment);
     PointType new_point;
-    for (int i=1;i<num;i++){
+    for (int i=0;i<num;i++){
         new_point.x = rand_float(X_MIN, X_MAX);
         new_point.y = rand_float(Y_MIN, Y_MAX);
         new_point.z = rand_float(Z_MIN, Z_MAX);
@@ -74,7 +73,7 @@ void generate_decrement_point_cloud(int num){
     vector<PointType> ().swap(cloud_decrement);
     auto rng = default_random_engine();
     shuffle(point_cloud.begin(), point_cloud.end(), rng);    
-    for (int i=1;i<num;i++){
+    for (int i=0;i<num;i++){
         cloud_decrement.push_back(point_cloud[point_cloud.size()-1]);
         point_cloud.pop_back();
     }
@@ -120,18 +119,30 @@ int main(int argc, char** argv){
     int counter = 0;
     bool flag = true;
     PointType target; 
+    // Initialize k-d tree
+    generate_initial_point_cloud(Point_Num);
+    scapegoat_kd_tree.Build(point_cloud);    
     while (flag && counter < Test_Time){
-        printf("Test %d: ",counter+1);
-        generate_initial_point_cloud(Point_Num);
-        scapegoat_kd_tree.Build(point_cloud);
+        printf("Test %d:\n",counter+1);
+        // Incremental Operation
         generate_increment_point_cloud(New_Point_Num);
         auto t1 = chrono::high_resolution_clock::now();
         scapegoat_kd_tree.Add_Points(cloud_increment, New_Point_Num);
         auto t2 = chrono::high_resolution_clock::now();
         auto duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
         auto total_duration = duration;
-        printf("Add point time cost is %0.3f ms, ",float(duration)/1e3);
-        duration = duration - duration;        
+        printf("Add point time cost is %0.3f ms\n",float(duration)/1e3);
+        // Decremental Operation
+        duration = duration - duration;   
+        generate_decrement_point_cloud(Delete_Point_Num);     
+        t1 = chrono::high_resolution_clock::now();
+        scapegoat_kd_tree.Delete_Points(cloud_decrement, Delete_Point_Num);
+        t2 = chrono::high_resolution_clock::now();
+        duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
+        total_duration += duration;
+        printf("Delete point time cost is %0.3f ms\n",float(duration)/1e3);      
+        // Search Operation  
+        duration = duration - duration;               
         for (int k=0;k<Search_Time;k++){
             vector<PointType> ().swap(search_result);             
             target = generate_target_point();    
@@ -140,7 +151,7 @@ int main(int argc, char** argv){
             t2 = chrono::high_resolution_clock::now();
             duration += chrono::duration_cast<chrono::microseconds>(t2-t1).count();
         }
-        printf("Search nearest point time cost is %0.3f ms  ",float(duration)/1e3);
+        printf("Search nearest point time cost is %0.3f ms\n",float(duration)/1e3);
         total_duration += duration;
         printf("Total time is %0.3f ms\n",total_duration/1e3);
         raw_cmp(target, Nearest_Num);    
@@ -160,6 +171,12 @@ int main(int argc, char** argv){
         print_point_vec(raw_cmp_result);
         printf("k d tree\n");
         print_point_vec(search_result);
+        printf("Points in kd_tree\n");
+        vector<PointType> ().swap(scapegoat_kd_tree.PCL_Storage);
+        scapegoat_kd_tree.traverse_for_rebuild(scapegoat_kd_tree.Root_Node);
+        print_point_vec(scapegoat_kd_tree.PCL_Storage);
+        printf("Points deleted");
+        print_point_vec(scapegoat_kd_tree.Points_deleted);        
         fclose(stdout);        
     } else {
         printf("Finished %d times test\n",counter);

@@ -14,6 +14,7 @@ KD_TREE::KD_TREE(float delete_param, float balance_param) {
 KD_TREE::~KD_TREE()
 {
     delete_tree_nodes(Root_Node);
+    vector<PointType> ().swap(PCL_Storage);
 }
 
 void KD_TREE::Set_delete_criterion_param(float delete_param){
@@ -47,21 +48,23 @@ void KD_TREE::Nearest_Search(PointType point, int k_nearest, vector<PointType>& 
 }
 
 void KD_TREE::Add_Points(vector<PointType> PointToAdd, int PointNum){
+    rebuild_counter = 0;
     for (int i=0; i<PointToAdd.size();i++){
         Add(Root_Node, PointToAdd[i]);
     }
-    printf("Rebuild counter is %d ", rebuild_counter);    
     return;
 }
 
 void KD_TREE::Delete_Points(vector<PointType> PointToDel, int PointNum){
     bool flag;
+    rebuild_counter = 0;
     for (int i=0;i!=PointToDel.size();i++){
         flag = Delete_by_point(Root_Node, PointToDel[i]);
         if (!flag) {
-            printf("Failed to delete point (%0.3f,%0.3f,%0.3f)", PointToDel[i].x, PointToDel[i].y, PointToDel[i].z);
+            printf("Failed to delete point (%0.3f,%0.3f,%0.3f)\n", PointToDel[i].x, PointToDel[i].y, PointToDel[i].z);
         }
     }
+    printf("Rebuild counter is %d, ", rebuild_counter);      
     return;
 }
 
@@ -112,7 +115,6 @@ void KD_TREE::BuildTree(KD_TREE_NODE * &root, int l, int r){
         break;
     }  
     root->point = PCL_Storage[mid];             
-    //printf("%d %d %d\n Current Point (%0.3f, %0.3f, %0.3f) Division Axis: %d\n", l,mid,r,root->point.x, root->point.y, root->point.z, div_axis);
     BuildTree(root->left_son_ptr, l, mid-1);
     BuildTree(root->right_son_ptr, mid+1, r);  
     Update(root);
@@ -122,10 +124,8 @@ void KD_TREE::BuildTree(KD_TREE_NODE * &root, int l, int r){
 
 void KD_TREE::Rebuild(KD_TREE_NODE * &root){
     // Clear the PCL_Storage vector and release memory
-    // printf("Rebuilding ...\n");
     vector<PointType> ().swap(PCL_Storage);
     traverse_for_rebuild(root);
-    //printf("Rebuilding %d\n",root->TreeSize);
     BuildTree(root, 0, PCL_Storage.size()-1);
     rebuild_counter += 1;
     return;
@@ -142,7 +142,11 @@ void KD_TREE::Delete_by_range(KD_TREE_NODE * root, float x_range[], float y_rang
     Delete_by_range(root->left_son_ptr, x_range, y_range, z_range);
     Delete_by_range(root->right_son_ptr, x_range, y_range, z_range);
     Update(root);
-    if (Criterion_Check(root)) Rebuild(root);
+    root->need_rebuild = Criterion_Check(root);
+    if (!root->need_rebuild){
+        if (root->left_son_ptr != nullptr & root->left_son_ptr->need_rebuild) Rebuild(root->left_son_ptr);
+        if (root->right_son_ptr != nullptr & root->right_son_ptr->need_rebuild) Rebuild(root->right_son_ptr);
+    } else if (root == Root_Node) Rebuild(root);
     return;
 }
 
@@ -152,30 +156,34 @@ bool KD_TREE::Delete_by_point(KD_TREE_NODE * root, PointType point){
     if (same_point(root->point, point) && !root->point_deleted) {
         root->point_deleted = true;
         root->invalid_point_num += 1;
-        if (root->invalid_point_num == root->TreeSize) root->tree_deleted = true;
+        if (root->invalid_point_num == root->TreeSize) root->tree_deleted = true;      
         return true;
     }
     switch (root->division_axis)
     {
     case 0:
-        if (point.x < (root->point.x - EPS)) flag = Delete_by_point(root->left_son_ptr, point);
+        if (point.x < root->point.x ) flag = Delete_by_point(root->left_son_ptr, point);
             else flag = Delete_by_point(root->right_son_ptr, point);
         break;
     case 1:
-        if (point.y < (root->point.y - EPS)) flag = Delete_by_point(root->left_son_ptr, point);
+        if (point.y < root->point.y) flag = Delete_by_point(root->left_son_ptr, point);
         else flag = Delete_by_point(root->right_son_ptr, point);
         break;
     case 2:
-        if (point.z < (root->point.z - EPS)) flag = Delete_by_point(root->left_son_ptr, point);
+        if (point.z < root->point.z) flag = Delete_by_point(root->left_son_ptr, point);
         else flag = Delete_by_point(root->right_son_ptr, point);
         break;
     default:
-        if (point.x < (root->point.x - EPS)) flag = Delete_by_point(root->left_son_ptr, point);
+        if (point.x < root->point.x) flag = Delete_by_point(root->left_son_ptr, point);
             else flag = Delete_by_point(root->right_son_ptr, point);    
         break;
     }
     Update(root);
-    if (Criterion_Check(root)) Rebuild(root); 
+    root->need_rebuild = Criterion_Check(root);
+    if (!root->need_rebuild){
+        if (root->left_son_ptr != nullptr & root->left_son_ptr->need_rebuild) Rebuild(root->left_son_ptr);
+        if (root->right_son_ptr != nullptr & root->right_son_ptr->need_rebuild) Rebuild(root->right_son_ptr);
+    } else if (root == Root_Node) Rebuild(root);
     return flag;
 }
 
@@ -211,10 +219,6 @@ void KD_TREE::Add(KD_TREE_NODE * &root, PointType point){
         if (root->left_son_ptr != nullptr & root->left_son_ptr->need_rebuild) Rebuild(root->left_son_ptr);
         if (root->right_son_ptr != nullptr & root->right_son_ptr->need_rebuild) Rebuild(root->right_son_ptr);
     } else if (root == Root_Node) Rebuild(root);
-    // printf("%d",root->need_rebuild);
-    // if (root->left_son_ptr!=nullptr) printf(" %d",root->left_son_ptr->need_rebuild);
-    // if (root->right_son_ptr!=nullptr) printf(" %d",root->right_son_ptr->need_rebuild);    
-    // printf("\n");
     return;
 }
 
@@ -250,8 +254,8 @@ bool KD_TREE::Criterion_Check(KD_TREE_NODE * root){
     if (root->TreeSize == 1){
         return false;
     }
-    float balance_evaluation = 0.0;
-    float delete_evaluation = 0.0;
+    float balance_evaluation = 0.0f;
+    float delete_evaluation = 0.0f;
     KD_TREE_NODE * son_ptr = root->left_son_ptr;
     if (son_ptr == nullptr) son_ptr = root->right_son_ptr;
     delete_evaluation = float(root->invalid_point_num)/ root->TreeSize;
@@ -269,9 +273,8 @@ void KD_TREE::Update(KD_TREE_NODE* root){
     KD_TREE_NODE * left_son_ptr = root->left_son_ptr;
     KD_TREE_NODE * right_son_ptr = root->right_son_ptr;
     // Update Tree Size
-    // Delete point should be considered
     if (left_son_ptr != nullptr && right_son_ptr != nullptr){
-        root->TreeSize = left_son_ptr->TreeSize + right_son_ptr->TreeSize + (root->point_deleted? 0:1);
+        root->TreeSize = left_son_ptr->TreeSize + right_son_ptr->TreeSize + 1;
         root->invalid_point_num = left_son_ptr->invalid_point_num + right_son_ptr->invalid_point_num + (root->point_deleted? 1:0);
         root->tree_deleted = left_son_ptr->tree_deleted && right_son_ptr->tree_deleted && root->point_deleted;
         root->node_range_x[0] = min(min(left_son_ptr->node_range_x[0],right_son_ptr->node_range_x[0]),root->point.x);
@@ -281,7 +284,7 @@ void KD_TREE::Update(KD_TREE_NODE* root){
         root->node_range_z[0] = min(min(left_son_ptr->node_range_z[0],right_son_ptr->node_range_z[0]),root->point.z);
         root->node_range_z[1] = max(max(left_son_ptr->node_range_z[1],right_son_ptr->node_range_z[1]),root->point.z);         
     } else if (left_son_ptr != nullptr){
-        root->TreeSize = left_son_ptr->TreeSize + (root->point_deleted? 0:1);
+        root->TreeSize = left_son_ptr->TreeSize + 1;
         root->invalid_point_num = left_son_ptr->invalid_point_num + (root->point_deleted?1:0);
         root->tree_deleted = left_son_ptr->tree_deleted && root->point_deleted;
         root->node_range_x[0] = min(left_son_ptr->node_range_x[0],root->point.x);
@@ -291,7 +294,7 @@ void KD_TREE::Update(KD_TREE_NODE* root){
         root->node_range_z[0] = min(left_son_ptr->node_range_z[0],root->point.z);
         root->node_range_z[1] = max(left_son_ptr->node_range_z[1],root->point.z);               
     } else if (right_son_ptr != nullptr){
-        root->TreeSize = right_son_ptr->TreeSize + (root->point_deleted? 0:1);
+        root->TreeSize = right_son_ptr->TreeSize + 1;
         root->invalid_point_num = right_son_ptr->invalid_point_num + (root->point_deleted? 1:0);
         root->tree_deleted = right_son_ptr->tree_deleted && root->point_deleted;        
         root->node_range_x[0] = min(right_son_ptr->node_range_x[0],root->point.x);
@@ -301,7 +304,7 @@ void KD_TREE::Update(KD_TREE_NODE* root){
         root->node_range_z[0] = min(right_son_ptr->node_range_z[0],root->point.z);
         root->node_range_z[1] = max(right_son_ptr->node_range_z[1],root->point.z);        
     } else {
-        root->TreeSize = (root->point_deleted? 0:1);
+        root->TreeSize = 1;
         root->invalid_point_num = (root->point_deleted? 1:0);
         root->tree_deleted = root->point_deleted;
         root->node_range_x[0] = root->point.x;
@@ -332,7 +335,7 @@ void KD_TREE::delete_tree_nodes(KD_TREE_NODE * root){
 }
 
 bool KD_TREE::same_point(PointType a, PointType b){
-    return (fabs(a.x-b.x) < EPS &&fabs(a.y-b.y) < EPS && fabs(a.z-b.z) < EPS );
+    return (fabs(a.x-b.x) < EPS && fabs(a.y-b.y) < EPS && fabs(a.z-b.z) < EPS );
 }
 
 float KD_TREE::calc_dist(PointType a, PointType b){
