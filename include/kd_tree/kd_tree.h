@@ -37,6 +37,11 @@ struct PointType_CMP{
     }
 };
 
+struct BoxPointType{
+    int vertex_min[3];
+    int vertex_max[3];
+};
+
 class KD_TREE
 {
 private:
@@ -51,7 +56,7 @@ private:
     vector<PointType> Points_deleted;
     void BuildTree(KD_TREE_NODE * &root, int l, int r);
     void Rebuild(KD_TREE_NODE * &root);
-    void Delete_by_range(KD_TREE_NODE * root, float x_range[], float y_range[], float z_range[]);
+    void Delete_by_range(KD_TREE_NODE * root, BoxPointType boxpoint);
     bool Delete_by_point(KD_TREE_NODE * root, PointType point);
     void Add(KD_TREE_NODE * &root, PointType point);
     void Search(KD_TREE_NODE * root, int k_nearest, PointType point);
@@ -75,9 +80,9 @@ public:
     void set_downsample_param(float box_length, int Maximal_Point_Num);
     void Build(vector<PointType> point_cloud);
     void Nearest_Search(PointType point, int k_nearest, vector<PointType> &Nearest_Points);
-    void Add_Points(vector<PointType> PointToAdd, int PointNum);
-    void Delete_Points(vector<PointType> PointToDel, int PointNum);
-    void Delete_Point_Boxes(float box_x_range[][2], float box_y_range[][2], float box_z_range[][2], int Box_Number);
+    void Add_Points(vector<PointType> PointToAdd);
+    void Delete_Points(vector<PointType> PointToDel);
+    void Delete_Point_Boxes(vector<BoxPointType> BoxPoints);
     void traverse_for_rebuild(KD_TREE_NODE * root);
     void acquire_removed_points(vector<PointType> & removed_points);
     vector<PointType> PCL_Storage;     
@@ -86,4 +91,3 @@ public:
     int rebuild_counter = 0;
     // void Compatibility_Check();
 };
-

@@ -18,7 +18,7 @@
 #define New_Point_Num 250
 #define Delete_Point_Num 200
 #define Nearest_Num 5
-#define Test_Time 10000
+#define Test_Time 100
 #define Search_Time 400
 #define Box_Length 1
 #define Box_Num 1
@@ -61,25 +61,28 @@ void generate_increment_point_cloud(int num){
     return;
 }
 
-void generate_box_decrement(float x_r[][2], float y_r[][2], float z_r[][2], float box_length, int box_num){
+void generate_box_decrement(vector<BoxPointType> & Delete_Boxes, float box_length, int box_num){
+    vector<BoxPointType> ().swap(Delete_Boxes);
     float d = box_length/2;
     float x_p, y_p, z_p;
+    BoxPointType boxpoint;
     for (int k=0;k < box_num; k++){
         x_p = rand_float(X_MIN, X_MAX);
         y_p = rand_float(Y_MIN, Y_MAX);
         z_p = rand_float(Z_MIN, Z_MAX);        
-        x_r[k][0] = x_p - d;
-        x_r[k][1] = x_p + d;
-        y_r[k][0] = y_p - d;
-        y_r[k][1] = y_p + d;  
-        z_r[k][0] = z_p - d;
-        z_r[k][1] = z_p + d;  
+        boxpoint.vertex_min[0] = x_p - d;
+        boxpoint.vertex_max[0] = x_p + d;
+        boxpoint.vertex_min[1] = y_p - d;
+        boxpoint.vertex_max[1] = y_p + d;  
+        boxpoint.vertex_min[2] = z_p - d;
+        boxpoint.vertex_max[2] = z_p + d;
+        Delete_Boxes.push_back(boxpoint);
         int n = point_cloud.size();
         int counter = 0;
         while (counter < n){
             PointType tmp = point_cloud[point_cloud.size()-1];
             point_cloud.pop_back();
-            if (tmp.x +EPS < x_r[k][0] || tmp.x - EPS > x_r[k][1] || tmp.y + EPS < y_r[k][0] || tmp.y - EPS > y_r[k][1] || tmp.z + EPS < z_r[k][0] || tmp.z - EPS > z_r[k][1]){
+            if (tmp.x +EPS < boxpoint.vertex_min[0] || tmp.x - EPS > boxpoint.vertex_max[0] || tmp.y + EPS < boxpoint.vertex_min[1] || tmp.y - EPS > boxpoint.vertex_max[1] || tmp.z + EPS < boxpoint.vertex_min[2] || tmp.z - EPS > boxpoint.vertex_max[2]){
                 point_cloud.insert(point_cloud.begin(),tmp);
             }
             counter += 1;
@@ -146,7 +149,8 @@ int main(int argc, char** argv){
     printf("Testing ...\n");
     int counter = 0;
     bool flag = true;
-    float x_r[Box_Num][2], y_r[Box_Num][2], z_r[Box_Num][2];
+    vector<BoxPointType> Delete_Boxes;
+    vector<PointType> DeletePoints;
     float max_total_time = 0.0;
     float box_delete_time = 0.0;
     float add_time = 0.0;
@@ -157,6 +161,10 @@ int main(int argc, char** argv){
     int rebuild_counter = 0, add_rebuild_record = 0;
     PointType target; 
     // Initialize k-d tree
+    FILE *fp_log;
+    fp_log = freopen("kd_tree_test_log.txt","w",stdout);
+    fprintf(fp_log,"Add, Delete Points, Delete Boxes, Search, Total\n");
+    fclose(stdout);
     generate_initial_point_cloud(Point_Num);
     scapegoat_kd_tree.Build(point_cloud);    
     while (flag && counter < Test_Time){
@@ -165,7 +173,7 @@ int main(int argc, char** argv){
         // Incremental Operation
         generate_increment_point_cloud(New_Point_Num);
         auto t1 = chrono::high_resolution_clock::now();
-        scapegoat_kd_tree.Add_Points(cloud_increment, New_Point_Num);
+        scapegoat_kd_tree.Add_Points(cloud_increment);
         auto t2 = chrono::high_resolution_clock::now();
         auto add_duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
         auto total_duration = add_duration;
@@ -174,7 +182,7 @@ int main(int argc, char** argv){
         // Decremental Operation
         generate_decrement_point_cloud(Delete_Point_Num);     
         t1 = chrono::high_resolution_clock::now();
-        scapegoat_kd_tree.Delete_Points(cloud_decrement, Delete_Point_Num);
+        scapegoat_kd_tree.Delete_Points(cloud_decrement);
         t2 = chrono::high_resolution_clock::now();
         auto delete_duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
         total_duration += delete_duration;
@@ -182,9 +190,9 @@ int main(int argc, char** argv){
         auto box_delete_duration = chrono::duration_cast<chrono::microseconds>(t2-t2).count();        
         // Box Decremental Operation
         if ((counter+1) % 20  == 0 ){
-            generate_box_decrement(x_r, y_r, z_r, Box_Length, Box_Num);
+            generate_box_decrement(Delete_Boxes, Box_Length, Box_Num);
             t1 = chrono::high_resolution_clock::now();
-            scapegoat_kd_tree.Delete_Point_Boxes(x_r, y_r, z_r, Box_Num);
+            scapegoat_kd_tree.Delete_Point_Boxes(Delete_Boxes);
             t2 = chrono::high_resolution_clock::now();
             box_delete_duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
             total_duration += box_delete_duration;
@@ -216,6 +224,9 @@ int main(int argc, char** argv){
         raw_cmp(target, Nearest_Num);    
         flag = cmp_point_vec(search_result, raw_cmp_result);      
         counter += 1;    
+        fp_log = freopen("kd_tree_test_log.txt","w",stdout);
+        fprintf(fp_log,"%f,%f,%f,%f,%f\n",add_duration/1e3,delete_duration/1e3,box_delete_duration/1e3,search_duration/1e3,total_duration/1e3);
+        fclose(stdout);        
     }
     // printf("Point Cloud Points:\n");
     // printf("Target Point is : (%0.3f, %0.3f, %0.3f)\n", target.x, target.y, target.z);
@@ -234,8 +245,6 @@ int main(int argc, char** argv){
         vector<PointType> ().swap(scapegoat_kd_tree.PCL_Storage);
         if (scapegoat_kd_tree.Root_Node != nullptr) scapegoat_kd_tree.traverse_for_rebuild(scapegoat_kd_tree.Root_Node);
         print_point_vec(scapegoat_kd_tree.PCL_Storage);   
-        printf("Box deleted\n");
-        printf("x:(%0.3f %0.3f) y:(%0.3f %0.3f) z:(%0.3f %0.3f)\n",x_r[0][0],x_r[0][1],y_r[0][0],y_r[0][1],z_r[0][0],z_r[0][1]); 
         fclose(stdout);        
     } else {
         printf("Finished %d times test\n",counter);
@@ -248,4 +257,3 @@ int main(int argc, char** argv){
     }
     return 0;
 }
-

@@ -49,7 +49,7 @@ void KD_TREE::Nearest_Search(PointType point, int k_nearest, vector<PointType>& 
     return;
 }
 
-void KD_TREE::Add_Points(vector<PointType> PointToAdd, int PointNum){
+void KD_TREE::Add_Points(vector<PointType> PointToAdd){
     rebuild_counter = 0;
     for (int i=0; i<PointToAdd.size();i++){
         Add(Root_Node, PointToAdd[i]);
@@ -58,7 +58,7 @@ void KD_TREE::Add_Points(vector<PointType> PointToAdd, int PointNum){
     return;
 }
 
-void KD_TREE::Delete_Points(vector<PointType> PointToDel, int PointNum){
+void KD_TREE::Delete_Points(vector<PointType> PointToDel){
     bool flag;
     rebuild_counter = 0;
     for (int i=0;i!=PointToDel.size();i++){
@@ -71,11 +71,11 @@ void KD_TREE::Delete_Points(vector<PointType> PointToDel, int PointNum){
     return;
 }
 
-void KD_TREE::Delete_Point_Boxes(float box_x_range[][2], float box_y_range[][2], float box_z_range[][2], int Box_Number){
+void KD_TREE::Delete_Point_Boxes(vector<BoxPointType> BoxPoints){
     rebuild_counter = 0;
     delete_counter = 0;
-    for (int i=0;i < Box_Number;i++){
-        Delete_by_range(Root_Node , box_x_range[i], box_y_range[i], box_z_range[i]);
+    for (int i=0;i < BoxPoints.size();i++){
+        Delete_by_range(Root_Node ,BoxPoints[i]);
     }
     printf("Delete counter is %d, ", delete_counter);
     printf("Rebuild counter is %d, ", rebuild_counter);     
@@ -131,7 +131,7 @@ void KD_TREE::BuildTree(KD_TREE_NODE * &root, int l, int r){
     BuildTree(root->left_son_ptr, l, mid-1);
     BuildTree(root->right_son_ptr, mid+1, r);  
     Update(root);
-    downsample(root);
+    //downsample(root);
     // In the very first building tree, check is unnecessary as the balance properties is gauranteed.
     return;
 }
@@ -146,13 +146,13 @@ void KD_TREE::Rebuild(KD_TREE_NODE * &root){
     return;
 }
 
-void KD_TREE::Delete_by_range(KD_TREE_NODE * root, float x_range[], float y_range[], float z_range[]){
+void KD_TREE::Delete_by_range(KD_TREE_NODE * root,  BoxPointType boxpoint){
     Push_Down(root);     
     if (root == nullptr || root->tree_deleted) return;
-    if (x_range[1] + EPS < root->node_range_x[0] || x_range[0] - EPS > root->node_range_x[1]) return;
-    if (y_range[1] + EPS < root->node_range_y[0] || y_range[0] - EPS > root->node_range_y[1]) return;
-    if (z_range[1] + EPS < root->node_range_z[0] || z_range[0] - EPS > root->node_range_z[1]) return;
-    if (x_range[0]-EPS < root->node_range_x[0] && x_range[1]+EPS > root->node_range_x[1] && y_range[0]-EPS < root->node_range_y[0] && y_range[1]+EPS > root->node_range_y[1] && z_range[0]-EPS < root->node_range_z[0] && z_range[1]+EPS > root->node_range_z[1]){
+    if (boxpoint.vertex_max[0] + EPS < root->node_range_x[0] || boxpoint.vertex_min[0] - EPS > root->node_range_x[1]) return;
+    if (boxpoint.vertex_max[1] + EPS < root->node_range_y[0] || boxpoint.vertex_min[1] - EPS > root->node_range_y[1]) return;
+    if (boxpoint.vertex_max[2] + EPS < root->node_range_z[0] || boxpoint.vertex_min[2] - EPS > root->node_range_z[1]) return;
+    if (boxpoint.vertex_min[0]-EPS < root->node_range_x[0] && boxpoint.vertex_max[0]+EPS > root->node_range_x[1] && boxpoint.vertex_min[1]-EPS < root->node_range_y[0] && boxpoint.vertex_max[1]+EPS > root->node_range_y[1] && boxpoint.vertex_min[2]-EPS < root->node_range_z[0] && boxpoint.vertex_max[2]+EPS > root->node_range_z[1]){
         //printf("Delete in range (%0.3f,%0.3f) (%0.3f,%0.3f) (%0.3f,%0.3f)\n",x_range[0],x_range[1],y_range[0],y_range[1],z_range[0],z_range[1]);        
         //printf("Delete by range (%0.3f,%0.3f) (%0.3f,%0.3f) (%0.3f,%0.3f)\n",root->node_range_x[0],root->node_range_x[1],root->node_range_y[0],root->node_range_y[1],root->node_range_z[0],root->node_range_z[1]);
         root->tree_deleted = true;
@@ -161,14 +161,14 @@ void KD_TREE::Delete_by_range(KD_TREE_NODE * root, float x_range[], float y_rang
         delete_counter += root->TreeSize;
         return;
     }
-    if (x_range[0]-EPS < root->point.x && x_range[1]+EPS > root->point.x && y_range[0]-EPS < root->point.y && y_range[1]+EPS > root->point.y && z_range[0]-EPS < root->point.z && z_range[1]+EPS > root->point.z){
+    if (boxpoint.vertex_min[0]-EPS < root->point.x && boxpoint.vertex_max[0]+EPS > root->point.x && boxpoint.vertex_min[1]-EPS < root->point.y && boxpoint.vertex_max[1]+EPS > root->point.y && boxpoint.vertex_min[2]-EPS < root->point.z && boxpoint.vertex_max[2]+EPS > root->point.z){
         //printf("Deleted points: (%0.3f,%0.3f,%0.3f)\n",root->point.x,root->point.y,root->point.z);
         root->point_deleted = true;
         root->invalid_point_num += 1;
         delete_counter += 1;
     }    
-    Delete_by_range(root->left_son_ptr, x_range, y_range, z_range);
-    Delete_by_range(root->right_son_ptr, x_range, y_range, z_range);
+    Delete_by_range(root->left_son_ptr, boxpoint);
+    Delete_by_range(root->right_son_ptr, boxpoint);
     Update(root);
     root->need_rebuild = Criterion_Check(root);
     if (!(root->need_rebuild)){
@@ -246,7 +246,7 @@ void KD_TREE::Add(KD_TREE_NODE * &root, PointType point){
         break;
     }    
     Update(root);
-    downsample(root);
+    // downsample(root);
     root->need_rebuild = Criterion_Check(root);
     if (!root->need_rebuild){
         if (root->left_son_ptr != nullptr & root->left_son_ptr->need_rebuild) Rebuild(root->left_son_ptr);
@@ -430,4 +430,3 @@ float KD_TREE::calc_box_dist(KD_TREE_NODE * node, PointType point){
 bool KD_TREE::point_cmp_x(PointType a, PointType b) { return a.x < b.x;}
 bool KD_TREE::point_cmp_y(PointType a, PointType b) { return a.y < b.y;}
 bool KD_TREE::point_cmp_z(PointType a, PointType b) { return a.z < b.z;}
-
