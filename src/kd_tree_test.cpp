@@ -18,7 +18,7 @@
 #define New_Point_Num 250
 #define Delete_Point_Num 200
 #define Nearest_Num 5
-#define Test_Time 100
+#define Test_Time 10000
 #define Search_Time 400
 #define Box_Length 1
 #define Box_Num 1
@@ -162,9 +162,9 @@ int main(int argc, char** argv){
     PointType target; 
     // Initialize k-d tree
     FILE *fp_log;
-    fp_log = freopen("kd_tree_test_log.txt","w",stdout);
+    fp_log = fopen("kd_tree_test_log.txt","w");
     fprintf(fp_log,"Add, Delete Points, Delete Boxes, Search, Total\n");
-    fclose(stdout);
+    fclose(fp_log);
     generate_initial_point_cloud(Point_Num);
     scapegoat_kd_tree.Build(point_cloud);    
     while (flag && counter < Test_Time){
@@ -224,9 +224,9 @@ int main(int argc, char** argv){
         raw_cmp(target, Nearest_Num);    
         flag = cmp_point_vec(search_result, raw_cmp_result);      
         counter += 1;    
-        fp_log = freopen("kd_tree_test_log.txt","w",stdout);
+        fp_log = fopen("kd_tree_test_log.txt","a");
         fprintf(fp_log,"%f,%f,%f,%f,%f\n",add_duration/1e3,delete_duration/1e3,box_delete_duration/1e3,search_duration/1e3,total_duration/1e3);
-        fclose(stdout);        
+        fclose(fp_log);        
     }
     // printf("Point Cloud Points:\n");
     // printf("Target Point is : (%0.3f, %0.3f, %0.3f)\n", target.x, target.y, target.z);
