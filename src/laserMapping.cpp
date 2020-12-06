@@ -47,6 +47,7 @@
 #include <common_lib.h>
 #include "IMU_Processing.hpp"
 #include <nav_msgs/Odometry.h>
+#include <nav_msgs/Path.h>
 #include <opencv2/core/eigen.hpp>
 #include <visualization_msgs/Marker.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -103,6 +104,7 @@ double lidar_end_time = 0.0;
 double last_timestamp_lidar = -1;
 double last_timestamp_imu   = -1;
 double HALF_FOV_COS = 0.0;
+double res_mean_last = 0.05;
 
 std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer;
 std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer;
@@ -541,11 +543,16 @@ int main(int argc, char** argv)
             ("/Laser_map", 100);
     ros::Publisher pubOdomAftMapped = nh.advertise<nav_msgs::Odometry> 
             ("/aft_mapped_to_init", 10);
-
+    ros::Publisher pubPath          = nh.advertise<nav_msgs::Path> 
+            ("/path", 10);
 #ifdef DEPLOY
     ros::Publisher mavros_pose_publisher = nh.advertise<geometry_msgs::PoseStamped>("/mavros/vision_pose/pose", 10);
-    geometry_msgs::PoseStamped msg_body_pose;
 #endif
+    geometry_msgs::PoseStamped msg_body_pose;
+    nav_msgs::Path path;
+    path.header.stamp    = ros::Time::now();
+    path.header.frame_id ="/camera_init";
+
     
     /*** variables definition ***/
     bool dense_map_en, Need_Init = true;
@@ -674,18 +681,18 @@ int main(int argc, char** argv)
             /*** ICP and iterated Kalman filter update ***/
             PointCloudXYZI::Ptr coeffSel_tmpt (new PointCloudXYZI(*feats_down));
             PointCloudXYZI::Ptr feats_down_updated (new PointCloudXYZI(*feats_down));
+            std::vector<double> res_last(feats_down_size, 1000.0); // initial
 
             if (featsFromMapNum > 100)
             {
+                
                 kdtreeSurfFromMap->setInputCloud(featsFromMap);
                 std::vector<bool> point_selected_surf(feats_down_size, true);
                 std::vector<std::vector<int>> pointSearchInd_surf(feats_down_size);
                 
                 int  rematch_num = 0;
                 bool rematch_en = 0;
-
                 t2 = omp_get_wtime();
-                
                 for (iterCount = 0; iterCount < NUM_MAX_ITERATIONS; iterCount++) 
                 {
                     match_start = omp_get_wtime();
@@ -707,11 +714,12 @@ int main(int argc, char** argv)
                         auto &points_near = pointSearchInd_surf[i];
                         if (iterCount == 0 || rematch_en)
                         {
+                            point_selected_surf[i] = true;
                             /** Find the closest surface/line in the map **/
                             kdtreeSurfFromMap->nearestKSearch(pointSel_tmpt, NUM_MATCH_POINTS, points_near, pointSearchSqDis_surf);
-                            if (pointSearchSqDis_surf[NUM_MATCH_POINTS - 1] < 3)
+                            if (pointSearchSqDis_surf[NUM_MATCH_POINTS - 1] > 6)
                             {
-                                point_selected_surf[i] = true;
+                                point_selected_surf[i] = false;
                             }
                         }
                         
@@ -771,13 +779,22 @@ int main(int argc, char** argv)
                             //if(fabs(pd2) > 0.1) continue;
                             float s = 1 - 0.9 * fabs(pd2) / sqrt(sqrt(pointSel_tmpt.x * pointSel_tmpt.x + pointSel_tmpt.y * pointSel_tmpt.y + pointSel_tmpt.z * pointSel_tmpt.z));
 
-                            if (s > 0.92)
+                            if ((s > 0.92))// && ((std::abs(pd2) - res_last[i]) < 3 * res_mean_last))
                             {
+                                if(std::abs(pd2) > 5 * res_mean_last)
+                                {
+                                    point_selected_surf[i] = false;
+                                    res_last[i] = 0.0;
+                                    continue;
+                                }
                                 point_selected_surf[i] = true;
                                 coeffSel_tmpt->points[i].x = pa;
                                 coeffSel_tmpt->points[i].y = pb;
                                 coeffSel_tmpt->points[i].z = pc;
                                 coeffSel_tmpt->points[i].intensity = pd2;
+                                
+                                // if(i%50==0) std::cout<<"s: "<<s<<"last res: "<<res_last[i]<<" current res: "<<std::abs(pd2)<<std::endl;
+                                res_last[i] = std::abs(pd2);
                             }
                             else
                             {
@@ -789,6 +806,22 @@ int main(int argc, char** argv)
                     }
 
                     double total_residual = 0.0;
+                    laserCloudSelNum = 0;
+
+                    for (int i = 0; i < coeffSel_tmpt->points.size(); i++)
+                    {
+                        if (point_selected_surf[i])
+                        {
+                            total_residual   += res_last[i];
+                            laserCloudSelNum ++;
+                        }
+                    }
+
+                    res_mean_last = total_residual / laserCloudSelNum;
+
+                    // if(iterCount == 1) 
+                    std::cout << "[ mapping ]: Effective feature num: "<<laserCloudSelNum<<" res_mean_last "<<res_mean_last<<std::endl;
+
                     for (int i = 0; i < coeffSel_tmpt->points.size(); i++)
                     {
                         float error_abs = std::abs(coeffSel_tmpt->points[i].intensity);
@@ -798,14 +831,7 @@ int main(int argc, char** argv)
                             coeffSel->push_back(coeffSel_tmpt->points[i]);
                             total_residual += error_abs;
                         }
-                    }
-
-                    laserCloudSelNum = laserCloudOri->points.size();
-                    double ave_residual = total_residual / laserCloudSelNum;
-                    // ave_res_last 
-
-                    effect_feat_num = coeffSel->size();
-                    if(iterCount == 1) std::cout << "[ mapping ]: Effective feature num: "<<effect_feat_num<<std::endl;
+                    }                    
 
                     match_time += omp_get_wtime() - match_start;
                     solve_start = omp_get_wtime();
@@ -885,7 +911,7 @@ int main(int argc, char** argv)
 
                     #ifdef DEBUG_PRINT
                     std::cout<<"update: R"<<euler_cur.transpose()*57.3<<" p "<<state.pos_end.transpose()<<" v "<<state.vel_end.transpose()<<" bg"<<state.bias_g.transpose()<<" ba"<<state.bias_a.transpose()<<std::endl;
-                    std::cout<<"dR & dT: "<<deltaR<<" "<<deltaT<<" res norm:"<<ave_residual<<std::endl;
+                    std::cout<<"dR & dT: "<<deltaR<<" "<<deltaT<<" res norm:"<<res_mean_last<<std::endl;
                     #endif
 
                     /*** Rematch Judgement ***/
@@ -970,37 +996,37 @@ int main(int argc, char** argv)
             }
 
             /******* Publish Effective points *******/
-            // {
-            // laserCloudFullResColor->clear();
-            // pcl::PointXYZRGB temp_point;
-            // for (int i = 0; i < laserCloudSelNum; i++)
-            // {
-            //     RGBpointBodyToWorld(&laserCloudOri->points[i], &temp_point);
-            //     laserCloudFullResColor->push_back(temp_point);
-            // }
-            // sensor_msgs::PointCloud2 laserCloudFullRes3;
-            // pcl::toROSMsg(*laserCloudFullResColor, laserCloudFullRes3);
-            // laserCloudFullRes3.header.stamp = ros::Time::now();//.fromSec(last_timestamp_lidar);
-            // laserCloudFullRes3.header.frame_id = "/camera_init";
-            // pubLaserCloudEffect.publish(laserCloudFullRes3);
-            // }
+            {
+            laserCloudFullResColor->clear();
+            pcl::PointXYZRGB temp_point;
+            for (int i = 0; i < laserCloudSelNum; i++)
+            {
+                RGBpointBodyToWorld(&laserCloudOri->points[i], &temp_point);
+                laserCloudFullResColor->push_back(temp_point);
+            }
+            sensor_msgs::PointCloud2 laserCloudFullRes3;
+            pcl::toROSMsg(*laserCloudFullResColor, laserCloudFullRes3);
+            laserCloudFullRes3.header.stamp = ros::Time::now();//.fromSec(last_timestamp_lidar);
+            laserCloudFullRes3.header.frame_id = "/camera_init";
+            pubLaserCloudEffect.publish(laserCloudFullRes3);
+            }
 
             /******* Publish Maps:  *******/
-            // sensor_msgs::PointCloud2 laserCloudMap;
-            // pcl::toROSMsg(*featsFromMap, laserCloudMap);
-            // laserCloudMap.header.stamp = ros::Time::now();//ros::Time().fromSec(last_timestamp_lidar);
-            // laserCloudMap.header.frame_id = "/camera_init";
-            // pubLaserCloudMap.publish(laserCloudMap);
+            sensor_msgs::PointCloud2 laserCloudMap;
+            pcl::toROSMsg(*featsFromMap, laserCloudMap);
+            laserCloudMap.header.stamp = ros::Time::now();//ros::Time().fromSec(last_timestamp_lidar);
+            laserCloudMap.header.frame_id = "/camera_init";
+            pubLaserCloudMap.publish(laserCloudMap);
 
             /******* Publish Odometry ******/
             geometry_msgs::Quaternion geoQuat = tf::createQuaternionMsgFromRollPitchYaw
-                    (euler_cur(2), - euler_cur(0), - euler_cur(1));
+                    (euler_cur(0), euler_cur(1), euler_cur(2));
             odomAftMapped.header.frame_id = "/camera_init";
             odomAftMapped.child_frame_id = "/aft_mapped";
             odomAftMapped.header.stamp = ros::Time::now();//ros::Time().fromSec(last_timestamp_lidar);
-            odomAftMapped.pose.pose.orientation.x = -geoQuat.y;
-            odomAftMapped.pose.pose.orientation.y = -geoQuat.z;
-            odomAftMapped.pose.pose.orientation.z = geoQuat.x;
+            odomAftMapped.pose.pose.orientation.x = geoQuat.x;
+            odomAftMapped.pose.pose.orientation.y = geoQuat.y;
+            odomAftMapped.pose.pose.orientation.z = geoQuat.z;
             odomAftMapped.pose.pose.orientation.w = geoQuat.w;
             odomAftMapped.pose.pose.position.x = state.pos_end(0);
             odomAftMapped.pose.pose.position.y = state.pos_end(1);
@@ -1021,18 +1047,24 @@ int main(int argc, char** argv)
             transform.setRotation( q );
             br.sendTransform( tf::StampedTransform( transform, odomAftMapped.header.stamp, "/camera_init", "/aft_mapped" ) );
 
-            #ifdef DEPLOY
+            
             msg_body_pose.header.stamp = ros::Time::now();
             msg_body_pose.header.frame_id = "/camera_odom_frame";
             msg_body_pose.pose.position.x = state.pos_end(0);
             msg_body_pose.pose.position.y = state.pos_end(1);
             msg_body_pose.pose.position.z = state.pos_end(2);
-            msg_body_pose.pose.orientation.x = - geoQuat.y;
-            msg_body_pose.pose.orientation.y = - geoQuat.z;
-            msg_body_pose.pose.orientation.z = geoQuat.x;
+            msg_body_pose.pose.orientation.x = geoQuat.x;
+            msg_body_pose.pose.orientation.y = geoQuat.y;
+            msg_body_pose.pose.orientation.z = geoQuat.z;
             msg_body_pose.pose.orientation.w = geoQuat.w;
+            #ifdef DEPLOY
             mavros_pose_publisher.publish(msg_body_pose);
             #endif
+
+            /******* Publish Path ********/
+            msg_body_pose.header.frame_id = "/camera_init";
+            path.poses.push_back(msg_body_pose);
+            pubPath.publish(path);
 
             /*** save debug variables ***/
             t4 = omp_get_wtime();
