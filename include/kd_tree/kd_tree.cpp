@@ -52,6 +52,7 @@ void KD_TREE::Add_Points(vector<PointType> PointToAdd, int PointNum){
     for (int i=0; i<PointToAdd.size();i++){
         Add(Root_Node, PointToAdd[i]);
     }
+    printf("Rebuild counter is %d, ", rebuild_counter);   
     return;
 }
 
@@ -129,10 +130,10 @@ void KD_TREE::BuildTree(KD_TREE_NODE * &root, int l, int r){
 void KD_TREE::Rebuild(KD_TREE_NODE * &root){
     // Clear the PCL_Storage vector and release memory
     vector<PointType> ().swap(PCL_Storage);
+    rebuild_counter += root->TreeSize;    
     traverse_for_rebuild(root);
     delete_tree_nodes(root);
     BuildTree(root, 0, PCL_Storage.size()-1);
-    rebuild_counter += 1;
     return;
 }
 
@@ -274,7 +275,7 @@ void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point){
 }
 
 bool KD_TREE::Criterion_Check(KD_TREE_NODE * root){
-    if (root->TreeSize == 1){
+    if (root->TreeSize < Minimal_Unbalanced_Tree_Size){
         return false;
     }
     float balance_evaluation = 0.0f;

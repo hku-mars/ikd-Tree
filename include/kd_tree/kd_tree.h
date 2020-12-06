@@ -4,6 +4,7 @@
 #include <queue>
 
 #define EPS 1e-6
+#define Minimal_Unbalanced_Tree_Size 50
 
 
 using namespace std;
@@ -40,7 +41,6 @@ class KD_TREE
 {
 private:
     int search_counter = 0;
-    int rebuild_counter = 0;
     int delete_counter = 0;
     float delete_criterion_param = 0.5f;
     float balance_criterion_param = 0.7f;
@@ -76,6 +76,7 @@ public:
     vector<PointType> PCL_Storage;     
     vector<PointType> Points_deleted;   
     KD_TREE_NODE * Root_Node = nullptr;    
+    int rebuild_counter = 0;
     // void Compatibility_Check();
 };
 

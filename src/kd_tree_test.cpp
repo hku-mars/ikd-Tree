@@ -29,7 +29,7 @@ vector<PointType> cloud_decrement;
 vector<PointType> search_result;
 vector<PointType> raw_cmp_result;
 
-KD_TREE scapegoat_kd_tree(0.5,0.65);
+KD_TREE scapegoat_kd_tree(0.5,0.7);
 
 float rand_float(float x_min, float x_max){
     float rand_ratio = rand()/(float)RAND_MAX;
@@ -148,8 +148,13 @@ int main(int argc, char** argv){
     bool flag = true;
     float x_r[Box_Num][2], y_r[Box_Num][2], z_r[Box_Num][2];
     float max_total_time = 0.0;
+    float box_delete_time = 0.0;
+    float add_time = 0.0;
+    float delete_time = 0.0;
+    float search_time = 0.0;
     int max_point_num = 0;
     int point_num_start = 0;
+    int rebuild_counter = 0, add_rebuild_record = 0;
     PointType target; 
     // Initialize k-d tree
     generate_initial_point_cloud(Point_Num);
@@ -162,45 +167,50 @@ int main(int argc, char** argv){
         auto t1 = chrono::high_resolution_clock::now();
         scapegoat_kd_tree.Add_Points(cloud_increment, New_Point_Num);
         auto t2 = chrono::high_resolution_clock::now();
-        auto duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
-        auto total_duration = duration;
-        printf("Add point time cost is %0.3f ms\n",float(duration)/1e3);
+        auto add_duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
+        auto total_duration = add_duration;
+        add_rebuild_record = scapegoat_kd_tree.rebuild_counter;
+        printf("Add point time cost is %0.3f ms\n",float(add_duration)/1e3);
         // Decremental Operation
-        duration = duration - duration;   
         generate_decrement_point_cloud(Delete_Point_Num);     
         t1 = chrono::high_resolution_clock::now();
         scapegoat_kd_tree.Delete_Points(cloud_decrement, Delete_Point_Num);
         t2 = chrono::high_resolution_clock::now();
-        duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
-        total_duration += duration;
-        printf("Delete point time cost is %0.3f ms\n",float(duration)/1e3);      
+        auto delete_duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
+        total_duration += delete_duration;
+        printf("Delete point time cost is %0.3f ms\n",float(delete_duration)/1e3);      
+        auto box_delete_duration = chrono::duration_cast<chrono::microseconds>(t2-t2).count();        
         // Box Decremental Operation
         if ((counter+1) % 20  == 0 ){
             generate_box_decrement(x_r, y_r, z_r, Box_Length, Box_Num);
-            duration = duration - duration;   
             t1 = chrono::high_resolution_clock::now();
             scapegoat_kd_tree.Delete_Point_Boxes(x_r, y_r, z_r, Box_Num);
             t2 = chrono::high_resolution_clock::now();
-            duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
-            total_duration += duration;
-            printf("Delete box points time cost is %0.3f ms\n",float(duration)/1e3); 
+            box_delete_duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
+            total_duration += box_delete_duration;
+            printf("Delete box points time cost is %0.3f ms\n",float(box_delete_duration)/1e3); 
         }
-        // Search Operation  
-        duration = duration - duration;               
+        // Search Operation
+        auto search_duration = chrono::duration_cast<chrono::microseconds>(t2-t2).count();            
         for (int k=0;k<Search_Time;k++){
             vector<PointType> ().swap(search_result);             
             target = generate_target_point();    
             t1 = chrono::high_resolution_clock::now();
             scapegoat_kd_tree.Nearest_Search(target, Nearest_Num, search_result);
             t2 = chrono::high_resolution_clock::now();
-            duration += chrono::duration_cast<chrono::microseconds>(t2-t1).count();
+            search_duration += chrono::duration_cast<chrono::microseconds>(t2-t1).count();
         }
-        printf("Search nearest point time cost is %0.3f ms\n",float(duration)/1e3);
-        total_duration += duration;
+        printf("Search nearest point time cost is %0.3f ms\n",float(search_duration)/1e3);
+        total_duration += search_duration;
         printf("Total time is %0.3f ms\n",total_duration/1e3);
         if (float(total_duration) > max_total_time){
             max_total_time = float(total_duration);
+            box_delete_time = box_delete_duration;
+            add_time = add_duration;
+            delete_time = delete_duration;
+            search_time = search_duration;            
             max_point_num = point_num_start;
+            rebuild_counter = add_rebuild_record;
         }
         max_total_time = max(max_total_time, float(total_duration));
         raw_cmp(target, Nearest_Num);    
@@ -230,6 +240,10 @@ int main(int argc, char** argv){
     } else {
         printf("Finished %d times test\n",counter);
         printf("Max Total Time is: %0.3fms\n",max_total_time/1e3);
+        printf("Add Time is: %0.3fms with rebuild counter %d\n",add_time/1e3,rebuild_counter);        
+        printf("Delete Time is: %0.3fms\n",delete_time/1e3);
+        printf("Box delete Time is: %0.3fms\n",box_delete_time/1e3);     
+        printf("Search Time is: %0.3fms\n",search_time/1e3);           
         printf("Corresponding point number is: %d\n",max_point_num);
     }
     return 0;
