@@ -6,9 +6,11 @@ Author: Yixi Cai
 email: yixicai@connect.hku.hk
 */
 
-KD_TREE::KD_TREE(float delete_param, float balance_param) {
+KD_TREE::KD_TREE(float delete_param, float balance_param, float box_length, int max_point_num) {
     delete_criterion_param = delete_param;
     balance_criterion_param = balance_param;
+    downsample_volume = box_length * box_length * box_length;
+    Maximal_Point_Num = max_point_num;    
 }
 
 KD_TREE::~KD_TREE()
@@ -80,6 +82,12 @@ void KD_TREE::Delete_Point_Boxes(float box_x_range[][2], float box_y_range[][2],
     return;
 }
 
+void KD_TREE::acquire_removed_points(vector<PointType> & removed_points){
+    removed_points = Points_deleted;
+    vector<PointType> ().swap(Points_deleted);
+    return;
+}
+
 void KD_TREE::BuildTree(KD_TREE_NODE * &root, int l, int r){
     if (l>r) return;
     root = new KD_TREE_NODE;
@@ -123,6 +131,7 @@ void KD_TREE::BuildTree(KD_TREE_NODE * &root, int l, int r){
     BuildTree(root->left_son_ptr, l, mid-1);
     BuildTree(root->right_son_ptr, mid+1, r);  
     Update(root);
+    downsample(root);
     // In the very first building tree, check is unnecessary as the balance properties is gauranteed.
     return;
 }
@@ -237,6 +246,7 @@ void KD_TREE::Add(KD_TREE_NODE * &root, PointType point){
         break;
     }    
     Update(root);
+    downsample(root);
     root->need_rebuild = Criterion_Check(root);
     if (!root->need_rebuild){
         if (root->left_son_ptr != nullptr & root->left_son_ptr->need_rebuild) Rebuild(root->left_son_ptr);
@@ -368,8 +378,30 @@ void KD_TREE::delete_tree_nodes(KD_TREE_NODE * &root){
     if (root == nullptr) return;
     delete_tree_nodes(root->left_son_ptr);
     delete_tree_nodes(root->right_son_ptr);
+    if (!downsample_flag) Points_deleted.push_back(root->point);
     delete root;
     root = nullptr;
+    return;
+}
+
+void KD_TREE::downsample(KD_TREE_NODE * &root){
+    float Volume = (root->node_range_x[1]-root->node_range_x[0]) * (root->node_range_y[1] - root->node_range_y[0]) * (root->node_range_z[1] - root->node_range_z[0]);
+    if (Volume < downsample_volume + EPS && (root->TreeSize - root->invalid_point_num) > Maximal_Point_Num){
+        PointType point, downsample_point;
+        point.x = (root->node_range_x[1] - root->node_range_x[0])/2.0f;
+        point.y = (root->node_range_y[1] - root->node_range_y[0])/2.0f;
+        point.z = (root->node_range_z[1] - root->node_range_z[0])/2.0f;
+        q = priority_queue<PointType_CMP> (); // Clear the priority queue;
+        search_counter = 0;
+        Search(root, 1, point);        
+        downsample_point = q.top().point;
+        downsample_flag = true;
+        delete_tree_nodes(root);
+        root = new KD_TREE_NODE;
+        root->point = downsample_point;
+        Update(root);
+        downsample_flag = false;
+    }
     return;
 }
 

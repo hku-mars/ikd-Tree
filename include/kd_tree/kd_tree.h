@@ -44,7 +44,11 @@ private:
     int delete_counter = 0;
     float delete_criterion_param = 0.5f;
     float balance_criterion_param = 0.7f;
+    float downsample_volume = 0.1*0.1*0.1;
+    float Maximal_Point_Num = 10;
+    bool downsample_flag = false;
     priority_queue<PointType_CMP> q;
+    vector<PointType> Points_deleted;
     void BuildTree(KD_TREE_NODE * &root, int l, int r);
     void Rebuild(KD_TREE_NODE * &root);
     void Delete_by_range(KD_TREE_NODE * root, float x_range[], float y_range[], float z_range[]);
@@ -55,6 +59,7 @@ private:
     void Push_Down(KD_TREE_NODE * root);
     void Update(KD_TREE_NODE * root); 
     void delete_tree_nodes(KD_TREE_NODE * &root);
+    void downsample(KD_TREE_NODE * &root);
     bool same_point(PointType a, PointType b);
     float calc_dist(PointType a, PointType b);
     float calc_box_dist(KD_TREE_NODE * node, PointType point);
@@ -63,18 +68,20 @@ private:
     static bool point_cmp_z(PointType a, PointType b); 
 
 public:
-    KD_TREE(float, float);
+    KD_TREE(float, float, float, int);
     ~KD_TREE();
     void Set_delete_criterion_param(float delete_param);
     void Set_balance_criterion_param(float balance_param);
+    void set_downsample_param(float box_length, int Maximal_Point_Num);
     void Build(vector<PointType> point_cloud);
     void Nearest_Search(PointType point, int k_nearest, vector<PointType> &Nearest_Points);
     void Add_Points(vector<PointType> PointToAdd, int PointNum);
     void Delete_Points(vector<PointType> PointToDel, int PointNum);
     void Delete_Point_Boxes(float box_x_range[][2], float box_y_range[][2], float box_z_range[][2], int Box_Number);
     void traverse_for_rebuild(KD_TREE_NODE * root);
+    void acquire_removed_points(vector<PointType> & removed_points);
     vector<PointType> PCL_Storage;     
-    vector<PointType> Points_deleted;   
+       
     KD_TREE_NODE * Root_Node = nullptr;    
     int rebuild_counter = 0;
     // void Compatibility_Check();

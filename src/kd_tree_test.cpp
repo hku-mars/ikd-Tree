@@ -29,7 +29,7 @@ vector<PointType> cloud_decrement;
 vector<PointType> search_result;
 vector<PointType> raw_cmp_result;
 
-KD_TREE scapegoat_kd_tree(0.5,0.7);
+KD_TREE scapegoat_kd_tree(0.5,0.7,0.1,10);
 
 float rand_float(float x_min, float x_max){
     float rand_ratio = rand()/(float)RAND_MAX;
