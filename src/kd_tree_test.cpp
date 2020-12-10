@@ -14,12 +14,12 @@
 #define Z_MAX 2
 #define Z_MIN 0
 
-#define Point_Num 100000
-#define New_Point_Num 250
-#define Delete_Point_Num 200
+#define Point_Num 50000
+#define New_Point_Num 40
+#define Delete_Point_Num 20
 #define Nearest_Num 5
-#define Test_Time 10
-#define Search_Time 400
+#define Test_Time 10000
+#define Search_Time 40
 #define Box_Length 1
 #define Box_Num 1
 
@@ -193,7 +193,7 @@ int main(int argc, char** argv){
         printf("Delete point time cost is %0.3f ms\n",float(delete_duration)/1e3);      
         auto box_delete_duration = chrono::duration_cast<chrono::microseconds>(t2-t2).count();        
         // Box Decremental Operation
-        if ((counter+1) % 20  == 0 ){
+        if ((counter+1) % 50  == 0 ){
             generate_box_decrement(Delete_Boxes, Box_Length, Box_Num);
             t1 = chrono::high_resolution_clock::now();
             scapegoat_kd_tree.Delete_Point_Boxes(Delete_Boxes);
@@ -260,7 +260,7 @@ int main(int argc, char** argv){
         if (scapegoat_kd_tree.Root_Node != nullptr) scapegoat_kd_tree.traverse_for_rebuild(scapegoat_kd_tree.Root_Node);
         t2 = chrono::high_resolution_clock::now();               
         auto duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
-        printf("Traverse time is %0.3f\n",duration/1e3);
+        printf("Traverse time is %0.3f ms\n",duration/1e3);
         // print_point_vec(scapegoat_kd_tree.PCL_Storage);           
     }
     return 0;

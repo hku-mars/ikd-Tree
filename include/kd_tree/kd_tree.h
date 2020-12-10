@@ -4,7 +4,7 @@
 #include <queue>
 
 #define EPS 1e-6
-#define Minimal_Unbalanced_Tree_Size 50
+#define Minimal_Unbalanced_Tree_Size 200
 
 
 using namespace std;
@@ -80,9 +80,9 @@ public:
     void set_downsample_param(float box_length, int Maximal_Point_Num);
     void Build(vector<PointType> point_cloud);
     void Nearest_Search(PointType point, int k_nearest, vector<PointType> &Nearest_Points);
-    void Add_Points(vector<PointType> PointToAdd);
-    void Delete_Points(vector<PointType> PointToDel);
-    void Delete_Point_Boxes(vector<BoxPointType> BoxPoints);
+    void Add_Points(vector<PointType> & PointToAdd);
+    void Delete_Points(vector<PointType> & PointToDel);
+    void Delete_Point_Boxes(vector<BoxPointType> & BoxPoints);
     void traverse_for_rebuild(KD_TREE_NODE * root);
     void acquire_removed_points(vector<PointType> & removed_points);
     vector<PointType> PCL_Storage;     

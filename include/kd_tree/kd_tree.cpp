@@ -49,7 +49,7 @@ void KD_TREE::Nearest_Search(PointType point, int k_nearest, vector<PointType>& 
     return;
 }
 
-void KD_TREE::Add_Points(vector<PointType> PointToAdd){
+void KD_TREE::Add_Points(vector<PointType> & PointToAdd){
     rebuild_counter = 0;
     for (int i=0; i<PointToAdd.size();i++){
         Add(Root_Node, PointToAdd[i]);
@@ -58,7 +58,7 @@ void KD_TREE::Add_Points(vector<PointType> PointToAdd){
     return;
 }
 
-void KD_TREE::Delete_Points(vector<PointType> PointToDel){
+void KD_TREE::Delete_Points(vector<PointType> & PointToDel){
     bool flag;
     rebuild_counter = 0;
     for (int i=0;i!=PointToDel.size();i++){
@@ -71,7 +71,7 @@ void KD_TREE::Delete_Points(vector<PointType> PointToDel){
     return;
 }
 
-void KD_TREE::Delete_Point_Boxes(vector<BoxPointType> BoxPoints){
+void KD_TREE::Delete_Point_Boxes(vector<BoxPointType> & BoxPoints){
     rebuild_counter = 0;
     delete_counter = 0;
     for (int i=0;i < BoxPoints.size();i++){
