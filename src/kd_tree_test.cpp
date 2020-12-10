@@ -14,11 +14,11 @@
 #define Z_MAX 2
 #define Z_MIN 0
 
-#define Point_Num 50000
+#define Point_Num 100000
 #define New_Point_Num 250
 #define Delete_Point_Num 200
 #define Nearest_Num 5
-#define Test_Time 10000
+#define Test_Time 10
 #define Search_Time 400
 #define Box_Length 1
 #define Box_Num 1
@@ -166,15 +166,19 @@ int main(int argc, char** argv){
     fprintf(fp_log,"Add, Delete Points, Delete Boxes, Search, Total\n");
     fclose(fp_log);
     generate_initial_point_cloud(Point_Num);
+    auto t1 = chrono::high_resolution_clock::now();
     scapegoat_kd_tree.Build(point_cloud);    
+    auto t2 = chrono::high_resolution_clock::now();    
+    auto build_duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
+    printf("Build tree time cost is: %0.3f\n",build_duration/1e3);
     while (flag && counter < Test_Time){
         printf("Test %d:\n",counter+1);
         point_num_start = scapegoat_kd_tree.Root_Node->TreeSize;
         // Incremental Operation
         generate_increment_point_cloud(New_Point_Num);
-        auto t1 = chrono::high_resolution_clock::now();
+        t1 = chrono::high_resolution_clock::now();
         scapegoat_kd_tree.Add_Points(cloud_increment);
-        auto t2 = chrono::high_resolution_clock::now();
+        t2 = chrono::high_resolution_clock::now();
         auto add_duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
         auto total_duration = add_duration;
         add_rebuild_record = scapegoat_kd_tree.rebuild_counter;
@@ -242,9 +246,6 @@ int main(int argc, char** argv){
         printf("k d tree\n");
         print_point_vec(search_result);
         printf("Points in kd_tree\n");
-        vector<PointType> ().swap(scapegoat_kd_tree.PCL_Storage);
-        if (scapegoat_kd_tree.Root_Node != nullptr) scapegoat_kd_tree.traverse_for_rebuild(scapegoat_kd_tree.Root_Node);
-        print_point_vec(scapegoat_kd_tree.PCL_Storage);   
         fclose(stdout);        
     } else {
         printf("Finished %d times test\n",counter);
@@ -254,6 +255,13 @@ int main(int argc, char** argv){
         printf("Box delete Time is: %0.3fms\n",box_delete_time/1e3);     
         printf("Search Time is: %0.3fms\n",search_time/1e3);           
         printf("Corresponding point number is: %d\n",max_point_num);
+        vector<PointType> ().swap(scapegoat_kd_tree.PCL_Storage);
+        t1 = chrono::high_resolution_clock::now(); 
+        if (scapegoat_kd_tree.Root_Node != nullptr) scapegoat_kd_tree.traverse_for_rebuild(scapegoat_kd_tree.Root_Node);
+        t2 = chrono::high_resolution_clock::now();               
+        auto duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
+        printf("Traverse time is %0.3f\n",duration/1e3);
+        // print_point_vec(scapegoat_kd_tree.PCL_Storage);           
     }
     return 0;
 }

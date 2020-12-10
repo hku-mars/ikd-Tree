@@ -131,7 +131,7 @@ void KD_TREE::BuildTree(KD_TREE_NODE * &root, int l, int r){
     BuildTree(root->left_son_ptr, l, mid-1);
     BuildTree(root->right_son_ptr, mid+1, r);  
     Update(root);
-    //downsample(root);
+    downsample(root);
     // In the very first building tree, check is unnecessary as the balance properties is gauranteed.
     return;
 }
@@ -246,7 +246,7 @@ void KD_TREE::Add(KD_TREE_NODE * &root, PointType point){
         break;
     }    
     Update(root);
-    // downsample(root);
+    downsample(root);
     root->need_rebuild = Criterion_Check(root);
     if (!root->need_rebuild){
         if (root->left_son_ptr != nullptr & root->left_son_ptr->need_rebuild) Rebuild(root->left_son_ptr);
