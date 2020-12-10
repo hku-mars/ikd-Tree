@@ -88,7 +88,7 @@ int laserCloudSelNum      = 0;
 const int laserCloudWidth  = 42;
 const int laserCloudHeight = 22;
 const int laserCloudDepth  = 42;
-const int laserCloudNum = laserCloudWidth * laserCloudHeight * laserCloudDepth;//4851
+const int laserCloudNum = laserCloudWidth * laserCloudHeight * laserCloudDepth;
 
 /// IMU relative variables
 std::mutex mtx_buffer;
@@ -117,6 +117,7 @@ std::deque< fast_lio::States > rot_kp_imu_buff;
 //all points
 PointCloudXYZI::Ptr laserCloudFullRes2(new PointCloudXYZI());
 PointCloudXYZI::Ptr featsArray[laserCloudNum];
+// bool                _last_inFOV[laserCloudNum];
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr laserCloudFullResColor(new pcl::PointCloud<pcl::PointXYZRGB>());
 pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfFromMap(new pcl::KdTreeFLANN<PointType>());
 
@@ -435,7 +436,8 @@ void lasermap_fov_segment()
                     laserCloudSurroundInd[laserCloudSurroundNum] = i + laserCloudWidth * j
                             + laserCloudWidth * laserCloudHeight * k;
                     laserCloudSurroundNum ++;
-                    
+
+                    // _last_inFOV = isInLaserFOV;
                 }
             }
         }
@@ -630,12 +632,12 @@ int main(int argc, char** argv)
                 continue;
             }
 
-            double t1,t2,t3,t4,match_start, match_time, solve_start, solve_time, pca_time, svd_time;
+            double t0,t1,t2,t3,t4,match_start, match_time, solve_start, solve_time, pca_time, svd_time;
             match_time = 0;
             solve_time = 0;
             pca_time   = 0;
             svd_time   = 0;
-            t1 = omp_get_wtime();
+            t0 = omp_get_wtime();
 
             p_imu->Process(Measures, state, feats_undistort);
 
@@ -685,7 +687,7 @@ int main(int argc, char** argv)
 
             if (featsFromMapNum > 100)
             {
-                
+                t1 = omp_get_wtime();
                 kdtreeSurfFromMap->setInputCloud(featsFromMap);
                 std::vector<bool> point_selected_surf(feats_down_size, true);
                 std::vector<std::vector<int>> pointSearchInd_surf(feats_down_size);
@@ -1073,10 +1075,10 @@ int main(int argc, char** argv)
             // aver_time_consu = aver_time_consu * 0.5 + (t4 - t1) * 0.5;
             T1.push_back(Measures.lidar_beg_time);
             s_plot.push_back(aver_time_consu);
-            // s_plot2.push_back(double(deltaR));
+            s_plot2.push_back(double(featsFromMapNum)/1000);
             // s_plot3.push_back(double(deltaT));
 
-            std::cout<<"[ mapping ]: time: selection "<<t2-t1 <<" match "<<match_time<<" pca "<<pca_time<<" solve "<<solve_time<<" total "<<t4 - t1<<std::endl;
+            std::cout<<"[ mapping ]: time: segm "<<t1-t0 <<" kdtree build: "<<t2-t1<<" match "<<match_time<<" pca "<<pca_time<<" solve "<<solve_time<<" total "<<t4 - t0<<std::endl;
             fout_out << std::setw(10) << Measures.lidar_beg_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
             <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<< std::endl;
             // fout_out << std::setw(10) << Measures.lidar_beg_time << " " << t3-t1 << " " << effect_feat_num << std::endl;
@@ -1107,7 +1109,7 @@ int main(int argc, char** argv)
         if (!T1.empty())
         {
             plt::named_plot("time consumed",T1,s_plot);
-            // plt::named_plot("R_residual",T1,s_plot2);
+            plt::named_plot("map number",T1,s_plot2);
             // plt::named_plot("T_residual",T1,s_plot3);
             plt::legend();
             plt::show();
