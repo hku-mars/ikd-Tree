@@ -661,7 +661,7 @@ int main(int argc, char** argv)
                 continue;
             }
 
-            double t0,t1,t2,t3,t4,match_start, match_time, solve_start, solve_time, pca_time, svd_time;
+            double t0,t1,t2,t3,t4,t5,match_start, match_time, solve_start, solve_time, pca_time, svd_time;
             match_time = 0;
             solve_time = 0;
             pca_time   = 0;
@@ -733,10 +733,8 @@ int main(int argc, char** argv)
             if (featsFromMapNum >= 5)
             {
                 t1 = omp_get_wtime();
-                std::cout<<"0"<<std::endl;
                 ikdtree.Delete_Point_Boxes(cub_needrm);
                 ikdtree.Add_Points(cube_points_add->points);
-                std::cout<<"1"<<std::endl;
 
                 std::vector<bool> point_selected_surf(feats_down_size, true);
                 std::vector<std::vector<int>> pointSearchInd_surf(feats_down_size);
@@ -750,8 +748,6 @@ int main(int argc, char** argv)
                     match_start = omp_get_wtime();
                     laserCloudOri->clear();
                     coeffSel->clear();
-
-                    std::cout<<"2"<<std::endl;
 
                     /** closest surface search and residual computation **/
                     omp_set_num_threads(4);
@@ -777,7 +773,7 @@ int main(int argc, char** argv)
                             PointType &p_closest = points_near[0];
                             float min_distance = std::pow(p_closest.x - pointSel_tmpt.x, 2) + std::pow(p_closest.y - pointSel_tmpt.y, 2)
                                                     + std::pow(p_closest.z - pointSel_tmpt.z, 2);
-                            if (min_distance > 3*3)
+                            if (min_distance > 5*5)
                             {
                                 point_selected_surf[i] = false;
                             }
@@ -842,7 +838,7 @@ int main(int argc, char** argv)
                             //if(fabs(pd2) > 0.1) continue;
                             float s = 1 - 0.9 * fabs(pd2) / sqrt(sqrt(pointSel_tmpt.x * pointSel_tmpt.x + pointSel_tmpt.y * pointSel_tmpt.y + pointSel_tmpt.z * pointSel_tmpt.z));
 
-                            if ((s > 0.92))// && ((std::abs(pd2) - res_last[i]) < 3 * res_mean_last))
+                            if ((s > 0.85))// && ((std::abs(pd2) - res_last[i]) < 3 * res_mean_last))
                             {
                                 // if(std::abs(pd2) > 5 * res_mean_last)
                                 // {
@@ -867,8 +863,6 @@ int main(int argc, char** argv)
 
                         pca_time += omp_get_wtime() - pca_start;
                     }
-
-                    std::cout<<"3"<<std::endl;
 
                     double total_residual = 0.0;
                     laserCloudSelNum = 0;
@@ -1004,10 +998,15 @@ int main(int argc, char** argv)
                 
                 std::cout<<"[ mapping ]: iteration count: "<<iterCount+1<<std::endl;
 
+                t3 = omp_get_wtime();
+
                 /*** add new frame points to map ikdtree ***/
                 PointVector points_history;
                 ikdtree.Add_Points(feats_down_updated->points);
+                t4 = omp_get_wtime();
                 ikdtree.acquire_removed_points(points_history);
+                t5 = omp_get_wtime();
+                
                 bool if_cube_updated[laserCloudNum] = {0};
                 for (int i = 0; i < points_history.size(); i++)
                 {
@@ -1038,41 +1037,11 @@ int main(int argc, char** argv)
                         }
                     }
                 }
+
+                // t5 = omp_get_wtime();
             }
 
-            // bool if_cube_updated[laserCloudNum] = {0};
-            // for (int i = 0; i < feats_down_size; i++)
-            // {
-            //     PointType &pointSel = feats_down_updated->points[i];
-
-            //     int cubeI = int((pointSel.x + 0.5 * cube_len) / cube_len) + laserCloudCenWidth;
-            //     int cubeJ = int((pointSel.y + 0.5 * cube_len) / cube_len) + laserCloudCenHeight;
-            //     int cubeK = int((pointSel.z + 0.5 * cube_len) / cube_len) + laserCloudCenDepth;
-
-            //     if (pointSel.x + 0.5 * cube_len < 0) cubeI--;
-            //     if (pointSel.y + 0.5 * cube_len < 0) cubeJ--;
-            //     if (pointSel.z + 0.5 * cube_len < 0) cubeK--;
-
-            //     if (cubeI >= 0 && cubeI < laserCloudWidth &&
-            //             cubeJ >= 0 && cubeJ < laserCloudHeight &&
-            //             cubeK >= 0 && cubeK < laserCloudDepth) {
-            //         int cubeInd = cubeI + laserCloudWidth * cubeJ + laserCloudWidth * laserCloudHeight * cubeK;
-            //         featsArray[cubeInd]->push_back(pointSel);
-            //         if_cube_updated[cubeInd] = true;
-            //     }
-            // }
-            // for (int i = 0; i < laserCloudValidNum; i++)
-            // {
-            //     int ind = laserCloudValidInd[i];
-
-            //     if(if_cube_updated[ind])
-            //     {
-            //         downSizeFilterMap.setInputCloud(featsArray[ind]);
-            //         downSizeFilterMap.filter(*featsArray[ind]);
-            //     }
-            // }
-
-            t3 = omp_get_wtime();
+            
 
             /******* Publish current frame points in world coordinates:  *******/
             laserCloudFullRes2->clear();
@@ -1168,7 +1137,6 @@ int main(int argc, char** argv)
             pubPath.publish(path);
 
             /*** save debug variables ***/
-            t4 = omp_get_wtime();
             frame_num ++;
             aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t2 - t1) / frame_num;
             // aver_time_consu = aver_time_consu * 0.5 + (t4 - t1) * 0.5;
@@ -1177,7 +1145,7 @@ int main(int argc, char** argv)
             s_plot2.push_back(double(featsFromMapNum)/1000);
             // s_plot3.push_back(double(deltaT));
 
-            std::cout<<"[ mapping ]: time: segm "<<t1-t0 <<" kdtree build: "<<t2-t1<<" match "<<match_time<<" solve "<<solve_time<<" total no pub "<<t3-t0<<" total "<<t4-t0<<std::endl;
+            std::cout<<"[ mapping ]: time: segm "<<t1-t0 <<" kdtree build: "<<t2-t1<<" match "<<match_time<<" solve "<<solve_time<<" map incre "<<t4-t3<<" octo incre "<<t5-t4<<" total "<<t5-t0<<std::endl;
             fout_out << std::setw(10) << Measures.lidar_beg_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
             <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<< std::endl;
             // fout_out << std::setw(10) << Measures.lidar_beg_time << " " << t3-t1 << " " << effect_feat_num << std::endl;
