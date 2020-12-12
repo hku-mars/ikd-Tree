@@ -167,6 +167,7 @@ void horizon_handler(const livox_ros_driver::CustomMsg::ConstPtr &msg)
   pcl::PointCloud<PointType> pl_full, pl_corn, pl_surf;
 
   uint plsize = msg->point_num;
+
   pl_corn.reserve(plsize); pl_surf.reserve(plsize);
   pl_full.resize(plsize);
 
@@ -175,18 +176,27 @@ void horizon_handler(const livox_ros_driver::CustomMsg::ConstPtr &msg)
     pl_buff[i].reserve(plsize);
   }
   
-  for(uint i=0; i<plsize; i++)
+  for(uint i=1; i<plsize; i++)
   {
-    if(msg->points[i].line < N_SCANS)
+    if((msg->points[i].line < N_SCANS) && ((msg->points[i].tag & 0x30) == 0x10))
     {
       pl_full[i].x = msg->points[i].x;
       pl_full[i].y = msg->points[i].y;
       pl_full[i].z = msg->points[i].z;
       pl_full[i].intensity = msg->points[i].reflectivity;
       pl_full[i].curvature = msg->points[i].offset_time / float(1000000); //use curvature as time of each laser points
-      pl_buff[msg->points[i].line].push_back(pl_full[i]);
+
+      if((std::abs(pl_full[i].x - pl_full[i-1].x) > 1e-7) 
+          || (std::abs(pl_full[i].y - pl_full[i-1].y) > 1e-7)
+          || (std::abs(pl_full[i].z - pl_full[i-1].z) > 1e-7))
+      {
+        pl_buff[msg->points[i].line].push_back(pl_full[i]);
+      }
+      
     }
   }
+
+  if(pl_buff[0].size() < 7) {return;}
 
   for(int j=0; j<N_SCANS; j++)
   {
@@ -197,11 +207,13 @@ void horizon_handler(const livox_ros_driver::CustomMsg::ConstPtr &msg)
     plsize--;
     for(uint i=0; i<plsize; i++)
     {
+      
       types[i].range = sqrt(pl[i].x*pl[i].x + pl[i].y*pl[i].y);
       vx = pl[i].x - pl[i+1].x;
       vy = pl[i].y - pl[i+1].y;
       vz = pl[i].z - pl[i+1].z;
       types[i].dista = vx*vx + vy*vy + vz*vz;
+      // std::cout<<vx<<" "<<vx<<" "<<vz<<" "<<std::endl;
     }
     // plsize++;
     types[plsize].range = sqrt(pl[plsize].x*pl[plsize].x + pl[plsize].y*pl[plsize].y);
@@ -400,9 +412,7 @@ void velo16_handler1(const sensor_msgs::PointCloud2::ConstPtr &msg)
   //   last_stat = orders[scanID];
   // }
 
-
   idx++;
-
 
   for(int j=0; j<N_SCANS; j++)
   {

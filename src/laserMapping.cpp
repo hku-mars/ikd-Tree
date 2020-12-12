@@ -68,7 +68,7 @@
 namespace plt = matplotlibcpp;
 #endif
 
-#define INIT_TIME           (1.0)
+#define INIT_TIME           (0)
 #define LASER_POINT_COV     (0.0015)
 #define NUM_MATCH_POINTS    (5)
 
@@ -783,12 +783,12 @@ int main(int argc, char** argv)
 
                             if ((s > 0.92))// && ((std::abs(pd2) - res_last[i]) < 3 * res_mean_last))
                             {
-                                if(std::abs(pd2) > 5 * res_mean_last)
-                                {
-                                    point_selected_surf[i] = false;
-                                    res_last[i] = 0.0;
-                                    continue;
-                                }
+                                // if(std::abs(pd2) > 5 * res_mean_last)
+                                // {
+                                //     point_selected_surf[i] = false;
+                                //     res_last[i] = 0.0;
+                                //     continue;
+                                // }
                                 point_selected_surf[i] = true;
                                 coeffSel_tmpt->points[i].x = pa;
                                 coeffSel_tmpt->points[i].y = pb;
