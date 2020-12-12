@@ -1,15 +1,17 @@
 #pragma once
 #include <pcl/point_types.h>
+#include <Eigen/StdVector>
+#include <Eigen/Geometry>
 #include <stdio.h>
 #include <queue>
 
 #define EPS 1e-6
 #define Minimal_Unbalanced_Tree_Size 200
 
-
 using namespace std;
 
 typedef pcl::PointXYZINormal PointType;
+typedef vector<PointType, Eigen::aligned_allocator<PointType>>  PointVector;
 
 struct KD_TREE_NODE
 {
@@ -52,14 +54,14 @@ private:
     float downsample_volume = 0.1*0.1*0.1;
     float Maximal_Point_Num = 10;
     bool downsample_flag = false;
-    priority_queue<PointType_CMP> q;
-    vector<PointType> Points_deleted;
+    // priority_queue<PointType_CMP> q;
+    PointVector Points_deleted;
     void BuildTree(KD_TREE_NODE * &root, int l, int r);
     void Rebuild(KD_TREE_NODE * &root);
     void Delete_by_range(KD_TREE_NODE * root, BoxPointType boxpoint);
     bool Delete_by_point(KD_TREE_NODE * root, PointType point);
     void Add(KD_TREE_NODE * &root, PointType point);
-    void Search(KD_TREE_NODE * root, int k_nearest, PointType point);
+    void Search(KD_TREE_NODE * root, int k_nearest, PointType point, priority_queue<PointType_CMP> & q);
     bool Criterion_Check(KD_TREE_NODE * root);
     void Push_Down(KD_TREE_NODE * root);
     void Update(KD_TREE_NODE * root); 
@@ -78,14 +80,14 @@ public:
     void Set_delete_criterion_param(float delete_param);
     void Set_balance_criterion_param(float balance_param);
     void set_downsample_param(float box_length, int Maximal_Point_Num);
-    void Build(vector<PointType> point_cloud);
-    void Nearest_Search(PointType point, int k_nearest, vector<PointType> &Nearest_Points);
-    void Add_Points(vector<PointType> & PointToAdd);
-    void Delete_Points(vector<PointType> & PointToDel);
+    void Build(PointVector point_cloud);
+    void Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points);
+    void Add_Points(PointVector & PointToAdd);
+    void Delete_Points(PointVector & PointToDel);
     void Delete_Point_Boxes(vector<BoxPointType> & BoxPoints);
     void traverse_for_rebuild(KD_TREE_NODE * root);
-    void acquire_removed_points(vector<PointType> & removed_points);
-    vector<PointType> PCL_Storage;     
+    void acquire_removed_points(PointVector & removed_points);
+    PointVector PCL_Storage;     
        
     KD_TREE_NODE * Root_Node = nullptr;    
     int rebuild_counter = 0;

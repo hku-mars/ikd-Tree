@@ -23,7 +23,7 @@
 	<param name="point_filter_num" type="int" value="4"/>
   <node pkg="fast_lio" type="loam_feat_extract" name="feature_extract" output="screen"/>
 
-  <node pkg="fast_lio" type="loam_laserMapping" name="laserMapping" output="screen">
+  <node pkg="fast_lio" type="loam_laserMapping" name="laserMapping" output="screen" required="true">
   <param name="map_file_path" type="string" value=" " />
   <param name="max_iteration" type="int" value="2" />
   <param name="dense_map_enable" type="bool" value="true" />
@@ -31,7 +31,7 @@
   <param name="filter_size_corner" type="double" value="0.3" />
   <param name="filter_size_surf" type="double" value="0.2" />
   <param name="filter_size_map" type="double" value="0.2" />
-  <param name="cube_side_length" type="double" value="10" />
+  <param name="cube_side_length" type="double" value="20" />
   </node>
 
   <group if="$(arg rviz)">

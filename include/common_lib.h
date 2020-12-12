@@ -13,7 +13,7 @@
 #include <eigen_conversions/eigen_msg.h>
 
 
-// #define DEBUG_PRINT
+#define DEBUG_PRINT
 
 #define PI_M (3.14159265358)
 #define G_m_s2 (9.8099)         // Gravaty const in GuangDong/China

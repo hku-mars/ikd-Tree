@@ -16,7 +16,7 @@ KD_TREE::KD_TREE(float delete_param, float balance_param, float box_length, int 
 KD_TREE::~KD_TREE()
 {
     delete_tree_nodes(Root_Node);
-    vector<PointType> ().swap(PCL_Storage);
+    PointVector ().swap(PCL_Storage);
 }
 
 void KD_TREE::Set_delete_criterion_param(float delete_param){
@@ -27,7 +27,7 @@ void KD_TREE::Set_balance_criterion_param(float balance_param){
     balance_criterion_param = balance_param;
 }
 
-void KD_TREE::Build(vector<PointType> point_cloud){
+void KD_TREE::Build(PointVector point_cloud){
     if (Root_Node != nullptr){
         delete_tree_nodes(Root_Node);
     }
@@ -36,10 +36,10 @@ void KD_TREE::Build(vector<PointType> point_cloud){
     BuildTree(Root_Node, 0, PCL_Storage.size()-1);
 }
 
-void KD_TREE::Nearest_Search(PointType point, int k_nearest, vector<PointType>& Nearest_Points){
-    q = priority_queue<PointType_CMP> (); // Clear the priority queue;
+void KD_TREE::Nearest_Search(PointType point, int k_nearest, PointVector& Nearest_Points){
+    priority_queue<PointType_CMP> q; // the priority queue;
     search_counter = 0;
-    Search(Root_Node, k_nearest, point);
+    Search(Root_Node, k_nearest, point, q);
     // printf("Search Counter is %d ",search_counter);
     int k_found = min(k_nearest,int(q.size()));
     for (int i=0;i < k_found;i++){
@@ -49,7 +49,7 @@ void KD_TREE::Nearest_Search(PointType point, int k_nearest, vector<PointType>& 
     return;
 }
 
-void KD_TREE::Add_Points(vector<PointType> & PointToAdd){
+void KD_TREE::Add_Points(PointVector & PointToAdd){
     rebuild_counter = 0;
     for (int i=0; i<PointToAdd.size();i++){
         Add(Root_Node, PointToAdd[i]);
@@ -58,7 +58,7 @@ void KD_TREE::Add_Points(vector<PointType> & PointToAdd){
     return;
 }
 
-void KD_TREE::Delete_Points(vector<PointType> & PointToDel){
+void KD_TREE::Delete_Points(PointVector & PointToDel){
     bool flag;
     rebuild_counter = 0;
     for (int i=0;i!=PointToDel.size();i++){
@@ -82,9 +82,9 @@ void KD_TREE::Delete_Point_Boxes(vector<BoxPointType> & BoxPoints){
     return;
 }
 
-void KD_TREE::acquire_removed_points(vector<PointType> & removed_points){
+void KD_TREE::acquire_removed_points(PointVector & removed_points){
     removed_points = Points_deleted;
-    vector<PointType> ().swap(Points_deleted);
+    PointVector ().swap(Points_deleted);
     return;
 }
 
@@ -138,7 +138,7 @@ void KD_TREE::BuildTree(KD_TREE_NODE * &root, int l, int r){
 
 void KD_TREE::Rebuild(KD_TREE_NODE * &root){
     // Clear the PCL_Storage vector and release memory
-    vector<PointType> ().swap(PCL_Storage);
+    PointVector ().swap(PCL_Storage);
     rebuild_counter += root->TreeSize;    
     traverse_for_rebuild(root);
     delete_tree_nodes(root);
@@ -255,8 +255,8 @@ void KD_TREE::Add(KD_TREE_NODE * &root, PointType point){
     return;
 }
 
-void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point){
-    Push_Down(root);
+void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point, priority_queue<PointType_CMP> & q){
+    // Push_Down(root);
     if (root == nullptr || root->tree_deleted) return;
     search_counter += 1;
     if (!root->point_deleted){
@@ -271,15 +271,15 @@ void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point){
     float dist_right_node = calc_box_dist(root->right_son_ptr, point);
     if (q.size()< k_nearest || dist_left_node < q.top().dist && dist_right_node < q.top().dist){
         if (dist_left_node <= dist_right_node) {
-            Search(root->left_son_ptr, k_nearest, point);
-            if (q.size() < k_nearest || dist_right_node < q.top().dist) Search(root->right_son_ptr, k_nearest, point);
+            Search(root->left_son_ptr, k_nearest, point, q);
+            if (q.size() < k_nearest || dist_right_node < q.top().dist) Search(root->right_son_ptr, k_nearest, point, q);
         } else {
-            Search(root->right_son_ptr, k_nearest, point);
-            if (q.size() < k_nearest || dist_left_node < q.top().dist) Search(root->left_son_ptr, k_nearest, point);
+            Search(root->right_son_ptr, k_nearest, point, q);
+            if (q.size() < k_nearest || dist_left_node < q.top().dist) Search(root->left_son_ptr, k_nearest, point, q);
         }
     } else {
-        if (dist_left_node < q.top().dist) Search(root->left_son_ptr, k_nearest, point);
-        if (dist_right_node < q.top().dist) Search(root->right_son_ptr, k_nearest, point);
+        if (dist_left_node < q.top().dist) Search(root->left_son_ptr, k_nearest, point, q);
+        if (dist_right_node < q.top().dist) Search(root->right_son_ptr, k_nearest, point, q);
     }
     return;
 }
@@ -391,9 +391,9 @@ void KD_TREE::downsample(KD_TREE_NODE * &root){
         point.x = (root->node_range_x[1] - root->node_range_x[0])/2.0f;
         point.y = (root->node_range_y[1] - root->node_range_y[0])/2.0f;
         point.z = (root->node_range_z[1] - root->node_range_z[0])/2.0f;
-        q = priority_queue<PointType_CMP> (); // Clear the priority queue;
+        priority_queue<PointType_CMP> q; // Clear the priority queue;
         search_counter = 0;
-        Search(root, 1, point);        
+        Search(root, 1, point, q);        
         downsample_point = q.top().point;
         downsample_flag = true;
         delete_tree_nodes(root);
