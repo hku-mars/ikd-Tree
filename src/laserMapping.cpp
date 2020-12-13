@@ -40,7 +40,7 @@
 #include <csignal>
 #include <unistd.h>
 #include <Python.h>
-#include <Exp_mat.h>
+#include <so3_math.h>
 #include <ros/ros.h>
 #include <Eigen/Core>
 #include <opencv/cv.h>
@@ -669,6 +669,7 @@ int main(int argc, char** argv)
             t0 = omp_get_wtime();
 
             p_imu->Process(Measures, state, feats_undistort);
+            StatesGroup state_propagat(state);
 
             if (feats_undistort->empty() || (feats_undistort == NULL))
             {
@@ -759,9 +760,6 @@ int main(int argc, char** argv)
 
                         /* transform to world frame */
                         pointBodyToWorld(&pointOri_tmpt, &pointSel_tmpt);
-
-                        // std::vector<float> pointSearchSqDis_surf;
-                        // auto &points_near = pointSearchInd_surf[i];
                         auto &points_near = Nearest_Points[i];
                         
                         if (iterCount == 0 || rematch_en)
@@ -788,11 +786,8 @@ int main(int argc, char** argv)
                         cv::Mat matB0(NUM_MATCH_POINTS, 1, CV_32F, cv::Scalar::all(-1));
                         cv::Mat matX0(NUM_MATCH_POINTS, 1, CV_32F, cv::Scalar::all(0));
 
-                        // std::cout<<"Nearest_Points: "<<Nearest_Points[j].x<<" "<<Nearest_Points[j].y<<" "<<Nearest_Points[j].z<<std::endl;
-
                         for (int j = 0; j < NUM_MATCH_POINTS; j++)
                         {
-                            // std::cout<<"Nearest_Points: "<<points_near[j].x<<" "<<points_near[j].y<<" "<<points_near[j].z<<std::endl;
                             matA0.at<float>(j, 0) = points_near[j].x;
                             matA0.at<float>(j, 1) = points_near[j].y;
                             matA0.at<float>(j, 2) = points_near[j].z;
@@ -927,7 +922,7 @@ int main(int argc, char** argv)
                     }
 
                     Eigen::Vector3d rot_add, t_add, v_add, bg_add, ba_add, g_add;
-                    Eigen::VectorXd solution(DIM_OF_STATES);
+                    Eigen::Matrix<double, DIM_OF_STATES, 1> solution;
                     Eigen::MatrixXd K(DIM_OF_STATES, laserCloudSelNum);
                     
                     /*** Iterative Kalman Filter Update ***/
@@ -956,8 +951,13 @@ int main(int argc, char** argv)
                         H_T_H.block<6,6>(0,0) = Hsub_T * Hsub;
                         Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 = (H_T_H + (state.cov / LASER_POINT_COV).inverse()).inverse();
                         K = K_1.block<DIM_OF_STATES,6>(0,0) * Hsub_T;
-                        solution = K * meas_vec;
-                        state += solution;
+
+                        auto vec = state_propagat - state;
+                        // std::cout<<"111 vec:"<<vec.transpose()<<std::endl;
+                        solution = K * (meas_vec - Hsub * vec.block<6,1>(0,0));
+                        state = state_propagat + solution;
+                        // solution = K * meas_vec;
+                        // state += solution;
 
                         rot_add = solution.block<3,1>(0,0);
                         t_add   = solution.block<3,1>(3,0);
@@ -1005,7 +1005,6 @@ int main(int argc, char** argv)
                 ikdtree.Add_Points(feats_down_updated->points);
                 t4 = omp_get_wtime();
                 ikdtree.acquire_removed_points(points_history);
-                t5 = omp_get_wtime();
                 
                 bool if_cube_updated[laserCloudNum] = {0};
                 for (int i = 0; i < points_history.size(); i++)
@@ -1038,7 +1037,7 @@ int main(int argc, char** argv)
                     }
                 }
 
-                // t5 = omp_get_wtime();
+                t5 = omp_get_wtime();
             }
 
             
@@ -1138,7 +1137,7 @@ int main(int argc, char** argv)
 
             /*** save debug variables ***/
             frame_num ++;
-            aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t2 - t1) / frame_num;
+            aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t5 - t0) / frame_num;
             // aver_time_consu = aver_time_consu * 0.5 + (t4 - t1) * 0.5;
             T1.push_back(Measures.lidar_beg_time);
             s_plot.push_back(aver_time_consu);
