@@ -121,7 +121,7 @@ PointCloudXYZI::Ptr featsArray[laserCloudNum];
 bool                _last_inFOV[laserCloudNum];
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr laserCloudFullResColor(new pcl::PointCloud<pcl::PointXYZRGB>());
 // pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfFromMap(new pcl::KdTreeFLANN<PointType>());
-KD_TREE ikdtree(0.5, 0.7, 0.1, 3);
+KD_TREE ikdtree(0.5, 0.7, 0.3, 1);
 
 //estimator inputs and output;
 MeasureGroup Measures;
@@ -472,7 +472,6 @@ void lasermap_fov_segment()
         }
     }
 
-    featsFromMap->clear();
     cube_points_add->clear();
     
     for (int i = 0; i < laserCloudValidNum; i++)
@@ -736,6 +735,11 @@ int main(int argc, char** argv)
                 t1 = omp_get_wtime();
                 ikdtree.Delete_Point_Boxes(cub_needrm);
                 ikdtree.Add_Points(cube_points_add->points);
+
+                PointVector ().swap(ikdtree.PCL_Storage);
+                if (ikdtree.Root_Node != nullptr) ikdtree.traverse_for_rebuild(ikdtree.Root_Node);
+                featsFromMap->clear();
+                featsFromMap->points = ikdtree.PCL_Storage;
 
                 std::vector<bool> point_selected_surf(feats_down_size, true);
                 std::vector<std::vector<int>> pointSearchInd_surf(feats_down_size);
@@ -1081,11 +1085,11 @@ int main(int argc, char** argv)
             }
 
             /******* Publish Maps:  *******/
-            // sensor_msgs::PointCloud2 laserCloudMap;
-            // pcl::toROSMsg(*featsFromMap, laserCloudMap);
-            // laserCloudMap.header.stamp = ros::Time::now();//ros::Time().fromSec(last_timestamp_lidar);
-            // laserCloudMap.header.frame_id = "/camera_init";
-            // pubLaserCloudMap.publish(laserCloudMap);
+            sensor_msgs::PointCloud2 laserCloudMap;
+            pcl::toROSMsg(*featsFromMap, laserCloudMap);
+            laserCloudMap.header.stamp = ros::Time::now();//ros::Time().fromSec(last_timestamp_lidar);
+            laserCloudMap.header.frame_id = "/camera_init";
+            pubLaserCloudMap.publish(laserCloudMap);
 
             /******* Publish Odometry ******/
             geometry_msgs::Quaternion geoQuat = tf::createQuaternionMsgFromRollPitchYaw
@@ -1137,8 +1141,8 @@ int main(int argc, char** argv)
 
             /*** save debug variables ***/
             frame_num ++;
-            aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t5 - t0) / frame_num;
-            // aver_time_consu = aver_time_consu * 0.5 + (t4 - t1) * 0.5;
+            // aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t5 - t0) / frame_num;
+            aver_time_consu = aver_time_consu * 0.8 + (t5 - t0) * 0.2;
             T1.push_back(Measures.lidar_beg_time);
             s_plot.push_back(aver_time_consu);
             s_plot2.push_back(double(featsFromMapNum)/1000);

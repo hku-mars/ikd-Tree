@@ -9,7 +9,8 @@ email: yixicai@connect.hku.hk
 KD_TREE::KD_TREE(float delete_param, float balance_param, float box_length, int max_point_num) {
     delete_criterion_param = delete_param;
     balance_criterion_param = balance_param;
-    downsample_volume = box_length * box_length * box_length;
+    // downsample_volume = box_length * box_length * box_length;
+    downsamp_size = box_length;
     Maximal_Point_Num = max_point_num;    
 }
 
@@ -97,16 +98,17 @@ void KD_TREE::BuildTree(KD_TREE_NODE * &root, int l, int r){
     float average[3] = {0,0,0};
     float covariance[3] = {0,0,0};
     for (i=l;i<=r;i++){
-        average[0] = average[0] + PCL_Storage[i].x;
-        average[1] = average[1] + PCL_Storage[i].y;
-        average[2] = average[2] + PCL_Storage[i].z;
+        average[0] += PCL_Storage[i].x;
+        average[1] += PCL_Storage[i].y;
+        average[2] += PCL_Storage[i].z;
     }
     for (i=0;i<3;i++) average[i] = average[i]/(r-l+1);
     for (i=l;i<=r;i++){
-        covariance[0] = (PCL_Storage[i].x - average[0]) * (PCL_Storage[i].x - average[0]);
-        covariance[1] = (PCL_Storage[i].y - average[1]) * (PCL_Storage[i].y - average[1]);  
-        covariance[2] = (PCL_Storage[i].z - average[2]) * (PCL_Storage[i].z - average[2]);              
+        covariance[0] += (PCL_Storage[i].x - average[0]) * (PCL_Storage[i].x - average[0]);
+        covariance[1] += (PCL_Storage[i].y - average[1]) * (PCL_Storage[i].y - average[1]);  
+        covariance[2] += (PCL_Storage[i].z - average[2]) * (PCL_Storage[i].z - average[2]);              
     }
+    for (i=0;i<3;i++) covariance[i] = covariance[i]/(r-l+1);    
     int div_axis = 0;
     for (i = 1;i<3;i++){
         if (covariance[i] > covariance[div_axis]) div_axis = i;
@@ -386,7 +388,14 @@ void KD_TREE::delete_tree_nodes(KD_TREE_NODE * &root){
 
 void KD_TREE::downsample(KD_TREE_NODE * &root){
     float Volume = (root->node_range_x[1]-root->node_range_x[0]) * (root->node_range_y[1] - root->node_range_y[0]) * (root->node_range_z[1] - root->node_range_z[0]);
-    if (Volume < downsample_volume + EPS && (root->TreeSize - root->invalid_point_num) > Maximal_Point_Num){
+
+    float &&x_dist = root->node_range_x[1]-root->node_range_x[0];
+    float &&y_dist = root->node_range_y[1]-root->node_range_y[0];
+    float &&z_dist = root->node_range_z[1]-root->node_range_z[0];
+
+    // if (Volume < downsample_volume + EPS && (root->TreeSize - root->invalid_point_num) > Maximal_Point_Num){
+    if ((x_dist < downsamp_size) && (y_dist < downsamp_size) && (z_dist < downsamp_size)
+        && (root->TreeSize - root->invalid_point_num) > Maximal_Point_Num){
         PointType point, downsample_point;
         point.x = (root->node_range_x[1] - root->node_range_x[0])/2.0f;
         point.y = (root->node_range_y[1] - root->node_range_y[0])/2.0f;

@@ -51,7 +51,8 @@ private:
     int delete_counter = 0;
     float delete_criterion_param = 0.5f;
     float balance_criterion_param = 0.7f;
-    float downsample_volume = 0.1*0.1*0.1;
+    // float downsample_volume = 0.1*0.1*0.1;
+    float downsamp_size = 0.2;
     float Maximal_Point_Num = 10;
     bool downsample_flag = false;
     // priority_queue<PointType_CMP> q;
