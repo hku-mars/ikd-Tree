@@ -737,7 +737,7 @@ int main(int argc, char** argv)
                 ikdtree.Add_Points(cube_points_add->points);
 
                 PointVector ().swap(ikdtree.PCL_Storage);
-                if (ikdtree.Root_Node != nullptr) ikdtree.traverse_for_rebuild(ikdtree.Root_Node);
+                if (ikdtree.Root_Node != nullptr) ikdtree.traverse_for_rebuild(ikdtree.Root_Node, ikdtree.PCL_Storage);
                 featsFromMap->clear();
                 featsFromMap->points = ikdtree.PCL_Storage;
 

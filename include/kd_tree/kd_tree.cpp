@@ -9,15 +9,18 @@ email: yixicai@connect.hku.hk
 KD_TREE::KD_TREE(float delete_param, float balance_param, float box_length, int max_point_num) {
     delete_criterion_param = delete_param;
     balance_criterion_param = balance_param;
-    // downsample_volume = box_length * box_length * box_length;
-    downsamp_size = box_length;
+    downsample_size = box_length;
     Maximal_Point_Num = max_point_num;    
 }
 
 KD_TREE::~KD_TREE()
 {
-    delete_tree_nodes(Root_Node);
+    Delete_Storage_Disabled = true;
+    delete_tree_nodes(Root_Node, Points_deleted);
+    Delete_Storage_Disabled = false;    
     PointVector ().swap(PCL_Storage);
+    PointVector ().swap(Points_deleted);
+    PointVector ().swap(Downsample_Storage);
 }
 
 void KD_TREE::Set_delete_criterion_param(float delete_param){
@@ -30,11 +33,12 @@ void KD_TREE::Set_balance_criterion_param(float balance_param){
 
 void KD_TREE::Build(PointVector point_cloud){
     if (Root_Node != nullptr){
-        delete_tree_nodes(Root_Node);
+        Delete_Storage_Disabled = true;
+        delete_tree_nodes(Root_Node, Points_deleted);
+        Delete_Storage_Disabled = false;
     }
-    rebuild_counter = 0;
-    PCL_Storage = point_cloud;   
-    BuildTree(Root_Node, 0, PCL_Storage.size()-1);
+    rebuild_counter = 0;  
+    BuildTree(Root_Node, 0, point_cloud.size()-1, point_cloud);
 }
 
 void KD_TREE::Nearest_Search(PointType point, int k_nearest, PointVector& Nearest_Points){
@@ -52,8 +56,32 @@ void KD_TREE::Nearest_Search(PointType point, int k_nearest, PointVector& Neares
 
 void KD_TREE::Add_Points(PointVector & PointToAdd){
     rebuild_counter = 0;
+    BoxPointType Box_of_Point;
+    PointType downsample_result, mid_point;
+    float min_dist, tmp_dist;
     for (int i=0; i<PointToAdd.size();i++){
-        Add(Root_Node, PointToAdd[i]);
+        // Downsample Before Add
+        Box_of_Point.vertex_min[0] = ceil(PointToAdd[i].x/downsample_size)*downsample_size;
+        Box_of_Point.vertex_max[0] = Box_of_Point.vertex_min[0]+downsample_size;
+        Box_of_Point.vertex_min[1] = ceil(PointToAdd[i].y/downsample_size)*downsample_size;
+        Box_of_Point.vertex_max[1] = Box_of_Point.vertex_min[1]+downsample_size; 
+        Box_of_Point.vertex_min[2] = ceil(PointToAdd[i].z/downsample_size)*downsample_size;
+        Box_of_Point.vertex_max[2] = Box_of_Point.vertex_min[2]+downsample_size;   
+        mid_point.x = (Box_of_Point.vertex_max[0]-Box_of_Point.vertex_min[0])/2.0;
+        mid_point.y = (Box_of_Point.vertex_max[1]-Box_of_Point.vertex_min[1])/2.0;
+        mid_point.z = (Box_of_Point.vertex_max[2]-Box_of_Point.vertex_min[2])/2.0;
+        PointVector ().swap(Downsample_Storage);
+        Delete_by_range(Root_Node, Box_of_Point, true);                      
+        min_dist = calc_dist(PointToAdd[i],mid_point);
+        downsample_result = PointToAdd[i];
+        for (int index = 0; index < Downsample_Storage.size(); index++){
+            tmp_dist = calc_dist(Downsample_Storage[index], mid_point);
+            if (tmp_dist < min_dist){
+                min_dist = tmp_dist;
+                downsample_result = Downsample_Storage[index];
+            }
+        }
+        Add(Root_Node, downsample_result);        
     }
     printf("Rebuild counter is %d, ", rebuild_counter);   
     return;
@@ -76,7 +104,7 @@ void KD_TREE::Delete_Point_Boxes(vector<BoxPointType> & BoxPoints){
     rebuild_counter = 0;
     delete_counter = 0;
     for (int i=0;i < BoxPoints.size();i++){
-        Delete_by_range(Root_Node ,BoxPoints[i]);
+        Delete_by_range(Root_Node ,BoxPoints[i], false);
     }
     printf("Delete counter is %d, ", delete_counter);
     printf("Rebuild counter is %d, ", rebuild_counter);     
@@ -89,52 +117,51 @@ void KD_TREE::acquire_removed_points(PointVector & removed_points){
     return;
 }
 
-void KD_TREE::BuildTree(KD_TREE_NODE * &root, int l, int r){
+void KD_TREE::BuildTree(KD_TREE_NODE * &root, int l, int r, PointVector & Storage){
     if (l>r) return;
-    root = new KD_TREE_NODE;
+    KD_TREE_NODE * new_node = new KD_TREE_NODE;
     int mid = (l+r)>>1; 
     // Find the best division Axis
     int i;
     float average[3] = {0,0,0};
     float covariance[3] = {0,0,0};
     for (i=l;i<=r;i++){
-        average[0] += PCL_Storage[i].x;
-        average[1] += PCL_Storage[i].y;
-        average[2] += PCL_Storage[i].z;
+        average[0] += Storage[i].x;
+        average[1] += Storage[i].y;
+        average[2] += Storage[i].z;
     }
     for (i=0;i<3;i++) average[i] = average[i]/(r-l+1);
     for (i=l;i<=r;i++){
-        covariance[0] += (PCL_Storage[i].x - average[0]) * (PCL_Storage[i].x - average[0]);
-        covariance[1] += (PCL_Storage[i].y - average[1]) * (PCL_Storage[i].y - average[1]);  
-        covariance[2] += (PCL_Storage[i].z - average[2]) * (PCL_Storage[i].z - average[2]);              
+        covariance[0] += (Storage[i].x - average[0]) * (Storage[i].x - average[0]);
+        covariance[1] += (Storage[i].y - average[1]) * (Storage[i].y - average[1]);  
+        covariance[2] += (Storage[i].z - average[2]) * (Storage[i].z - average[2]);              
     }
     for (i=0;i<3;i++) covariance[i] = covariance[i]/(r-l+1);    
     int div_axis = 0;
     for (i = 1;i<3;i++){
         if (covariance[i] > covariance[div_axis]) div_axis = i;
     }
-    root->division_axis = div_axis;
+    new_node->division_axis = div_axis;
     switch (div_axis)
     {
     case 0:
-        nth_element(begin(PCL_Storage)+l, begin(PCL_Storage)+mid, begin(PCL_Storage)+r+1, point_cmp_x);
+        nth_element(begin(Storage)+l, begin(Storage)+mid, begin(Storage)+r+1, point_cmp_x);
         break;
     case 1:
-        nth_element(begin(PCL_Storage)+l, begin(PCL_Storage)+mid, begin(PCL_Storage)+r+1, point_cmp_y);
+        nth_element(begin(Storage)+l, begin(Storage)+mid, begin(Storage)+r+1, point_cmp_y);
         break;
     case 2:
-        nth_element(begin(PCL_Storage)+l, begin(PCL_Storage)+mid, begin(PCL_Storage)+r+1, point_cmp_z);
+        nth_element(begin(Storage)+l, begin(Storage)+mid, begin(Storage)+r+1, point_cmp_z);
         break;
     default:
-        nth_element(begin(PCL_Storage)+l, begin(PCL_Storage)+mid, begin(PCL_Storage)+r+1, point_cmp_x);
+        nth_element(begin(Storage)+l, begin(Storage)+mid, begin(Storage)+r+1, point_cmp_x);
         break;
     }  
-    root->point = PCL_Storage[mid];             
-    BuildTree(root->left_son_ptr, l, mid-1);
-    BuildTree(root->right_son_ptr, mid+1, r);  
-    Update(root);
-    downsample(root);
-    // In the very first building tree, check is unnecessary as the balance properties is gauranteed.
+    new_node->point = Storage[mid];             
+    BuildTree(new_node->left_son_ptr, l, mid-1, Storage);
+    BuildTree(new_node->right_son_ptr, mid+1, r, Storage);  
+    Update(new_node);
+    root = new_node;    
     return;
 }
 
@@ -142,13 +169,13 @@ void KD_TREE::Rebuild(KD_TREE_NODE * &root){
     // Clear the PCL_Storage vector and release memory
     PointVector ().swap(PCL_Storage);
     rebuild_counter += root->TreeSize;    
-    traverse_for_rebuild(root);
-    delete_tree_nodes(root);
-    BuildTree(root, 0, PCL_Storage.size()-1);
+    traverse_for_rebuild(root, PCL_Storage);
+    delete_tree_nodes(root, Points_deleted);
+    BuildTree(root, 0, PCL_Storage.size()-1, PCL_Storage);
     return;
 }
 
-void KD_TREE::Delete_by_range(KD_TREE_NODE * root,  BoxPointType boxpoint){
+void KD_TREE::Delete_by_range(KD_TREE_NODE * &root, BoxPointType boxpoint, bool is_downsample){
     Push_Down(root);     
     if (root == nullptr || root->tree_deleted) return;
     if (boxpoint.vertex_max[0] + EPS < root->node_range_x[0] || boxpoint.vertex_min[0] - EPS > root->node_range_x[1]) return;
@@ -161,6 +188,7 @@ void KD_TREE::Delete_by_range(KD_TREE_NODE * root,  BoxPointType boxpoint){
         root->point_deleted = true;
         root->invalid_point_num = root->TreeSize;
         delete_counter += root->TreeSize;
+        if (is_downsample) delete_tree_nodes(root, Downsample_Storage);
         return;
     }
     if (boxpoint.vertex_min[0]-EPS < root->point.x && boxpoint.vertex_max[0]+EPS > root->point.x && boxpoint.vertex_min[1]-EPS < root->point.y && boxpoint.vertex_max[1]+EPS > root->point.y && boxpoint.vertex_min[2]-EPS < root->point.z && boxpoint.vertex_max[2]+EPS > root->point.z){
@@ -168,9 +196,10 @@ void KD_TREE::Delete_by_range(KD_TREE_NODE * root,  BoxPointType boxpoint){
         root->point_deleted = true;
         root->invalid_point_num += 1;
         delete_counter += 1;
+        if (is_downsample) Downsample_Storage.push_back(root->point);        
     }    
-    Delete_by_range(root->left_son_ptr, boxpoint);
-    Delete_by_range(root->right_son_ptr, boxpoint);
+    Delete_by_range(root->left_son_ptr, boxpoint, is_downsample);
+    Delete_by_range(root->right_son_ptr, boxpoint, is_downsample);
     Update(root);
     root->need_rebuild = Criterion_Check(root);
     if (!(root->need_rebuild)){
@@ -182,7 +211,7 @@ void KD_TREE::Delete_by_range(KD_TREE_NODE * root,  BoxPointType boxpoint){
     return;
 }
 
-bool KD_TREE::Delete_by_point(KD_TREE_NODE * root, PointType point){
+bool KD_TREE::Delete_by_point(KD_TREE_NODE * &root, PointType point){
     Push_Down(root); 
     if (root == nullptr || root->tree_deleted) return false;
     bool flag = false;
@@ -248,7 +277,6 @@ void KD_TREE::Add(KD_TREE_NODE * &root, PointType point){
         break;
     }    
     Update(root);
-    downsample(root);
     root->need_rebuild = Criterion_Check(root);
     if (!root->need_rebuild){
         if (root->left_son_ptr != nullptr & root->left_son_ptr->need_rebuild) Rebuild(root->left_son_ptr);
@@ -366,51 +394,23 @@ void KD_TREE::Update(KD_TREE_NODE* root){
     return;
 }
 
-void KD_TREE::traverse_for_rebuild(KD_TREE_NODE * root){
+void KD_TREE::traverse_for_rebuild(KD_TREE_NODE * root, PointVector &Storage){
     if (root == nullptr || root->tree_deleted) return;
     if (!root->point_deleted) {
-        PCL_Storage.push_back(root->point);
+        Storage.push_back(root->point);
     }
-    traverse_for_rebuild(root->left_son_ptr);
-    traverse_for_rebuild(root->right_son_ptr);
+    traverse_for_rebuild(root->left_son_ptr, Storage);
+    traverse_for_rebuild(root->right_son_ptr, Storage);
     return;
 }
 
-void KD_TREE::delete_tree_nodes(KD_TREE_NODE * &root){
+void KD_TREE::delete_tree_nodes(KD_TREE_NODE * &root, PointVector & Delete_Storage){
     if (root == nullptr) return;
-    delete_tree_nodes(root->left_son_ptr);
-    delete_tree_nodes(root->right_son_ptr);
-    if (!downsample_flag) Points_deleted.push_back(root->point);
+    delete_tree_nodes(root->left_son_ptr, Delete_Storage);
+    delete_tree_nodes(root->right_son_ptr, Delete_Storage);
+    if (!Delete_Storage_Disabled) Delete_Storage.push_back(root->point);
     delete root;
     root = nullptr;
-    return;
-}
-
-void KD_TREE::downsample(KD_TREE_NODE * &root){
-    float Volume = (root->node_range_x[1]-root->node_range_x[0]) * (root->node_range_y[1] - root->node_range_y[0]) * (root->node_range_z[1] - root->node_range_z[0]);
-
-    float &&x_dist = root->node_range_x[1]-root->node_range_x[0];
-    float &&y_dist = root->node_range_y[1]-root->node_range_y[0];
-    float &&z_dist = root->node_range_z[1]-root->node_range_z[0];
-
-    // if (Volume < downsample_volume + EPS && (root->TreeSize - root->invalid_point_num) > Maximal_Point_Num){
-    if ((x_dist < downsamp_size) && (y_dist < downsamp_size) && (z_dist < downsamp_size)
-        && (root->TreeSize - root->invalid_point_num) > Maximal_Point_Num){
-        PointType point, downsample_point;
-        point.x = (root->node_range_x[1] - root->node_range_x[0])/2.0f;
-        point.y = (root->node_range_y[1] - root->node_range_y[0])/2.0f;
-        point.z = (root->node_range_z[1] - root->node_range_z[0])/2.0f;
-        priority_queue<PointType_CMP> q; // Clear the priority queue;
-        search_counter = 0;
-        Search(root, 1, point, q);        
-        downsample_point = q.top().point;
-        downsample_flag = true;
-        delete_tree_nodes(root);
-        root = new KD_TREE_NODE;
-        root->point = downsample_point;
-        Update(root);
-        downsample_flag = false;
-    }
     return;
 }
 
