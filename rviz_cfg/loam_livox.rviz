@@ -10,6 +10,7 @@ Panels:
         - /odometry1/odomPath1
         - /mapping1
         - /mapping1/surround1
+        - /mapping1/currPoints1
         - /mapping1/PointCloud21
         - /mapping1/PointCloud22
         - /Debug1/PointCloud21
@@ -26,7 +27,7 @@ Panels:
         - /Features1/PointCloud23
         - /Odometry2/Shape1
         - /Path1
-      Splitter Ratio: 0.6608186960220337
+      Splitter Ratio: 0.5948616862297058
     Tree Height: 714
   - Class: rviz/Selection
     Name: Selection
@@ -54,11 +55,11 @@ Toolbars:
 Visualization Manager:
   Class: ""
   Displays:
-    - Alpha: 0.5
-      Cell Size: 1
+    - Alpha: 1
+      Cell Size: 0.20000000298023224
       Class: rviz/Grid
       Color: 160; 160; 164
-      Enabled: false
+      Enabled: true
       Line Style:
         Line Width: 0.029999999329447746
         Value: Lines
@@ -71,7 +72,7 @@ Visualization Manager:
       Plane: XY
       Plane Cell Count: 160
       Reference Frame: <Fixed Frame>
-      Value: false
+      Value: true
     - Class: rviz/Axes
       Enabled: true
       Length: 0.5
@@ -188,11 +189,11 @@ Visualization Manager:
           Use Fixed Frame: true
           Use rainbow: true
           Value: true
-        - Alpha: 0.20000000298023224
+        - Alpha: 0.30000001192092896
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 3.8495893478393555
-            Min Value: -0.38633599877357483
+            Max Value: 8.022581100463867
+            Min Value: -0.35852980613708496
             Value: true
           Axis: Z
           Channel Name: intensity
@@ -221,14 +222,14 @@ Visualization Manager:
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 3.8495893478393555
-            Min Value: -0.38633599877357483
+            Max Value: 5.01795768737793
+            Min Value: -0.3809538185596466
             Value: true
           Axis: Z
           Channel Name: intensity
           Class: rviz/PointCloud2
           Color: 255; 255; 255
-          Color Transformer: AxisColor
+          Color Transformer: RGB8
           Decay Time: 0
           Enabled: true
           Invert Rainbow: false
@@ -248,7 +249,7 @@ Visualization Manager:
           Use Fixed Frame: true
           Use rainbow: false
           Value: true
-        - Alpha: 1
+        - Alpha: 0.800000011920929
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
             Max Value: 10
@@ -678,25 +679,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 34.147499084472656
+      Distance: 20.164432525634766
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 10.973794937133789
-        Y: -0.7918469905853271
-        Z: -1.9516242742538452
+        X: 9.605826377868652
+        Y: -0.0783628448843956
+        Z: -3.183142900466919
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.6952037811279297
+      Pitch: 0.7497971653938293
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.0935745239257812
+      Yaw: 3.168570041656494
     Saved: ~
 Window Geometry:
   Displays:

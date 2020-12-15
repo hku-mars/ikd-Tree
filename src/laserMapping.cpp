@@ -121,7 +121,7 @@ PointCloudXYZI::Ptr featsArray[laserCloudNum];
 bool                _last_inFOV[laserCloudNum];
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr laserCloudFullResColor(new pcl::PointCloud<pcl::PointXYZRGB>());
 // pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfFromMap(new pcl::KdTreeFLANN<PointType>());
-KD_TREE ikdtree(0.5, 0.7, 0.3, 1);
+KD_TREE ikdtree(0.5, 0.7, 0.2, 1);
 
 //estimator inputs and output;
 MeasureGroup Measures;
@@ -702,8 +702,6 @@ int main(int argc, char** argv)
             /*** downsample the features of new frame ***/
             downSizeFilterSurf.setInputCloud(feats_undistort);
             downSizeFilterSurf.filter(*feats_down);
-            // downSizeFilterMap.setInputCloud(featsFromMap);
-            // downSizeFilterMap.filter(*featsFromMap);
 
             /*** initialize the map ikdtree ***/
             if((feats_down->points.size() > 1) && (ikdtree.Root_Node == nullptr))
@@ -736,10 +734,10 @@ int main(int argc, char** argv)
                 ikdtree.Delete_Point_Boxes(cub_needrm);
                 ikdtree.Add_Points(cube_points_add->points);
 
-                PointVector ().swap(ikdtree.PCL_Storage);
-                if (ikdtree.Root_Node != nullptr) ikdtree.traverse_for_rebuild(ikdtree.Root_Node, ikdtree.PCL_Storage);
-                featsFromMap->clear();
-                featsFromMap->points = ikdtree.PCL_Storage;
+                // PointVector ().swap(ikdtree.PCL_Storage);
+                // if (ikdtree.Root_Node != nullptr) ikdtree.traverse_for_rebuild(ikdtree.Root_Node, ikdtree.PCL_Storage);
+                // featsFromMap->clear();
+                // featsFromMap->points = ikdtree.PCL_Storage;
 
                 std::vector<bool> point_selected_surf(feats_down_size, true);
                 std::vector<std::vector<int>> pointSearchInd_surf(feats_down_size);
@@ -772,10 +770,10 @@ int main(int argc, char** argv)
                             /** Find the closest surfaces in the map **/
                             ikdtree.Nearest_Search(pointSel_tmpt, NUM_MATCH_POINTS, points_near);
                             // kdtreeSurfFromMap->nearestKSearch(pointSel_tmpt, NUM_MATCH_POINTS, points_near, pointSearchSqDis_surf);
-                            PointType &p_closest = points_near[0];
-                            float min_distance = std::pow(p_closest.x - pointSel_tmpt.x, 2) + std::pow(p_closest.y - pointSel_tmpt.y, 2)
-                                                    + std::pow(p_closest.z - pointSel_tmpt.z, 2);
-                            if (min_distance > 5*5)
+                            PointType &p_farest = points_near[NUM_MATCH_POINTS - 1];
+                            float max_distance = std::pow(p_farest.x - pointSel_tmpt.x, 2) + std::pow(p_farest.y - pointSel_tmpt.y, 2)
+                                                    + std::pow(p_farest.z - pointSel_tmpt.z, 2);
+                            if (max_distance > 1)
                             {
                                 point_selected_surf[i] = false;
                             }
@@ -837,7 +835,7 @@ int main(int argc, char** argv)
                             //if(fabs(pd2) > 0.1) continue;
                             float s = 1 - 0.9 * fabs(pd2) / sqrt(sqrt(pointSel_tmpt.x * pointSel_tmpt.x + pointSel_tmpt.y * pointSel_tmpt.y + pointSel_tmpt.z * pointSel_tmpt.z));
 
-                            if ((s > 0.85))// && ((std::abs(pd2) - res_last[i]) < 3 * res_mean_last))
+                            if ((s > 0.92))// && ((std::abs(pd2) - res_last[i]) < 3 * res_mean_last))
                             {
                                 // if(std::abs(pd2) > 5 * res_mean_last)
                                 // {
@@ -956,12 +954,12 @@ int main(int argc, char** argv)
                         Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 = (H_T_H + (state.cov / LASER_POINT_COV).inverse()).inverse();
                         K = K_1.block<DIM_OF_STATES,6>(0,0) * Hsub_T;
 
+                        solution = K * meas_vec;
+                        // state += solution;
+
                         auto vec = state_propagat - state;
-                        // std::cout<<"111 vec:"<<vec.transpose()<<std::endl;
                         solution = K * (meas_vec - Hsub * vec.block<6,1>(0,0));
                         state = state_propagat + solution;
-                        // solution = K * meas_vec;
-                        // state += solution;
 
                         rot_add = solution.block<3,1>(0,0);
                         t_add   = solution.block<3,1>(3,0);
@@ -1006,10 +1004,8 @@ int main(int argc, char** argv)
 
                 /*** add new frame points to map ikdtree ***/
                 PointVector points_history;
-                ikdtree.Add_Points(feats_down_updated->points);
-                t4 = omp_get_wtime();
                 ikdtree.acquire_removed_points(points_history);
-                
+                t4 = omp_get_wtime();
                 bool if_cube_updated[laserCloudNum] = {0};
                 for (int i = 0; i < points_history.size(); i++)
                 {
@@ -1041,10 +1037,16 @@ int main(int argc, char** argv)
                     }
                 }
 
+                omp_set_num_threads(4);
+                #pragma omp parallel for
+                for (int i = 0; i < feats_down_size; i++)
+                {
+                    /* transform to world frame */
+                    pointBodyToWorld(&(feats_down->points[i]), &(feats_down_updated->points[i]));
+                }
+                ikdtree.Add_Points(feats_down_updated->points);
                 t5 = omp_get_wtime();
             }
-
-            
 
             /******* Publish current frame points in world coordinates:  *******/
             laserCloudFullRes2->clear();
