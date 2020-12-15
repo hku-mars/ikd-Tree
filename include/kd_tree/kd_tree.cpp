@@ -93,21 +93,7 @@ void KD_TREE::stop_thread(){
 void * KD_TREE::multi_thread_ptr(void * arg){
     KD_TREE * handle = (KD_TREE*) arg;
     handle->multi_thread_rebuild();
-}
-
-void print_q(queue<KD_TREE_NODE **> q_print){
-    printf("Start print q------------------------------\n");
-    KD_TREE_NODE * head;
-    while (!q_print.empty()){
-        head = *(q_print.front());
-        q_print.pop();    
-        printf("    Address %lu ",head);
-        if (head != nullptr) printf("    Tree Size %d\n",head->TreeSize);
-            else printf("   Null\n");
-    }
-    printf("Finished print q---------------------------\n");    
-    return;
-}      
+}    
 
 void KD_TREE::multi_thread_rebuild(){
     bool terminated = false;
@@ -279,16 +265,18 @@ void KD_TREE::Add_Points(PointVector & PointToAdd){
             mid_point.z = (Box_of_Point.vertex_max[2]-Box_of_Point.vertex_min[2])/2.0;
             PointVector ().swap(Downsample_Storage);
             Delete_by_range(&Root_Node, Box_of_Point, false, true);
-            min_dist = calc_dist(PointToAdd[i],mid_point);
-            downsample_result = PointToAdd[i];
-            for (int index = 0; index < Downsample_Storage.size(); index++){
-                tmp_dist = calc_dist(Downsample_Storage[index], mid_point);
-                if (tmp_dist < min_dist){
-                    min_dist = tmp_dist;
-                    downsample_result = Downsample_Storage[index];
+            if (Downsample_Storage.size() != 1){
+                min_dist = calc_dist(PointToAdd[i],mid_point);
+                downsample_result = PointToAdd[i];                
+                for (int index = 0; index < Downsample_Storage.size(); index++){
+                    tmp_dist = calc_dist(Downsample_Storage[index], mid_point);
+                    if (tmp_dist < min_dist){
+                        min_dist = tmp_dist;
+                        downsample_result = Downsample_Storage[index];
+                    }
                 }
-            }
-            Add_by_point(&Root_Node, downsample_result, true);    
+                Add_by_point(&Root_Node, downsample_result, true);  
+            }  
         } else {        
             Add_by_point(&Root_Node, PointToAdd[i], true);        
         }
