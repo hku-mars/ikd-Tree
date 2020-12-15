@@ -84,6 +84,7 @@ struct StatesGroup
         this->bias_a  = b.bias_a;
         this->gravity = b.gravity;
         this->cov     = b.cov;
+        return *this;
 	};
 
 
@@ -99,10 +100,15 @@ struct StatesGroup
 		return a;
 	};
 
-    StatesGroup operator+=(const Eigen::Matrix<double, DIM_OF_STATES, 1> &state_add)
+    StatesGroup& operator+=(const Eigen::Matrix<double, DIM_OF_STATES, 1> &state_add)
 	{
-        StatesGroup a = *this;
-		return a + state_add;
+        this->rot_end = this->rot_end * Exp(state_add(0,0), state_add(1,0), state_add(2,0));
+		this->pos_end += state_add.block<3,1>(3,0);
+        this->vel_end += state_add.block<3,1>(6,0);
+        this->bias_g  += state_add.block<3,1>(9,0);
+        this->bias_a  += state_add.block<3,1>(12,0);
+        this->gravity += state_add.block<3,1>(15,0);
+		return *this;
 	};
 
     Eigen::Matrix<double, DIM_OF_STATES, 1> operator-(const StatesGroup& b)

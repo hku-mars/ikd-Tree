@@ -40,8 +40,8 @@ struct PointType_CMP{
 };
 
 struct BoxPointType{
-    int vertex_min[3];
-    int vertex_max[3];
+    float vertex_min[3];
+    float vertex_max[3];
 };
 
 class KD_TREE
@@ -51,7 +51,6 @@ private:
     int delete_counter = 0;
     float delete_criterion_param = 0.5f;
     float balance_criterion_param = 0.7f;
-    // float downsample_volume = 0.1*0.1*0.1;
     float downsample_size = 0.2;
     float Maximal_Point_Num = 10;
     bool Delete_Storage_Disabled = false;

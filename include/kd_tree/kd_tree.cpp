@@ -61,17 +61,19 @@ void KD_TREE::Add_Points(PointVector & PointToAdd){
     float min_dist, tmp_dist;
     for (int i=0; i<PointToAdd.size();i++){
         // Downsample Before Add
-        Box_of_Point.vertex_min[0] = ceil(PointToAdd[i].x/downsample_size)*downsample_size;
+        Box_of_Point.vertex_min[0] = floor(PointToAdd[i].x/downsample_size)*downsample_size;
         Box_of_Point.vertex_max[0] = Box_of_Point.vertex_min[0]+downsample_size;
-        Box_of_Point.vertex_min[1] = ceil(PointToAdd[i].y/downsample_size)*downsample_size;
+        Box_of_Point.vertex_min[1] = floor(PointToAdd[i].y/downsample_size)*downsample_size;
         Box_of_Point.vertex_max[1] = Box_of_Point.vertex_min[1]+downsample_size; 
-        Box_of_Point.vertex_min[2] = ceil(PointToAdd[i].z/downsample_size)*downsample_size;
-        Box_of_Point.vertex_max[2] = Box_of_Point.vertex_min[2]+downsample_size;   
+        Box_of_Point.vertex_min[2] = floor(PointToAdd[i].z/downsample_size)*downsample_size;
+        Box_of_Point.vertex_max[2] = Box_of_Point.vertex_min[2]+downsample_size; 
+        // printf("%0.3f %0.3f %0.3f-------------------------------------\n", PointToAdd[i].x, PointToAdd[i].y, PointToAdd[i].z);
+        // printf("%0.3f %0.3f %0.3f %0.3f %0.3f %0.3f ------------------\n", Box_of_Point.vertex_min[0], Box_of_Point.vertex_max[0],Box_of_Point.vertex_min[1], Box_of_Point.vertex_max[1],Box_of_Point.vertex_min[2], Box_of_Point.vertex_max[2]) ; 
         mid_point.x = (Box_of_Point.vertex_max[0]-Box_of_Point.vertex_min[0])/2.0;
         mid_point.y = (Box_of_Point.vertex_max[1]-Box_of_Point.vertex_min[1])/2.0;
         mid_point.z = (Box_of_Point.vertex_max[2]-Box_of_Point.vertex_min[2])/2.0;
         PointVector ().swap(Downsample_Storage);
-        Delete_by_range(Root_Node, Box_of_Point, true);                      
+        Delete_by_range(Root_Node, Box_of_Point, true);                    
         min_dist = calc_dist(PointToAdd[i],mid_point);
         downsample_result = PointToAdd[i];
         for (int index = 0; index < Downsample_Storage.size(); index++){
@@ -188,7 +190,9 @@ void KD_TREE::Delete_by_range(KD_TREE_NODE * &root, BoxPointType boxpoint, bool 
         root->point_deleted = true;
         root->invalid_point_num = root->TreeSize;
         delete_counter += root->TreeSize;
+        //printf("%d %d-----------------------------------------\n",int(Downsample_Storage.size()), root->TreeSize);  
         if (is_downsample) delete_tree_nodes(root, Downsample_Storage);
+        //printf("%d %d-----------------------------------------\n",int(Downsample_Storage.size()), root->TreeSize); 
         return;
     }
     if (boxpoint.vertex_min[0]-EPS < root->point.x && boxpoint.vertex_max[0]+EPS > root->point.x && boxpoint.vertex_min[1]-EPS < root->point.y && boxpoint.vertex_max[1]+EPS > root->point.y && boxpoint.vertex_min[2]-EPS < root->point.z && boxpoint.vertex_max[2]+EPS > root->point.z){
