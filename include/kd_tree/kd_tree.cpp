@@ -276,7 +276,7 @@ void KD_TREE::Add_Points(PointVector & PointToAdd){
                     }
                 }
                 Add_by_point(&Root_Node, downsample_result, true);  
-            }  
+            }
         } else {        
             Add_by_point(&Root_Node, PointToAdd[i], true);        
         }
@@ -623,7 +623,7 @@ void KD_TREE::Add_by_point(KD_TREE_NODE ** root, PointType point, bool allow_reb
 
 void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point){
     if (root == nullptr || root->tree_deleted) return;    
-    // Push_Down(root);
+    Push_Down(root);
     if (!root->point_deleted){
         float dist = calc_dist(point, root->point);
         if (q.size() < k_nearest || dist < q.top().dist){

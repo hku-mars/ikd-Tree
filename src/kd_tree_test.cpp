@@ -281,7 +281,6 @@ int main(int argc, char** argv){
             delete_box_rebuild_record = delete_box_tmp_rebuild_counter;
         }
         max_total_time = max(max_total_time, float(total_duration));
-        printf("Finished usleep\n");
         raw_cmp(target, Nearest_Num);    
         flag = cmp_point_vec(search_result, raw_cmp_result);      
         if (!flag) {
