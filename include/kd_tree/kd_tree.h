@@ -10,9 +10,9 @@
 
 #define EPS 1e-6
 #define Minimal_Unbalanced_Tree_Size 10 
-#define Multi_Thread_Rebuild_Minimal_Size 3000
+#define Multi_Thread_Rebuild_Minimal_Size 5000
 #define LOCK_TIMEOUT 500
-#define DOWNSAMPLE_SWITCH false
+#define DOWNSAMPLE_SWITCH true
 
 using namespace std;
 

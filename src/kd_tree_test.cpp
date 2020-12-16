@@ -14,10 +14,10 @@
 #define Z_MIN 0
 
 #define Point_Num 50000
-#define New_Point_Num 100
-#define Delete_Point_Num 100
+#define New_Point_Num 200
+#define Delete_Point_Num 0
 #define Nearest_Num 5
-#define Test_Time 10000
+#define Test_Time 100000
 #define Search_Time 100
 #define Box_Length 0.1
 #define Box_Num 1
@@ -295,7 +295,9 @@ int main(int argc, char** argv){
         PointVector ().swap(removed_points);
         scapegoat_kd_tree.acquire_removed_points(removed_points);
     }
-    usleep(5e5);
+    printf("Test time is : %d\n",Test_Time);
+    usleep(add_executable(kd_tree_test include/kd_tree/kd_tree.cpp src/kd_tree_test.cpp)
+target_link_libraries(kd_tree_test ${PCL_LIBRARIES})5e5);
     // printf("Point Cloud Points:\n");
     // printf("Target Point is : (%0.3f, %0.3f, %0.3f)\n", target.x, target.y, target.z);
     FILE *fp;
