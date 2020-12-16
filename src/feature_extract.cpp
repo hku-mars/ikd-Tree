@@ -790,17 +790,17 @@ void give_feature(pcl::PointCloud<PointType> &pl, vector<orgtype> &types, pcl::P
         PointType ap;
         for(uint k=last_surface; k<=j; k++)
         {
-          ap.x += pl[k].x;
-          ap.y += pl[k].y;
-          ap.z += pl[k].z;
-          ap.curvature += pl[k].curvature;
+          // ap.x += pl[k].x;
+          // ap.y += pl[k].y;
+          // ap.z += pl[k].z;
+          // ap.curvature += pl[k].curvature;
+          pl_surf.push_back(pl[k]);
         }
-        ap.x /= point_filter_num;
-        ap.y /= point_filter_num;
-        ap.z /= point_filter_num;
-        ap.curvature /= point_filter_num;
-        pl_surf.push_back(ap);
-        // printf("%d-%d: %lf %lf %lf\n", last_surface, j, ap.x, ap.y, ap.z);
+        // ap.x /= point_filter_num;
+        // ap.y /= point_filter_num;
+        // ap.z /= point_filter_num;
+        // ap.curvature /= point_filter_num;
+        // pl_surf.push_back(ap);
         last_surface = -1;
       }
     }

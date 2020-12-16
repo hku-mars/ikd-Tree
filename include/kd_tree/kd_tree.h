@@ -10,9 +10,9 @@
 
 #define EPS 1e-6
 #define Minimal_Unbalanced_Tree_Size 10 
-#define Multi_Thread_Rebuild_Minimal_Size 3000
+#define Multi_Thread_Rebuild_Minimal_Size 5000
 #define LOCK_TIMEOUT 500
-#define DOWNSAMPLE_SWITCH false
+#define DOWNSAMPLE_SWITCH true
 
 using namespace std;
 
@@ -28,6 +28,7 @@ struct KD_TREE_NODE
     bool point_deleted = false;
     bool tree_deleted = false; 
     bool need_rebuild = false;
+    bool downsample_deleted = false;
     bool need_push_down_to_left = false;
     bool need_push_down_to_right = false;
     pthread_mutex_t leftson_working_mutex_lock, rightson_working_mutex_lock;
