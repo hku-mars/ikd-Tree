@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <random>
 #include <algorithm>
+#include <omp.h>
 
 
 #define X_MAX 3
@@ -257,7 +258,9 @@ int main(int argc, char** argv){
         }
         total_duration += box_add_duration;               
         // Search Operation
-        auto search_duration = chrono::duration_cast<chrono::microseconds>(t2-t2).count();            
+        auto search_duration = chrono::duration_cast<chrono::microseconds>(t2-t2).count();      
+        omp_set_num_threads(4);
+        #pragma omp parallel for              
         for (int k=0;k<Search_Time;k++){
             PointVector ().swap(search_result);             
             target = generate_target_point();    

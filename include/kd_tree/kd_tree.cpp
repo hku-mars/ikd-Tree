@@ -53,6 +53,7 @@ void KD_TREE::InitTreeNode(KD_TREE_NODE * root){
     root->point_deleted = false;
     root->tree_deleted = false;
     root->downsample_deleted = false;
+    pthread_mutex_init(&(root->push_down_mutex_lock),NULL);    
     pthread_mutex_init(&(root->leftson_working_mutex_lock),NULL);
     pthread_mutex_init(&(root->leftson_search_mutex_lock),NULL);
     pthread_mutex_init(&(root->rightson_working_mutex_lock),NULL);
@@ -648,8 +649,18 @@ void KD_TREE::Add_by_point(KD_TREE_NODE ** root, PointType point, bool allow_reb
 }
 
 void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point, priority_queue<PointType_CMP> &q){
-    if (root == nullptr || root->tree_deleted) return;    
-    Push_Down(root);
+    if (root == nullptr || root->tree_deleted) return;   
+    int retval; 
+    if (root->need_push_down_to_left || root->need_push_down_to_right) {
+        retval = pthread_mutex_trylock(&(root->push_down_mutex_lock));
+        if (retval == 0){
+            Push_Down(root);
+            pthread_mutex_unlock(&(root->push_down_mutex_lock));
+        } else {
+            pthread_mutex_lock(&(root->push_down_mutex_lock));
+            pthread_mutex_unlock(&(root->push_down_mutex_lock));
+        }
+    }
     if (!root->point_deleted){
         float dist = calc_dist(point, root->point);
         if (q.size() < k_nearest || dist < q.top().dist){
@@ -658,38 +669,39 @@ void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point, priori
             q.push(current_point);            
         }
     }  
+    
     float dist_left_node = calc_box_dist(root->left_son_ptr, point);
     float dist_right_node = calc_box_dist(root->right_son_ptr, point);
     if (q.size()< k_nearest || dist_left_node < q.top().dist && dist_right_node < q.top().dist){
         if (dist_left_node <= dist_right_node) {
-            pthread_mutex_lock(&(root->leftson_search_mutex_lock));
+            retval = pthread_mutex_trylock(&(root->leftson_search_mutex_lock));
             Search(root->left_son_ptr, k_nearest, point,q);
-            pthread_mutex_unlock(&(root->leftson_search_mutex_lock));
+            if (retval == 0) pthread_mutex_unlock(&(root->leftson_search_mutex_lock));
             if (q.size() < k_nearest || dist_right_node < q.top().dist) {
-                pthread_mutex_lock(&(root->rightson_search_mutex_lock));
+                retval = pthread_mutex_trylock(&(root->rightson_search_mutex_lock));
                 Search(root->right_son_ptr, k_nearest, point,q);
-                pthread_mutex_unlock(&(root->rightson_search_mutex_lock));
+                if (retval == 0) pthread_mutex_unlock(&(root->rightson_search_mutex_lock));
             }
         } else {
-            pthread_mutex_lock(&(root->rightson_search_mutex_lock));            
+            retval = pthread_mutex_trylock(&(root->rightson_search_mutex_lock));            
             Search(root->right_son_ptr, k_nearest, point,q);
-            pthread_mutex_unlock(&(root->rightson_search_mutex_lock));            
+            if (retval == 0) pthread_mutex_unlock(&(root->rightson_search_mutex_lock));            
             if (q.size() < k_nearest || dist_left_node < q.top().dist) {
-                pthread_mutex_lock(&(root->leftson_search_mutex_lock));                
+                retval = pthread_mutex_trylock(&(root->leftson_search_mutex_lock));                
                 Search(root->left_son_ptr, k_nearest, point,q);
-                pthread_mutex_unlock(&(root->leftson_search_mutex_lock));                
+                if (retval == 0) pthread_mutex_unlock(&(root->leftson_search_mutex_lock));                
             }
         }
     } else {
         if (dist_left_node < q.top().dist) {
-            pthread_mutex_lock(&(root->leftson_search_mutex_lock));            
+            retval = pthread_mutex_trylock(&(root->leftson_search_mutex_lock));            
             Search(root->left_son_ptr, k_nearest, point,q);
-            pthread_mutex_unlock(&(root->leftson_search_mutex_lock));  
+            if (retval == 0) pthread_mutex_unlock(&(root->leftson_search_mutex_lock));  
         }
         if (dist_right_node < q.top().dist) {
-            pthread_mutex_lock(&(root->rightson_search_mutex_lock));              
+            retval = pthread_mutex_trylock(&(root->rightson_search_mutex_lock));              
             Search(root->right_son_ptr, k_nearest, point,q);
-            pthread_mutex_unlock(&(root->rightson_search_mutex_lock));             
+            if (retval == 0) pthread_mutex_unlock(&(root->rightson_search_mutex_lock));             
         }
     }  
     return;
