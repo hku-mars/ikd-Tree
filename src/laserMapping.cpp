@@ -752,10 +752,10 @@ int main(int argc, char** argv)
             {
                 t1 = omp_get_wtime();
 
-                PointVector ().swap(ikdtree.PCL_Storage);
-                ikdtree.traverse_for_rebuild(ikdtree.Root_Node, ikdtree.PCL_Storage);
-                featsFromMap->clear();
-                featsFromMap->points = ikdtree.PCL_Storage;
+                // PointVector ().swap(ikdtree.PCL_Storage);
+                // ikdtree.traverse_for_rebuild(ikdtree.Root_Node, ikdtree.PCL_Storage);
+                // featsFromMap->clear();
+                // featsFromMap->points = ikdtree.PCL_Storage;
 
                 std::vector<bool> point_selected_surf(feats_down_size, true);
                 std::vector<std::vector<int>> pointSearchInd_surf(feats_down_size);
@@ -771,8 +771,8 @@ int main(int argc, char** argv)
                     coeffSel->clear();
 
                     /** closest surface search and residual computation **/
-                    // omp_set_num_threads(4);
-                    // #pragma omp parallel for
+                    omp_set_num_threads(4);
+                    #pragma omp parallel for
                     for (int i = 0; i < feats_down_size; i++)
                     {
                         PointType &pointOri_tmpt = feats_down->points[i];
@@ -973,11 +973,11 @@ int main(int argc, char** argv)
                         K = K_1.block<DIM_OF_STATES,6>(0,0) * Hsub_T;
 
                         solution = K * meas_vec;
-                        // state += solution;
+                        state += solution;
 
-                        auto vec = state_propagat - state;
-                        solution = K * (meas_vec - Hsub * vec.block<6,1>(0,0));
-                        state = state_propagat + solution;
+                        // auto vec = state_propagat - state;
+                        // solution = K * (meas_vec - Hsub * vec.block<6,1>(0,0));
+                        // state = state_propagat + solution;
 
                         rot_add = solution.block<3,1>(0,0);
                         t_add   = solution.block<3,1>(3,0);
@@ -1018,12 +1018,12 @@ int main(int argc, char** argv)
                 
                 std::cout<<"[ mapping ]: iteration count: "<<iterCount+1<<std::endl;
 
-                // t3 = omp_get_wtime();
+                t3 = omp_get_wtime();
 
                 /*** add new frame points to map ikdtree ***/
                 PointVector points_history;
                 ikdtree.acquire_removed_points(points_history);
-                t3 = omp_get_wtime();
+                
                 bool if_cube_updated[laserCloudNum] = {0};
                 std::cout<<"acquire points size: "<<points_history.size()<<std::endl;
                 for (int i = 0; i < points_history.size(); i++)
@@ -1161,8 +1161,8 @@ int main(int argc, char** argv)
             aver_time_consu = aver_time_consu * 0.8 + (t5 - t0) * 0.2;
             T1.push_back(Measures.lidar_beg_time);
             s_plot.push_back(t5 - t0);
-            s_plot2.push_back(double(featsFromMapNum)/1000);
-            // s_plot3.push_back(double(deltaT));
+            s_plot2.push_back(t5 - t3);
+            s_plot3.push_back(match_time);
 
             std::cout<<"[ mapping ]: time: segm "<<t1-t0 <<" kdtree build: "<<t2-t1<<" match "<<match_time<<" solve "<<solve_time<<" map incre "<<t4-t3<<" octo incre "<<t5-t4<<" total "<<t5-t0<<std::endl;
             fout_out << std::setw(10) << Measures.lidar_beg_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
@@ -1192,9 +1192,9 @@ int main(int argc, char** argv)
     #ifndef DEPLOY
     if (!T1.empty())
     {
-        plt::named_plot("time consumed",T1,s_plot);
-        // plt::named_plot("map number",T1,s_plot2);
-        // plt::named_plot("T_residual",T1,s_plot3);
+        plt::named_plot("total time",T1,s_plot);
+        plt::named_plot("add new frame",T1,s_plot2);
+        plt::named_plot("search and pca",T1,s_plot3);
         plt::legend();
         plt::show();
         plt::pause(0.5);
