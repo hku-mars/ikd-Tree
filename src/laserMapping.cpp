@@ -459,7 +459,6 @@ void lasermap_fov_segment()
                         cub_points.vertex_min[2] = centerZ - 0.5 * cube_len;
                         cub_needad.push_back(cub_points);
 
-                        std::cout<<" !!!!!!!! READD !!!!!!!!"<<centerX<<" "<<centerY<<" "<<centerZ<<" size: "<<featsArray[center_index]->size()<<std::endl;
                     }
                     
                     if(last_inFOV && (!now_inFOV))
@@ -473,7 +472,6 @@ void lasermap_fov_segment()
                         cub_points.vertex_min[2] = centerZ - 0.5 * cube_len;
                         cub_needrm.push_back(cub_points);
 
-                        std::cout<<" !!!!!!!! REMOVE !!!!!!!!"<<centerX<<" "<<centerY<<" "<<centerZ<<" size: "<<std::endl;
                     }
 
                     laserCloudSurroundInd[laserCloudSurroundNum] = i + laserCloudWidth * j
@@ -496,12 +494,11 @@ void lasermap_fov_segment()
         featsArray[laserCloudValidInd[i]]->clear();
     }
 
-    if (ikdtree.Root_Node != nullptr)
-    {
-        if(cub_needrm.size() > 0)               ikdtree.Delete_Point_Boxes(cub_needrm);
-        if(cub_needad.size() > 0)               ikdtree.Add_Point_Boxes(cub_needad);
-        if(cube_points_add->points.size() > 0)  ikdtree.Add_Points(cube_points_add->points);
-    }
+
+    if(cub_needrm.size() > 0)               ikdtree.Delete_Point_Boxes(cub_needrm);
+    if(cub_needad.size() > 0)               ikdtree.Add_Point_Boxes(cub_needad);
+    if(cube_points_add->points.size() > 0)  ikdtree.Add_Points(cube_points_add->points);
+
 }
 
 void feat_points_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg) 
@@ -742,7 +739,7 @@ int main(int argc, char** argv)
                 continue;
             }
 
-            int featsFromMapNum = ikdtree.Root_Node->TreeSize;
+            int featsFromMapNum = ikdtree.size();
             int feats_down_size = feats_down->points.size();
             std::cout<<"[ mapping ]: Raw feature num: "<<feats_undistort->points.size()<<" downsamp num "<<feats_down_size<<" Map num: "<<featsFromMapNum<<" laserCloudValidNum "<<laserCloudValidNum<<std::endl;
 
@@ -756,7 +753,7 @@ int main(int argc, char** argv)
                 t1 = omp_get_wtime();
 
                 PointVector ().swap(ikdtree.PCL_Storage);
-                if (ikdtree.Root_Node != nullptr) ikdtree.traverse_for_rebuild(ikdtree.Root_Node, ikdtree.PCL_Storage);
+                ikdtree.traverse_for_rebuild(ikdtree.Root_Node, ikdtree.PCL_Storage);
                 featsFromMap->clear();
                 featsFromMap->points = ikdtree.PCL_Storage;
 

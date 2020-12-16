@@ -10,7 +10,7 @@
 
 #define EPS 1e-6
 #define Minimal_Unbalanced_Tree_Size 10 
-#define Multi_Thread_Rebuild_Minimal_Size 5000
+#define Multi_Thread_Rebuild_Minimal_Percent 0.2
 #define LOCK_TIMEOUT 500
 #define DOWNSAMPLE_SWITCH true
 
@@ -95,7 +95,6 @@ private:
     float Maximal_Point_Num = 10;
     bool Delete_Storage_Disabled = false;
     KD_TREE_NODE * STATIC_ROOT_NODE = nullptr;
-    priority_queue<PointType_CMP> q;
     PointVector Points_deleted;
     PointVector Downsample_Storage;
     PointVector Multithread_Points_deleted;
@@ -107,15 +106,16 @@ private:
     void Delete_by_point(KD_TREE_NODE ** root, PointType point, bool allow_rebuild);
     void Add_by_point(KD_TREE_NODE ** root, PointType point, bool allow_rebuild);
     void Add_by_range(KD_TREE_NODE ** root, BoxPointType boxpoint, bool allow_rebuild);
-    void Search(KD_TREE_NODE * root, int k_nearest, PointType point);
+    void Search(KD_TREE_NODE * root, int k_nearest, PointType point, priority_queue<PointType_CMP> &q);
     bool Criterion_Check(KD_TREE_NODE * root);
     void Push_Down(KD_TREE_NODE * root);
     void Update(KD_TREE_NODE * root); 
+    void traverse_for_multi_thread_rebuild(KD_TREE_NODE * root, PointVector &Storage);
     void delete_tree_nodes(KD_TREE_NODE ** root, delete_point_storage_set storage_type);
     void downsample(KD_TREE_NODE ** root);
     bool same_point(PointType a, PointType b);
     float calc_dist(PointType a, PointType b);
-    float calc_box_dist(KD_TREE_NODE * node, PointType point);
+    float calc_box_dist(KD_TREE_NODE * node, PointType point);    
     static bool point_cmp_x(PointType a, PointType b); 
     static bool point_cmp_y(PointType a, PointType b); 
     static bool point_cmp_z(PointType a, PointType b); 

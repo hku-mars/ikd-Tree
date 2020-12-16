@@ -296,8 +296,7 @@ int main(int argc, char** argv){
         scapegoat_kd_tree.acquire_removed_points(removed_points);
     }
     printf("Test time is : %d\n",Test_Time);
-    usleep(add_executable(kd_tree_test include/kd_tree/kd_tree.cpp src/kd_tree_test.cpp)
-target_link_libraries(kd_tree_test ${PCL_LIBRARIES})5e5);
+    usleep(5e5);
     // printf("Point Cloud Points:\n");
     // printf("Target Point is : (%0.3f, %0.3f, %0.3f)\n", target.x, target.y, target.z);
     FILE *fp;
