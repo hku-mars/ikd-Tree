@@ -27,7 +27,7 @@ Panels:
         - /Features1/PointCloud23
         - /Odometry2/Shape1
         - /Path1
-      Splitter Ratio: 0.5948616862297058
+      Splitter Ratio: 0.6581027507781982
     Tree Height: 714
   - Class: rviz/Selection
     Name: Selection
@@ -47,7 +47,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: surround
+    SyncSource: ""
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -56,10 +56,10 @@ Visualization Manager:
   Class: ""
   Displays:
     - Alpha: 1
-      Cell Size: 0.20000000298023224
+      Cell Size: 1
       Class: rviz/Grid
       Color: 160; 160; 164
-      Enabled: true
+      Enabled: false
       Line Style:
         Line Width: 0.029999999329447746
         Value: Lines
@@ -72,7 +72,7 @@ Visualization Manager:
       Plane: XY
       Plane Cell Count: 160
       Reference Frame: <Fixed Frame>
-      Value: true
+      Value: false
     - Class: rviz/Axes
       Enabled: true
       Length: 0.5
@@ -189,11 +189,11 @@ Visualization Manager:
           Use Fixed Frame: true
           Use rainbow: true
           Value: true
-        - Alpha: 0.30000001192092896
+        - Alpha: 0.10000000149011612
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 8.022581100463867
-            Min Value: -0.35852980613708496
+            Max Value: 4.631499290466309
+            Min Value: -0.35765671730041504
             Value: true
           Axis: Z
           Channel Name: intensity
@@ -258,7 +258,7 @@ Visualization Manager:
           Axis: Z
           Channel Name: intensity
           Class: rviz/PointCloud2
-          Color: 138; 226; 52
+          Color: 239; 41; 41
           Color Transformer: FlatColor
           Decay Time: 0
           Enabled: true
@@ -272,7 +272,7 @@ Visualization Manager:
           Queue Size: 1
           Selectable: true
           Size (Pixels): 3
-          Size (m): 0.029999999329447746
+          Size (m): 0.05000000074505806
           Style: Flat Squares
           Topic: /Laser_map
           Unreliable: false
@@ -679,7 +679,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 20.164432525634766
+      Distance: 39.80101013183594
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -694,10 +694,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7497971653938293
+      Pitch: 1.3897968530654907
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.168570041656494
+      Yaw: 3.0535690784454346
     Saved: ~
 Window Geometry:
   Displays:

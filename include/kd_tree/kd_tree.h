@@ -28,6 +28,7 @@ struct KD_TREE_NODE
     bool point_deleted = false;
     bool tree_deleted = false; 
     bool need_rebuild = false;
+    bool downsample_deleted = false;
     bool need_push_down_to_left = false;
     bool need_push_down_to_right = false;
     pthread_mutex_t leftson_working_mutex_lock, rightson_working_mutex_lock;

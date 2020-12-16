@@ -23,7 +23,7 @@
 	<param name="point_filter_num" type="int" value="4"/>
   <node pkg="fast_lio" type="loam_feat_extract" name="feature_extract" output="screen"/>
 
-  <node pkg="fast_lio" type="loam_laserMapping" name="laserMapping" output="screen" required="true">
+  <node pkg="fast_lio" type="loam_laserMapping" name="laserMapping" output="screen" required="true" launch-prefix="xterm -e gdb -ex run --args">
   <param name="map_file_path" type="string" value=" " />
   <param name="max_iteration" type="int" value="2" />
   <param name="dense_map_enable" type="bool" value="true" />
