@@ -69,7 +69,7 @@
 namespace plt = matplotlibcpp;
 #endif
 
-#define INIT_TIME           (0)
+#define INIT_TIME           (2)
 #define LASER_POINT_COV     (0.0015)
 #define NUM_MATCH_POINTS    (5)
 
@@ -486,7 +486,7 @@ void lasermap_fov_segment()
     }
 
     cube_points_add->clear();
-    
+
     for (int i = 0; i < laserCloudValidNum; i++)
     {
         // *featsFromMap += *featsArray[laserCloudValidInd[i]];
@@ -494,11 +494,9 @@ void lasermap_fov_segment()
         featsArray[laserCloudValidInd[i]]->clear();
     }
 
-
     if(cub_needrm.size() > 0)               ikdtree.Delete_Point_Boxes(cub_needrm);
     if(cub_needad.size() > 0)               ikdtree.Add_Point_Boxes(cub_needad);
     if(cube_points_add->points.size() > 0)  ikdtree.Add_Points(cube_points_add->points);
-
 }
 
 void feat_points_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg) 
@@ -751,7 +749,6 @@ int main(int argc, char** argv)
             if (featsFromMapNum >= 5)
             {
                 t1 = omp_get_wtime();
-
                 // PointVector ().swap(ikdtree.PCL_Storage);
                 // ikdtree.traverse_for_rebuild(ikdtree.Root_Node, ikdtree.PCL_Storage);
                 // featsFromMap->clear();
@@ -791,7 +788,7 @@ int main(int argc, char** argv)
                             PointType &p_farest = points_near[NUM_MATCH_POINTS - 1];
                             float max_distance = std::pow(p_farest.x - pointSel_tmpt.x, 2) + std::pow(p_farest.y - pointSel_tmpt.y, 2)
                                                     + std::pow(p_farest.z - pointSel_tmpt.z, 2);
-                            if (max_distance > 1)
+                            if (max_distance > 4)
                             {
                                 point_selected_surf[i] = false;
                             }
@@ -853,7 +850,7 @@ int main(int argc, char** argv)
                             //if(fabs(pd2) > 0.1) continue;
                             float s = 1 - 0.9 * fabs(pd2) / sqrt(sqrt(pointSel_tmpt.x * pointSel_tmpt.x + pointSel_tmpt.y * pointSel_tmpt.y + pointSel_tmpt.z * pointSel_tmpt.z));
 
-                            if ((s > 0.92))// && ((std::abs(pd2) - res_last[i]) < 3 * res_mean_last))
+                            if ((s > 0.85))// && ((std::abs(pd2) - res_last[i]) < 3 * res_mean_last))
                             {
                                 // if(std::abs(pd2) > 5 * res_mean_last)
                                 // {
@@ -919,8 +916,8 @@ int main(int argc, char** argv)
                     Eigen::VectorXd meas_vec(laserCloudSelNum);
                     Hsub.setZero();
 
-                    omp_set_num_threads(4);
-                    #pragma omp parallel for
+                    // omp_set_num_threads(4);
+                    // #pragma omp parallel for
                     for (int i = 0; i < laserCloudSelNum; i++)
                     {
                         const PointType &laser_p  = laserCloudOri->points[i];
@@ -972,12 +969,12 @@ int main(int argc, char** argv)
                         Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 = (H_T_H + (state.cov / LASER_POINT_COV).inverse()).inverse();
                         K = K_1.block<DIM_OF_STATES,6>(0,0) * Hsub_T;
 
-                        solution = K * meas_vec;
-                        state += solution;
+                        // solution = K * meas_vec;
+                        // state += solution;
 
-                        // auto vec = state_propagat - state;
-                        // solution = K * (meas_vec - Hsub * vec.block<6,1>(0,0));
-                        // state = state_propagat + solution;
+                        auto vec = state_propagat - state;
+                        solution = K * (meas_vec - Hsub * vec.block<6,1>(0,0));
+                        state = state_propagat + solution;
 
                         rot_add = solution.block<3,1>(0,0);
                         t_add   = solution.block<3,1>(3,0);
@@ -1004,7 +1001,7 @@ int main(int argc, char** argv)
                     /*** Convergence Judgements and Covariance Update ***/
                     if (rematch_num >= 2 || (iterCount == NUM_MAX_ITERATIONS - 1))
                     {
-                        if (!flg_EKF_inited)
+                        if (flg_EKF_inited)
                         {
                             /*** Covariance Update ***/
                             G.block<DIM_OF_STATES,6>(0,0) = K * Hsub;

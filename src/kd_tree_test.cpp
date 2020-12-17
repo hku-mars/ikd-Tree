@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <random>
 #include <algorithm>
-#include <omp.h>
 
 
 #define X_MAX 3
@@ -14,13 +13,13 @@
 #define Z_MAX 2
 #define Z_MIN 0
 
-#define Point_Num 50000
-#define New_Point_Num 200
-#define Delete_Point_Num 0
+#define Point_Num 10000
+#define New_Point_Num 210
+#define Delete_Point_Num 200
 #define Nearest_Num 5
-#define Test_Time 100000
+#define Test_Time 5000
 #define Search_Time 100
-#define Box_Length 0.1
+#define Box_Length 0.5
 #define Box_Num 1
 #define Delete_Box_Switch true
 #define Add_Box_Switch true
@@ -31,7 +30,8 @@ PointVector cloud_decrement;
 PointVector cloud_deleted;
 PointVector search_result;
 PointVector raw_cmp_result;
-
+PointVector DeletePoints;
+PointVector removed_points;
 
 KD_TREE scapegoat_kd_tree(0.5,0.6,0.1,10);
 
@@ -81,14 +81,16 @@ void generate_box_decrement(vector<BoxPointType> & Delete_Boxes, float box_lengt
         boxpoint.vertex_min[2] = z_p - d;
         boxpoint.vertex_max[2] = z_p + d;
         Delete_Boxes.push_back(boxpoint);
-        int n = cloud_deleted.size();
+        int n = point_cloud.size();
         int counter = 0;
         while (counter < n){
             PointType tmp = point_cloud[point_cloud.size()-1];
-            cloud_deleted.push_back(tmp);
-            point_cloud.pop_back();
+            point_cloud.pop_back();            
             if (tmp.x +EPS < boxpoint.vertex_min[0] || tmp.x - EPS > boxpoint.vertex_max[0] || tmp.y + EPS < boxpoint.vertex_min[1] || tmp.y - EPS > boxpoint.vertex_max[1] || tmp.z + EPS < boxpoint.vertex_min[2] || tmp.z - EPS > boxpoint.vertex_max[2]){
-                point_cloud.insert(point_cloud.begin(),tmp);
+                point_cloud.insert(point_cloud.begin(),tmp);                  
+            } else {
+                cloud_deleted.push_back(tmp);
+                // printf("        Decremental Push back: (%0.3f, %0.3f, %0.3f)\n",tmp.x,tmp.y,tmp.z);                              
             }
             counter += 1;
         }   
@@ -116,13 +118,16 @@ void generate_box_increment(vector<BoxPointType> & Add_Boxes, float box_length, 
         int counter = 0;
         while (counter < n){
             PointType tmp = cloud_deleted[cloud_deleted.size()-1];
-            point_cloud.push_back(tmp);
             cloud_deleted.pop_back();
+        
             if (tmp.x +EPS < boxpoint.vertex_min[0] || tmp.x - EPS > boxpoint.vertex_max[0] || tmp.y + EPS < boxpoint.vertex_min[1] || tmp.y - EPS > boxpoint.vertex_max[1] || tmp.z + EPS < boxpoint.vertex_min[2] || tmp.z - EPS > boxpoint.vertex_max[2]){
-                cloud_deleted.insert(point_cloud.begin(),tmp);
+                cloud_deleted.insert(cloud_deleted.begin(),tmp);
+            } else {
+                // printf("        Incremental Push back: (%0.3f, %0.3f, %0.3f)\n",tmp.x,tmp.y,tmp.z);                    
+                point_cloud.push_back(tmp);
             }
             counter += 1;
-        }   
+        }
         printf("Add boxes: x:(%0.3f %0.3f) y:(%0.3f %0.3f) z:(%0.3f %0.3f)\n",boxpoint.vertex_min[0],boxpoint.vertex_max[0],boxpoint.vertex_min[1],boxpoint.vertex_max[1], boxpoint.vertex_min[2],boxpoint.vertex_max[2]); 
     }
 }
@@ -185,9 +190,9 @@ int main(int argc, char** argv){
     bool flag = true;
     vector<BoxPointType> Delete_Boxes;
     vector<BoxPointType> Add_Boxes;
-    PointVector DeletePoints;
     float max_total_time = 0.0;
     float box_delete_time = 0.0;
+    float box_add_time = 0.0;
     float add_time = 0.0;
     float delete_time = 0.0;
     float search_time = 0.0;
@@ -198,12 +203,16 @@ int main(int argc, char** argv){
     int delete_box_rebuild_record = 0, delete_box_tmp_rebuild_counter = 0;
     int wa_rec = 0;
     PointType target; 
-    PointVector removed_points;
+
     // Initialize k-d tree
     FILE *fp_log;
     fp_log = fopen("kd_tree_test_log.csv","w");
     fprintf(fp_log,"Add, Delete Points, Delete Boxes, Add Boxes, Search, Total, Treesize\n");
     fclose(fp_log);
+    fp_log = fopen("kd_tree_test_param.csv","w");
+    fprintf(fp_log,"Add Num, Delete Num, Boxes Length, Boxes Num, Search Num, Total Num\n");  
+    fprintf(fp_log,"%d,%d,%0.3f,%d,%d,%d\n", New_Point_Num, Delete_Point_Num, Box_Length, Box_Num, Search_Time, Point_Num);
+    fclose(fp_log); 
     generate_initial_point_cloud(Point_Num);
     auto t1 = chrono::high_resolution_clock::now();
     scapegoat_kd_tree.Build(point_cloud);    
@@ -214,6 +223,7 @@ int main(int argc, char** argv){
         printf("Test %d:\n",counter+1);      
         // Incremental Operation
         generate_increment_point_cloud(New_Point_Num);
+        printf("Start add\n");
         // printf("New Points are\n");
         // print_point_vec(cloud_increment);
         t1 = chrono::high_resolution_clock::now();
@@ -225,6 +235,7 @@ int main(int argc, char** argv){
         printf("Add point time cost is %0.3f ms\n",float(add_duration)/1e3);
         // Decremental Operation
         generate_decrement_point_cloud(Delete_Point_Num);     
+        printf("Start delete\n");        
         t1 = chrono::high_resolution_clock::now();
         scapegoat_kd_tree.Delete_Points(cloud_decrement);
         t2 = chrono::high_resolution_clock::now();
@@ -253,14 +264,13 @@ int main(int argc, char** argv){
             scapegoat_kd_tree.Add_Point_Boxes(Add_Boxes);
             t2 = chrono::high_resolution_clock::now();            
             box_add_duration += chrono::duration_cast<chrono::microseconds>(t2-t1).count();
-            printf("Add box points time cost is %0.3f ms\n",float(box_add_duration)/1e3); 
+            printf("Add box points time cost is %0.3f ms\n",float(box_  add_duration)/1e3); 
             // delete_box_tmp_rebuild_counter = scapegoat_kd_tree.rebuild_counter;
         }
         total_duration += box_add_duration;               
         // Search Operation
-        auto search_duration = chrono::duration_cast<chrono::microseconds>(t2-t2).count();      
-        omp_set_num_threads(4);
-        #pragma omp parallel for              
+        auto search_duration = chrono::duration_cast<chrono::microseconds>(t2-t2).count();           
+        printf("Start Search\n");               
         for (int k=0;k<Search_Time;k++){
             PointVector ().swap(search_result);             
             target = generate_target_point();    
@@ -275,6 +285,7 @@ int main(int argc, char** argv){
         if (float(total_duration) > max_total_time){
             max_total_time = float(total_duration);
             box_delete_time = box_delete_duration;
+            box_add_time = box_add_duration;
             add_time = add_duration;
             delete_time = delete_duration;
             search_time = search_duration;            
@@ -285,7 +296,8 @@ int main(int argc, char** argv){
         }
         max_total_time = max(max_total_time, float(total_duration));
         raw_cmp(target, Nearest_Num);    
-        flag = cmp_point_vec(search_result, raw_cmp_result);      
+        flag = cmp_point_vec(search_result, raw_cmp_result);    
+        usleep(1000);  
         if (!flag) {
             wa_rec += 1;            
             printf("Wrong answer with counter %d\n", wa_rec);
@@ -297,9 +309,10 @@ int main(int argc, char** argv){
         printf("Treesize: %d\n", scapegoat_kd_tree.size());
         PointVector ().swap(removed_points);
         scapegoat_kd_tree.acquire_removed_points(removed_points);
+        // print_point_vec(removed_points);
     }
     printf("Test time is : %d\n",Test_Time);
-    usleep(5e5);
+    usleep(1e5);
     // printf("Point Cloud Points:\n");
     // printf("Target Point is : (%0.3f, %0.3f, %0.3f)\n", target.x, target.y, target.z);
     FILE *fp;
@@ -323,7 +336,7 @@ int main(int argc, char** argv){
         printf("Add Time is: %0.3fms\n",add_time/1e3);        
         printf("Delete Time is: %0.3fms\n",delete_time/1e3);
         printf("Box delete Time is: %0.3fms\n",box_delete_time/1e3);    
-        printf("Box Add Time is: %0.3fms\n",box_delete_time/1e3);          
+        printf("Box Add Time is: %0.3fms\n",box_add_time/1e3);          
         printf("Search Time is: %0.3fms\n",search_time/1e3);           
         printf("Corresponding point number is: %d\n",max_point_num);
         PointVector ().swap(scapegoat_kd_tree.PCL_Storage);

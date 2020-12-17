@@ -11,7 +11,7 @@
 #define EPS 1e-6
 #define Minimal_Unbalanced_Tree_Size 10 
 #define Multi_Thread_Rebuild_Minimal_Percent 0.2
-#define LOCK_TIMEOUT 500
+#define Multi_Thread_Rebuild_Point_Num 2000
 #define DOWNSAMPLE_SWITCH true
 
 using namespace std;
@@ -27,13 +27,11 @@ struct KD_TREE_NODE
     int invalid_point_num = 0;
     bool point_deleted = false;
     bool tree_deleted = false; 
-    bool need_rebuild = false;
     bool downsample_deleted = false;
     bool need_push_down_to_left = false;
     bool need_push_down_to_right = false;
     pthread_mutex_t push_down_mutex_lock;
-    pthread_mutex_t leftson_working_mutex_lock, rightson_working_mutex_lock;
-    pthread_mutex_t leftson_search_mutex_lock, rightson_search_mutex_lock;
+    int leftson_search_flag, rightson_search_flag;
     float node_range_x[2], node_range_y[2], node_range_z[2];   
     KD_TREE_NODE *left_son_ptr = nullptr;
     KD_TREE_NODE *right_son_ptr = nullptr;
@@ -75,11 +73,13 @@ private:
     // debug
     int add_counter;
     int delete_counter;
+    int max_rebuild_num = 0;
+    int max_need_rebuild_num = 0;
     // Multi-thread Tree Rebuild
     bool termination_flag = false;
     pthread_t rebuild_thread;
-    pthread_mutex_t termination_flag_mutex_lock, rebuild_ptr_mutex_lock;
-    pthread_mutex_t rebuild_logger_mutex_lock, points_deleted_mutex_lock, points_deleted_rebuild_mutex_lock;
+    pthread_mutex_t termination_flag_mutex_lock, rebuild_ptr_mutex_lock, working_flag_mutex, search_flag_mutex;
+    pthread_mutex_t rebuild_logger_mutex_lock, points_deleted_rebuild_mutex_lock;
     vector<Operation_Logger_Type> Rebuild_Logger;
     PointVector Rebuild_PCL_Storage;
     KD_TREE_NODE ** Rebuild_Ptr;
@@ -111,7 +111,6 @@ private:
     bool Criterion_Check(KD_TREE_NODE * root);
     void Push_Down(KD_TREE_NODE * root);
     void Update(KD_TREE_NODE * root); 
-    void traverse_for_multi_thread_rebuild(KD_TREE_NODE * root, PointVector &Storage);
     void delete_tree_nodes(KD_TREE_NODE ** root, delete_point_storage_set storage_type);
     void downsample(KD_TREE_NODE ** root);
     bool same_point(PointType a, PointType b);
