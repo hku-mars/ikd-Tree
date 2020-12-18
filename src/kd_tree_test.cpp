@@ -14,10 +14,10 @@
 #define Z_MIN 0
 
 #define Point_Num 10000
-#define New_Point_Num 210
-#define Delete_Point_Num 200
+#define New_Point_Num 200
+#define Delete_Point_Num 0
 #define Nearest_Num 5
-#define Test_Time 5000
+#define Test_Time 1000
 #define Search_Time 100
 #define Box_Length 0.5
 #define Box_Num 1
@@ -264,7 +264,7 @@ int main(int argc, char** argv){
             scapegoat_kd_tree.Add_Point_Boxes(Add_Boxes);
             t2 = chrono::high_resolution_clock::now();            
             box_add_duration += chrono::duration_cast<chrono::microseconds>(t2-t1).count();
-            printf("Add box points time cost is %0.3f ms\n",float(box_  add_duration)/1e3); 
+            printf("Add box points time cost is %0.3f ms\n",float(box_add_duration)/1e3); 
             // delete_box_tmp_rebuild_counter = scapegoat_kd_tree.rebuild_counter;
         }
         total_duration += box_add_duration;               
