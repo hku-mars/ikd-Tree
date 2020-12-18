@@ -207,7 +207,7 @@ void KD_TREE::Build(PointVector point_cloud){
     Root_Node = STATIC_ROOT_NODE->left_son_ptr;
 }
 
-void KD_TREE::Nearest_Search(PointType point, int k_nearest, PointVector& Nearest_Points){
+void KD_TREE::Nearest_Search(PointType point, int k_nearest, PointVector& Nearest_Points, vector<float> Point_Dist){
     priority_queue<PointType_CMP> q; // Clear the priority queue;
     while (STATIC_ROOT_NODE->leftson_search_flag < 0) usleep(1);   
     if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){

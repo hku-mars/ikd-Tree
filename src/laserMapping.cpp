@@ -79,7 +79,7 @@ int iterCount = 0;
 int NUM_MAX_ITERATIONS  = 0;
 int laserCloudCenWidth  = 20;
 int laserCloudCenHeight = 10;
-int laserCloudCenDepth  = 20;
+int laserCloudCenDepth  = 20;4
 int laserCloudValidInd[250];
 int laserCloudSurroundInd[250];
 int laserCloudValidNum    = 0;
@@ -124,7 +124,7 @@ PointCloudXYZI::Ptr featsArray[laserCloudNum];
 bool                _last_inFOV[laserCloudNum];
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr laserCloudFullResColor(new pcl::PointCloud<pcl::PointXYZRGB>());
 // pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfFromMap(new pcl::KdTreeFLANN<PointType>());
-KD_TREE ikdtree(0.5, 0.7, 0.4, 1);
+KD_TREE ikdtree(0.5, 0.7, 0.2, 1);
 
 //estimator inputs and output;
 MeasureGroup Measures;

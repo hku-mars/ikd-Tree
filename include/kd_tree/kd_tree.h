@@ -11,7 +11,7 @@
 #define EPS 1e-6
 #define Minimal_Unbalanced_Tree_Size 10 
 #define Multi_Thread_Rebuild_Minimal_Percent 0.2
-#define Multi_Thread_Rebuild_Point_Num 200000
+#define Multi_Thread_Rebuild_Point_Num 2000
 #define DOWNSAMPLE_SWITCH true
 
 using namespace std;
@@ -130,7 +130,7 @@ public:
     void set_downsample_param(float box_length, int Maximal_Point_Num);
     int size();
     void Build(PointVector point_cloud);
-    void Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points);
+    void Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> & Point_Distance);
     void Add_Points(PointVector & PointToAdd);
     void Add_Point_Boxes(vector<BoxPointType> & BoxPoints);
     void Delete_Points(PointVector & PointToDel);
