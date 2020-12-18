@@ -207,7 +207,7 @@ void KD_TREE::Build(PointVector point_cloud){
     Root_Node = STATIC_ROOT_NODE->left_son_ptr;
 }
 
-void KD_TREE::Nearest_Search(PointType point, int k_nearest, PointVector& Nearest_Points, vector<float> Point_Dist){
+void KD_TREE::Nearest_Search(PointType point, int k_nearest, PointVector& Nearest_Points, vector<float> & Point_Distance){
     priority_queue<PointType_CMP> q; // Clear the priority queue;
     while (STATIC_ROOT_NODE->leftson_search_flag < 0) usleep(1);   
     if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){
@@ -219,8 +219,11 @@ void KD_TREE::Nearest_Search(PointType point, int k_nearest, PointVector& Neares
     }
     // printf("Search Counter is %d ",search_counter);
     int k_found = min(k_nearest,int(q.size()));
+    PointVector ().swap(Nearest_Points);
+    vector<float> Point_Distance;
     for (int i=0;i < k_found;i++){
         Nearest_Points.insert(Nearest_Points.begin(), q.top().point);
+        Point_Distance.insert(Point_Distance.begin(), q.top().dist);
         q.pop();
     }
     return;
