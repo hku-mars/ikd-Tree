@@ -778,10 +778,10 @@ int main(int argc, char** argv)
                 t1 = omp_get_wtime();
             
             #ifdef USE_ikdtree
-                PointVector ().swap(ikdtree.PCL_Storage);
-                ikdtree.traverse_for_rebuild(ikdtree.Root_Node, ikdtree.PCL_Storage);
-                featsFromMap->clear();
-                featsFromMap->points = ikdtree.PCL_Storage;
+                // PointVector ().swap(ikdtree.PCL_Storage);
+                // ikdtree.traverse_for_rebuild(ikdtree.Root_Node, ikdtree.PCL_Storage);
+                // featsFromMap->clear();
+                // featsFromMap->points = ikdtree.PCL_Storage;
             #else
                 kdtreeSurfFromMap->setInputCloud(featsFromMap);
             #endif
@@ -809,10 +809,10 @@ int main(int argc, char** argv)
 
                         /* transform to world frame */
                         pointBodyToWorld(&pointOri_tmpt, &pointSel_tmpt);
+                        std::vector<float> pointSearchSqDis_surf;
                     #ifdef USE_ikdtree
                         auto &points_near = Nearest_Points[i];
                     #else
-                        std::vector<float> pointSearchSqDis_surf;
                         auto &points_near = pointSearchInd_surf[i];
                     #endif
                         
@@ -821,25 +821,23 @@ int main(int argc, char** argv)
                             point_selected_surf[i] = true;
                             /** Find the closest surfaces in the map **/
                         #ifdef USE_ikdtree
-                            ikdtree.Nearest_Search(pointSel_tmpt, NUM_MATCH_POINTS, Nearest_Points[i]);
-                            points_near = Nearest_Points[i];
-
-                            PointType &p_farest = points_near[NUM_MATCH_POINTS - 1];
-                            float max_distance = std::pow(p_farest.x - pointSel_tmpt.x, 2) + std::pow(p_farest.y - pointSel_tmpt.y, 2)
-                                                    + std::pow(p_farest.z - pointSel_tmpt.z, 2);
-                            if (max_distance > 9)
-                            {
-                                point_selected_surf[i] = false;
-                            }
+                            ikdtree.Nearest_Search(pointSel_tmpt, NUM_MATCH_POINTS, points_near, pointSearchSqDis_surf);
+                            // PointType &p_farest = points_near[NUM_MATCH_POINTS - 1];
+                            // float max_distance = std::pow(p_farest.x - pointSel_tmpt.x, 2) + std::pow(p_farest.y - pointSel_tmpt.y, 2)
+                            //                         + std::pow(p_farest.z - pointSel_tmpt.z, 2);
+                            // if (max_distance > 9)
+                            // {
+                            //     point_selected_surf[i] = false;
+                            // }
                         #else
                             kdtreeSurfFromMap->nearestKSearch(pointSel_tmpt, NUM_MATCH_POINTS, points_near, pointSearchSqDis_surf);
+                        #endif
                             float max_distance = pointSearchSqDis_surf[NUM_MATCH_POINTS - 1];
                         
                             if (max_distance > 3)
                             {
                                 point_selected_surf[i] = false;
                             }
-                        #endif
                         }
 
                         if (point_selected_surf[i] == false) continue;
@@ -1150,9 +1148,10 @@ int main(int argc, char** argv)
                         downSizeFilterMap.filter(*featsArray[ind]);
                     }
                 }
+                
             #endif
-                t5 = omp_get_wtime();
-
+            t5 = omp_get_wtime();
+                
             /******* Publish current frame points in world coordinates:  *******/
             laserCloudFullRes2->clear();
             *laserCloudFullRes2 = dense_map_en ? (*feats_undistort) : (* feats_down);
@@ -1248,19 +1247,19 @@ int main(int argc, char** argv)
 
             /*** save debug variables ***/
             frame_num ++;
-            // aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t5 - t0) / frame_num;
-            aver_time_consu = aver_time_consu * 0.8 + (t5 - t0) * 0.2;
+            aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t5 - t0) / frame_num;
+            // aver_time_consu = aver_time_consu * 0.8 + (t5 - t0) * 0.2;
             T1.push_back(Measures.lidar_beg_time);
-            s_plot.push_back(t5 - t0);
+            s_plot.push_back(aver_time_consu);
             s_plot2.push_back(t5 - t3);
             s_plot3.push_back(match_time);
             s_plot4.push_back(float(feats_down_size/10000.0));
             s_plot5.push_back(float(laserCloudSelNum/10000.0));
 
-            std::cout<<"[ mapping ]: time: segm "<<t1-t0 <<" kdtree build: "<<t2-t1<<" match "<<match_time<<" solve "<<solve_time<<" map incre "<<t5-t3<<" total "<<t5-t0<<std::endl;
-            fout_out << std::setw(10) << Measures.lidar_beg_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
-            <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<< std::endl;
-            // fout_out << std::setw(10) << Measures.lidar_beg_time << " " << t3-t1 << " " << effect_feat_num << std::endl;
+            std::cout<<"[ mapping ]: time: segm "<<t1-t0 <<" kdtree build: "<<t2-t1<<" match "<<match_time<<" solve "<<solve_time<<" map incre "<<t5-t3<<" total "<<aver_time_consu<<std::endl;
+            // fout_out << std::setw(10) << Measures.lidar_beg_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
+            // <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<< std::endl;
+            fout_out<<std::setw(8)<<laserCloudSelNum<<" "<<Measures.lidar_beg_time<<" "<<t2-t0<<" "<<match_time<<" "<<t5-t3<<" "<<t5-t0<<std::endl;
         }
         status = ros::ok();
         rate.sleep();
