@@ -762,10 +762,10 @@ int main(int argc, char** argv)
             {
                 t1 = omp_get_wtime();
 
-                // PointVector ().swap(ikdtree.PCL_Storage);
-                // ikdtree.traverse_for_rebuild(ikdtree.Root_Node, ikdtree.PCL_Storage);
-                // featsFromMap->clear();
-                // featsFromMap->points = ikdtree.PCL_Storage;
+                PointVector ().swap(ikdtree.PCL_Storage);
+                ikdtree.traverse_for_rebuild(ikdtree.Root_Node, ikdtree.PCL_Storage);
+                featsFromMap->clear();
+                featsFromMap->points = ikdtree.PCL_Storage;
 
                 std::vector<bool> point_selected_surf(feats_down_size, true);
                 std::vector<std::vector<int>> pointSearchInd_surf(feats_down_size);
