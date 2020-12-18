@@ -69,7 +69,7 @@
 namespace plt = matplotlibcpp;
 #endif
 
-#define INIT_TIME           (2)
+#define INIT_TIME           (0)
 #define LASER_POINT_COV     (0.0015)
 #define NUM_MATCH_POINTS    (5)
 
@@ -90,6 +90,8 @@ const int laserCloudWidth  = 42;
 const int laserCloudHeight = 22;
 const int laserCloudDepth  = 42;
 const int laserCloudNum = laserCloudWidth * laserCloudHeight * laserCloudDepth;
+
+std::vector<double> T1, T2, s_plot, s_plot2, s_plot3, s_plot4, s_plot5, s_plot6;
 
 /// IMU relative variables
 std::mutex mtx_buffer;
@@ -494,9 +496,20 @@ void lasermap_fov_segment()
         featsArray[laserCloudValidInd[i]]->clear();
     }
 
+    double t_begin = omp_get_wtime();
+    T2.push_back(Measures.lidar_beg_time);
+
     if(cub_needrm.size() > 0)               ikdtree.Delete_Point_Boxes(cub_needrm);
-    if(cub_needad.size() > 0)               ikdtree.Add_Point_Boxes(cub_needad);
+
+    // s_plot4.push_back(omp_get_wtime() - t_begin); t_begin = omp_get_wtime();
+
+    if(cub_needad.size() > 0)               ikdtree.Add_Point_Boxes(cub_needad); 
+
+    // s_plot5.push_back(omp_get_wtime() - t_begin); t_begin = omp_get_wtime();
+
     if(cube_points_add->points.size() > 0)  ikdtree.Add_Points(cube_points_add->points);
+
+    s_plot6.push_back(omp_get_wtime() - t_begin);
 }
 
 void feat_points_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg) 
@@ -658,7 +671,6 @@ int main(int argc, char** argv)
         std::cout << "~~~~"<<ROOT_DIR<<" file opened" << std::endl;
     else
         std::cout << "~~~~"<<ROOT_DIR<<" doesn't exist" << std::endl;
-    std::vector<double> T1, s_plot, s_plot2, s_plot3;
 
 //------------------------------------------------------------------------------------------------------
     signal(SIGINT, SigHandle);
@@ -749,6 +761,7 @@ int main(int argc, char** argv)
             if (featsFromMapNum >= 5)
             {
                 t1 = omp_get_wtime();
+
                 // PointVector ().swap(ikdtree.PCL_Storage);
                 // ikdtree.traverse_for_rebuild(ikdtree.Root_Node, ikdtree.PCL_Storage);
                 // featsFromMap->clear();
@@ -1160,6 +1173,8 @@ int main(int argc, char** argv)
             s_plot.push_back(t5 - t0);
             s_plot2.push_back(t5 - t3);
             s_plot3.push_back(match_time);
+            s_plot4.push_back(float(feats_down_size/10000.0));
+            s_plot5.push_back(float(laserCloudSelNum/10000.0));
 
             std::cout<<"[ mapping ]: time: segm "<<t1-t0 <<" kdtree build: "<<t2-t1<<" match "<<match_time<<" solve "<<solve_time<<" map incre "<<t4-t3<<" octo incre "<<t5-t4<<" total "<<t5-t0<<std::endl;
             fout_out << std::setw(10) << Measures.lidar_beg_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
@@ -1192,6 +1207,9 @@ int main(int argc, char** argv)
         plt::named_plot("total time",T1,s_plot);
         plt::named_plot("add new frame",T1,s_plot2);
         plt::named_plot("search and pca",T1,s_plot3);
+        plt::named_plot("newpoints number",T1,s_plot4);
+        plt::named_plot("effective number",T1,s_plot5);
+        // plt::named_plot("readd",T2,s_plot6);
         plt::legend();
         plt::show();
         plt::pause(0.5);
