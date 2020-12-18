@@ -27,7 +27,8 @@ struct KD_TREE_NODE
     int invalid_point_num = 0;
     bool point_deleted = false;
     bool tree_deleted = false; 
-    bool downsample_deleted = false;
+    bool point_downsample_deleted = false;
+    bool tree_downsample_deleted = false;
     bool need_push_down_to_left = false;
     bool need_push_down_to_right = false;
     pthread_mutex_t push_down_mutex_lock;
@@ -56,7 +57,7 @@ struct BoxPointType{
 };
 
 
-enum operation_set {ADD_POINT, DELETE_POINT, DELETE_BOX, ADD_BOX};
+enum operation_set {ADD_POINT, DELETE_POINT, DELETE_BOX, ADD_BOX, DOWNSAMPLE_DELETE};
 
 enum delete_point_storage_set {NOT_RECORD, DELETE_POINTS_REC, MULTI_THREAD_REC, DOWNSAMPLE_REC};
 
@@ -108,6 +109,7 @@ private:
     void Add_by_point(KD_TREE_NODE ** root, PointType point, bool allow_rebuild);
     void Add_by_range(KD_TREE_NODE ** root, BoxPointType boxpoint, bool allow_rebuild);
     void Search(KD_TREE_NODE * root, int k_nearest, PointType point, priority_queue<PointType_CMP> &q);
+    void Search_by_range(KD_TREE_NODE *root, BoxPointType boxpoint, PointVector &Storage);
     bool Criterion_Check(KD_TREE_NODE * root);
     void Push_Down(KD_TREE_NODE * root);
     void Update(KD_TREE_NODE * root); 
