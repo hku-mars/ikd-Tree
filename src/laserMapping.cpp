@@ -123,6 +123,7 @@ PointCloudXYZI::Ptr laserCloudFullRes2(new PointCloudXYZI());
 PointCloudXYZI::Ptr featsArray[laserCloudNum];
 bool                _last_inFOV[laserCloudNum];
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr laserCloudFullResColor(new pcl::PointCloud<pcl::PointXYZRGB>());
+<<<<<<< HEAD
 
 #ifdef USE_ikdtree
 KD_TREE ikdtree(0.5, 0.7, 0.2, 1);
@@ -130,6 +131,10 @@ KD_TREE ikdtree(0.5, 0.7, 0.2, 1);
 pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfFromMap(new pcl::KdTreeFLANN<PointType>());
 #endif
 
+=======
+// pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfFromMap(new pcl::KdTreeFLANN<PointType>());
+KD_TREE ikdtree(0.5, 0.7, 0.4, 1);
+>>>>>>> c629c24d12673d1e83f23a6fa0b5e3c3f985d49e
 
 //estimator inputs and output;
 MeasureGroup Measures;

@@ -10,6 +10,7 @@ KD_TREE::KD_TREE(float delete_param = 0.5, float balance_param = 0.7, float box_
     delete_criterion_param = delete_param;
     balance_criterion_param = balance_param;
     Maximal_Point_Num = max_point_num;
+    downsample_size = box_length;
     vector<Operation_Logger_Type> ().swap(Rebuild_Logger);            
     termination_flag = false;
     start_thread(); 
@@ -236,9 +237,10 @@ void KD_TREE::Add_Points(PointVector & PointToAdd){
         Box_of_Point.vertex_max[1] = Box_of_Point.vertex_min[1]+downsample_size; 
         Box_of_Point.vertex_min[2] = floor(PointToAdd[i].z/downsample_size)*downsample_size;
         Box_of_Point.vertex_max[2] = Box_of_Point.vertex_min[2]+downsample_size;   
-        mid_point.x = (Box_of_Point.vertex_max[0]-Box_of_Point.vertex_min[0])/2.0;
-        mid_point.y = (Box_of_Point.vertex_max[1]-Box_of_Point.vertex_min[1])/2.0;
-        mid_point.z = (Box_of_Point.vertex_max[2]-Box_of_Point.vertex_min[2])/2.0;
+        // printf("=================(%0.3f,%0.3f) (%0.3f,%0.3f) (%0.3f,%0.3f)\n",Box_of_Point.vertex_min[0],Box_of_Point.vertex_max[0],Box_of_Point.vertex_min[1],Box_of_Point.vertex_max[1],Box_of_Point.vertex_min[2],Box_of_Point.vertex_max[2]);
+        mid_point.x = Box_of_Point.vertex_min[0] + (Box_of_Point.vertex_max[0]-Box_of_Point.vertex_min[0])/2.0;
+        mid_point.y = Box_of_Point.vertex_min[1] + (Box_of_Point.vertex_max[1]-Box_of_Point.vertex_min[1])/2.0;
+        mid_point.z = Box_of_Point.vertex_min[2] + (Box_of_Point.vertex_max[2]-Box_of_Point.vertex_min[2])/2.0;
         PointVector ().swap(Downsample_Storage);
         Search_by_range(Root_Node, Box_of_Point, Downsample_Storage);
         min_dist = calc_dist(PointToAdd[i],mid_point);
@@ -249,7 +251,9 @@ void KD_TREE::Add_Points(PointVector & PointToAdd){
                 min_dist = tmp_dist;
                 downsample_result = Downsample_Storage[index];
             }
-        }        
+        }
+        // printf("=================(%0.3f,%0.3f,%0.3f) (%0.3f,%0.3f,%0.3f) \n",downsample_result.x,downsample_result.y,downsample_result.z, mid_point.x, mid_point.y, mid_point.z);
+        // printf("================= Downsample size is %d Mindist is %0.3f \n",int(Downsample_Storage.size()),sqrt(min_dist));
         if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){
             if (DOWNSAMPLE_SWITCH){
                 Delete_by_range(&Root_Node, Box_of_Point, true, true);
@@ -464,7 +468,6 @@ void KD_TREE::Delete_by_range(KD_TREE_NODE ** root,  BoxPointType boxpoint, bool
             (*root)->tree_downsample_deleted = true;
             (*root)->point_downsample_deleted = true;
         }
-        // if (is_downsample) delete_tree_nodes(root, DOWNSAMPLE_REC);
         return;
     }
     if (boxpoint.vertex_min[0]-EPS < (*root)->point.x && boxpoint.vertex_max[0]+EPS > (*root)->point.x && boxpoint.vertex_min[1]-EPS < (*root)->point.y && boxpoint.vertex_max[1]+EPS > (*root)->point.y && boxpoint.vertex_min[2]-EPS < (*root)->point.z && boxpoint.vertex_max[2]+EPS > (*root)->point.z){
@@ -544,7 +547,6 @@ void KD_TREE::Delete_by_point(KD_TREE_NODE ** root, PointType point, bool allow_
             retval = pthread_mutex_trylock(&working_flag_mutex);
             if (!retval){          
                 Delete_by_point(&(*root)->right_son_ptr, point, allow_rebuild);       
-
             } else {
                 pthread_mutex_lock(&rebuild_logger_mutex_lock);
                 Rebuild_Logger.push_back(delete_log);
@@ -761,7 +763,7 @@ void KD_TREE::Search_by_range(KD_TREE_NODE *root, BoxPointType boxpoint, PointVe
         return;
     }
     if (boxpoint.vertex_min[0]-EPS < root->point.x && boxpoint.vertex_max[0]+EPS > root->point.x && boxpoint.vertex_min[1]-EPS < root->point.y && boxpoint.vertex_max[1]+EPS > root->point.y && boxpoint.vertex_min[2]-EPS < root->point.z && boxpoint.vertex_max[2]+EPS > root->point.z){
-        Storage.push_back(root->point);
+        if (!root->point_deleted) Storage.push_back(root->point);
     }
     if ((Rebuild_Ptr == nullptr) || root->left_son_ptr != *Rebuild_Ptr){
         Search_by_range(root->left_son_ptr, boxpoint, Storage);
