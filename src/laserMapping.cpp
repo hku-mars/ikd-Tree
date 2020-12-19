@@ -81,9 +81,7 @@ int laserCloudCenWidth  = 20;
 int laserCloudCenHeight = 10;
 int laserCloudCenDepth  = 20;
 int laserCloudValidInd[250];
-int laserCloudSurroundInd[250];
 int laserCloudValidNum    = 0;
-int laserCloudSurroundNum = 0;
 int laserCloudSelNum      = 0;
 
 const int laserCloudWidth  = 42;
@@ -130,6 +128,8 @@ KD_TREE ikdtree(0.5, 0.7, 0.2, 1);
 pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfFromMap(new pcl::KdTreeFLANN<PointType>());
 #endif
 
+Eigen::Vector3f XAxisPoint_body(LIDAR_SP_LEN, 0.0, 0.0);
+Eigen::Vector3f XAxisPoint_world(LIDAR_SP_LEN, 0.0, 0.0);
 
 //estimator inputs and output;
 MeasureGroup Measures;
@@ -152,6 +152,16 @@ void pointBodyToWorld(PointType const * const pi, PointType * const po)
     po->y = p_global(1);
     po->z = p_global(2);
     po->intensity = pi->intensity;
+}
+
+template<typename T>
+void pointBodyToWorld(const Eigen::Matrix<T, 3, 1> &pi, Eigen::Matrix<T, 3, 1> &po)
+{
+    Eigen::Vector3d p_body(pi[0], pi[1], pi[2]);
+    Eigen::Vector3d p_global(state.rot_end * (p_body + Lidar_offset_to_IMU) + state.pos_end);
+    po[0] = p_global(0);
+    po[1] = p_global(1);
+    po[2] = p_global(2);
 }
 
 void RGBpointBodyToWorld(PointType const * const pi, pcl::PointXYZRGB * const po)
@@ -206,15 +216,41 @@ int cube_ind(const int &i, const int &j, const int &k)
     return (i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k);
 }
 
+bool CenterinFOV(Eigen::Vector3f cube_p)
+{                                
+    Eigen::Vector3f dis_vec = state.pos_end.cast<float>() - cube_p;
+    float squaredSide1 = dis_vec.transpose() * dis_vec;
+
+    if(squaredSide1 < 0.4 * cube_len * cube_len) return true;
+
+    dis_vec = XAxisPoint_world.cast<float>() - cube_p;
+    float squaredSide2 = dis_vec.transpose() * dis_vec;
+
+    float ang_cos = fabs(squaredSide1 <= 3) ? 1.0 :
+        (LIDAR_SP_LEN * LIDAR_SP_LEN + squaredSide1 - squaredSide2) / (2 * LIDAR_SP_LEN * sqrt(squaredSide1));
+    
+    return ((ang_cos > HALF_FOV_COS)? true : false);
+}
+
+bool CornerinFOV(Eigen::Vector3f cube_p)
+{                                
+    Eigen::Vector3f dis_vec = state.pos_end.cast<float>() - cube_p;
+    float squaredSide1 = dis_vec.transpose() * dis_vec;
+
+    dis_vec = XAxisPoint_world.cast<float>() - cube_p;
+    float squaredSide2 = dis_vec.transpose() * dis_vec;
+
+    float ang_cos = fabs(squaredSide1 <= 3) ? 1.0 :
+        (LIDAR_SP_LEN * LIDAR_SP_LEN + squaredSide1 - squaredSide2) / (2 * LIDAR_SP_LEN * sqrt(squaredSide1));
+    
+    return ((ang_cos > HALF_FOV_COS)? true : false);
+}
+
 void lasermap_fov_segment()
 {
-    laserCloudValidNum    = 0;
-    laserCloudSurroundNum = 0;
-    PointType pointOnYAxis;
-    pointOnYAxis.x = LIDAR_SP_LEN;
-    pointOnYAxis.y = 0.0;
-    pointOnYAxis.z = 0.0;
-    pointBodyToWorld(&pointOnYAxis, &pointOnYAxis);
+    laserCloudValidNum = 0;
+
+    pointBodyToWorld(XAxisPoint_body, XAxisPoint_world);
 
     int centerCubeI = int((state.pos_end(0) + 0.5 * cube_len) / cube_len) + laserCloudCenWidth;
     int centerCubeJ = int((state.pos_end(1) + 0.5 * cube_len) / cube_len) + laserCloudCenHeight;
@@ -369,6 +405,9 @@ void lasermap_fov_segment()
         laserCloudCenDepth--;
     }
 
+    cube_points_add->clear();
+    featsFromMap->clear();
+
     for (int i = centerCubeI - 2; i <= centerCubeI + 2; i++) 
     {
         for (int j = centerCubeJ - 2; j <= centerCubeJ + 2; j++) 
@@ -379,103 +418,87 @@ void lasermap_fov_segment()
                         j >= 0 && j < laserCloudHeight &&
                         k >= 0 && k < laserCloudDepth) 
                 {
+                    // float centerX = cube_len * (i - laserCloudCenWidth);
+                    // float centerY = cube_len * (j - laserCloudCenHeight);
+                    // float centerZ = cube_len * (k - laserCloudCenDepth);
 
-                    float centerX = cube_len * (i - laserCloudCenWidth);
-                    float centerY = cube_len * (j - laserCloudCenHeight);
-                    float centerZ = cube_len * (k - laserCloudCenDepth);
+                    Eigen::Vector3f center_p(cube_len * (i - laserCloudCenWidth),\
+                                             cube_len * (j - laserCloudCenHeight),\
+                                             cube_len * (k - laserCloudCenDepth));
 
                     float check1, check2;
                     float squaredSide1, squaredSide2;
                     float ang_cos = 1;
+                    bool &last_inFOV = _last_inFOV[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
+                    bool now_inFOV = CenterinFOV(center_p);
 
-                    bool now_inFOV = false;
-
-                    for (int ii = -1; ii <= 1; ii += 2) 
+                    for (int ii = -1; (ii <= 1) && (!now_inFOV); ii += 2) 
                     {
-                        for (int jj = -1; jj <= 1; jj += 2) 
+                        for (int jj = -1; (jj <= 1) && (!now_inFOV); jj += 2) 
                         {
                             for (int kk = -1; (kk <= 1) && (!now_inFOV); kk += 2) 
                             {
-
-                                float cornerX = centerX + 0.5 * cube_len * ii;
-                                float cornerY = centerY + 0.5 * cube_len * jj;
-                                float cornerZ = centerZ + 0.5 * cube_len * kk;
-
-                                squaredSide1 = (state.pos_end(0) - cornerX)
-                                        * (state.pos_end(0) - cornerX)
-                                        + (state.pos_end(1) - cornerY)
-                                        * (state.pos_end(1) - cornerY)
-                                        + (state.pos_end(2) - cornerZ)
-                                        * (state.pos_end(2) - cornerZ);
-
-                                squaredSide2 = (pointOnYAxis.x - cornerX) * (pointOnYAxis.x - cornerX)
-                                        + (pointOnYAxis.y - cornerY) * (pointOnYAxis.y - cornerY)
-                                        + (pointOnYAxis.z - cornerZ) * (pointOnYAxis.z - cornerZ);
-
-                                ang_cos = fabs(squaredSide1 <= 3) ? 1.0 :
-                                    (LIDAR_SP_LEN * LIDAR_SP_LEN + squaredSide1 - squaredSide2) / (2 * LIDAR_SP_LEN * sqrt(squaredSide1));
+                                Eigen::Vector3f corner_p(cube_len * ii, cube_len * jj, cube_len * kk);
+                                corner_p = center_p + 0.5 * corner_p;
                                 
-                                if(ang_cos > HALF_FOV_COS) now_inFOV = true;
+                                now_inFOV = CornerinFOV(corner_p);
                             }
                         }
                     }
-                    
-                    if(!now_inFOV)
-                    {
-                        float cornerX = centerX;
-                        float cornerY = centerY;
-                        float cornerZ = centerZ;
 
-                        squaredSide1 = (state.pos_end(0) - cornerX)
-                                * (state.pos_end(0) - cornerX)
-                                + (state.pos_end(1) - cornerY)
-                                * (state.pos_end(1) - cornerY)
-                                + (state.pos_end(2) - cornerZ)
-                                * (state.pos_end(2) - cornerZ);
+                    // if(!now_inFOV)
+                    // {
+                    //     float cornerX = centerX;
+                    //     float cornerY = centerY;
+                    //     float cornerZ = centerZ;
 
-                        if(squaredSide1 <= 0.4 * cube_len * cube_len)
-                        {
-                            now_inFOV = true;
-                        }
+                    //     squaredSide1 = (state.pos_end(0) - cornerX)
+                    //             * (state.pos_end(0) - cornerX)
+                    //             + (state.pos_end(1) - cornerY)
+                    //             * (state.pos_end(1) - cornerY)
+                    //             + (state.pos_end(2) - cornerZ)
+                    //             * (state.pos_end(2) - cornerZ);
 
-                        squaredSide2 = (pointOnYAxis.x - cornerX) * (pointOnYAxis.x - cornerX)
-                                + (pointOnYAxis.y - cornerY) * (pointOnYAxis.y - cornerY)
-                                + (pointOnYAxis.z - cornerZ) * (pointOnYAxis.z - cornerZ);
+                    //     if(squaredSide1 <= 0.4 * cube_len * cube_len)
+                    //     {
+                    //         now_inFOV = true;
+                    //     }
+
+                    //     squaredSide2 = (XAxisPoint_body.x - cornerX) * (XAxisPoint_body.x - cornerX)
+                    //             + (XAxisPoint_body.y - cornerY) * (XAxisPoint_body.y - cornerY)
+                    //             + (XAxisPoint_body.z - cornerZ) * (XAxisPoint_body.z - cornerZ);
                         
-                        ang_cos = fabs(squaredSide2 <= 0.5 * cube_len) ? 1.0 :
-                            (LIDAR_SP_LEN * LIDAR_SP_LEN + squaredSide1 - squaredSide2) / (2 * LIDAR_SP_LEN * sqrt(squaredSide1));
+                    //     ang_cos = fabs(squaredSide2 <= 0.5 * cube_len) ? 1.0 :
+                    //         (LIDAR_SP_LEN * LIDAR_SP_LEN + squaredSide1 - squaredSide2) / (2 * LIDAR_SP_LEN * sqrt(squaredSide1));
                         
-                        if(ang_cos > HALF_FOV_COS) now_inFOV = true;
-                    }
-                
-                    bool &last_inFOV = _last_inFOV[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
+                    //     if(ang_cos > HALF_FOV_COS) now_inFOV = true;
+                    // }
 
                 #ifdef USE_ikdtree
+                    BoxPointType cub_points;
                     if (!last_inFOV && now_inFOV)
                     {
                         int center_index = i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k;
+                        *cube_points_add += *featsArray[center_index];
+                        featsArray[center_index]->clear();
+
+                        for(int i = 0; i < 3; i++)
+                        {
+                            cub_points.vertex_max[i] = center_p[i] + 0.5 * cube_len;
+                            cub_points.vertex_min[i] = center_p[i] - 0.5 * cube_len;
+                        }
+                        cub_needad.push_back(cub_points);
                         laserCloudValidInd[laserCloudValidNum] = center_index;
                         laserCloudValidNum ++;
-
-                        BoxPointType cub_points;
-                        cub_points.vertex_max[0] = centerX + 0.5 * cube_len;
-                        cub_points.vertex_max[1] = centerY + 0.5 * cube_len;
-                        cub_points.vertex_max[2] = centerZ + 0.5 * cube_len;
-                        cub_points.vertex_min[0] = centerX - 0.5 * cube_len;
-                        cub_points.vertex_min[1] = centerY - 0.5 * cube_len;
-                        cub_points.vertex_min[2] = centerZ - 0.5 * cube_len;
-                        cub_needad.push_back(cub_points);
                     }
                     
                     if(last_inFOV && (!now_inFOV))
                     {
-                        BoxPointType cub_points;
-                        cub_points.vertex_max[0] = centerX + 0.5 * cube_len;
-                        cub_points.vertex_max[1] = centerY + 0.5 * cube_len;
-                        cub_points.vertex_max[2] = centerZ + 0.5 * cube_len;
-                        cub_points.vertex_min[0] = centerX - 0.5 * cube_len;
-                        cub_points.vertex_min[1] = centerY - 0.5 * cube_len;
-                        cub_points.vertex_min[2] = centerZ - 0.5 * cube_len;
+                        for(int i = 0; i < 3; i++)
+                        {
+                            cub_points.vertex_max[i] = center_p[i] + 0.5 * cube_len;
+                            cub_points.vertex_min[i] = center_p[i] - 0.5 * cube_len;
+                        }
                         cub_needrm.push_back(cub_points);
                     }
 
@@ -483,15 +506,11 @@ void lasermap_fov_segment()
                     if(now_inFOV)
                     {
                         int center_index = i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k;
+                        *featsFromMap += *featsArray[center_index];
                         laserCloudValidInd[laserCloudValidNum] = center_index;
                         laserCloudValidNum++;
                     }
                 #endif
-
-                    laserCloudSurroundInd[laserCloudSurroundNum] = i + laserCloudWidth * j
-                            + laserCloudWidth * laserCloudHeight * k;
-
-                    laserCloudSurroundNum ++;
                     last_inFOV = now_inFOV;
                 }
             }
@@ -501,23 +520,11 @@ void lasermap_fov_segment()
     T2.push_back(Measures.lidar_beg_time);
     double t_begin = omp_get_wtime();
 #ifdef USE_ikdtree
-    cube_points_add->clear();
-    for (int i = 0; i < laserCloudValidNum; i++)
-    {
-        *cube_points_add += *featsArray[laserCloudValidInd[i]];
-        featsArray[laserCloudValidInd[i]]->clear();
-    }
     if(cub_needrm.size() > 0)               ikdtree.Delete_Point_Boxes(cub_needrm);
     // s_plot4.push_back(omp_get_wtime() - t_begin); t_begin = omp_get_wtime();
     if(cub_needad.size() > 0)               ikdtree.Add_Point_Boxes(cub_needad); 
     // s_plot5.push_back(omp_get_wtime() - t_begin); t_begin = omp_get_wtime();
     if(cube_points_add->points.size() > 0)  ikdtree.Add_Points(cube_points_add->points);
-#else
-    featsFromMap->clear();
-    for (int i = 0; i < laserCloudValidNum; i++)
-    {
-        *featsFromMap += *featsArray[laserCloudValidInd[i]];
-    }
 #endif
     s_plot6.push_back(omp_get_wtime() - t_begin);
 }
@@ -761,7 +768,14 @@ int main(int argc, char** argv)
             }
             int featsFromMapNum = ikdtree.size();
         #else
-            downSizeFilterMap.setInputCloud(featsFromMap);
+            if(featsFromMap->points.empty())
+            {
+                downSizeFilterMap.setInputCloud(feats_down);
+            }
+            else
+            {
+                downSizeFilterMap.setInputCloud(featsFromMap);
+            }
             downSizeFilterMap.filter(*featsFromMap);
             int featsFromMapNum = featsFromMap->points.size();
         #endif
@@ -822,13 +836,6 @@ int main(int argc, char** argv)
                             /** Find the closest surfaces in the map **/
                         #ifdef USE_ikdtree
                             ikdtree.Nearest_Search(pointSel_tmpt, NUM_MATCH_POINTS, points_near, pointSearchSqDis_surf);
-                            // PointType &p_farest = points_near[NUM_MATCH_POINTS - 1];
-                            // float max_distance = std::pow(p_farest.x - pointSel_tmpt.x, 2) + std::pow(p_farest.y - pointSel_tmpt.y, 2)
-                            //                         + std::pow(p_farest.z - pointSel_tmpt.z, 2);
-                            // if (max_distance > 9)
-                            // {
-                            //     point_selected_surf[i] = false;
-                            // }
                         #else
                             kdtreeSurfFromMap->nearestKSearch(pointSel_tmpt, NUM_MATCH_POINTS, points_near, pointSearchSqDis_surf);
                         #endif
@@ -941,33 +948,18 @@ int main(int argc, char** argv)
                     {
                         if (point_selected_surf[i])
                         {
-                            total_residual   += res_last[i];
+                            laserCloudOri->push_back(feats_down->points[i]);
+                            coeffSel->push_back(coeffSel_tmpt->points[i]);
+                            total_residual += res_last[i];
                             laserCloudSelNum ++;
                         }
                     }
 
                     res_mean_last = total_residual / laserCloudSelNum;
-
-                    // if(iterCount == 1) 
                     std::cout << "[ mapping ]: Effective feature num: "<<laserCloudSelNum<<" res_mean_last "<<res_mean_last<<std::endl;
-
-                    for (int i = 0; i < coeffSel_tmpt->points.size(); i++)
-                    {
-                        float error_abs = std::abs(coeffSel_tmpt->points[i].intensity);
-                        if (point_selected_surf[i])
-                        {
-                            laserCloudOri->push_back(feats_down->points[i]);
-                            coeffSel->push_back(coeffSel_tmpt->points[i]);
-                            total_residual += error_abs;
-                        }
-                    }                    
 
                     match_time += omp_get_wtime() - match_start;
                     solve_start = omp_get_wtime();
-
-                    if (laserCloudSelNum < 10) {
-                        continue;
-                    }
                     
                     /*** Computation of Measuremnt Jacobian matrix H and measurents vector ***/
                     Eigen::MatrixXd Hsub(laserCloudSelNum, 6);
@@ -1104,8 +1096,8 @@ int main(int argc, char** argv)
                     }
                 }
 
-                omp_set_num_threads(4);
-                #pragma omp parallel for
+                // omp_set_num_threads(4);
+                // #pragma omp parallel for
                 for (int i = 0; i < feats_down_size; i++)
                 {
                     /* transform to world frame */
@@ -1113,9 +1105,8 @@ int main(int argc, char** argv)
                 }
                 t4 = omp_get_wtime();
                 ikdtree.Add_Points(feats_down_updated->points);
-            }
+            
             #else
-            }
                 std::cout<<"kkkkkkk: "<<feats_down_updated->points.size()<<std::endl;
                 bool if_cube_updated[laserCloudNum] = {0};
                 for (int i = 0; i < feats_down_size; i++)
@@ -1148,9 +1139,9 @@ int main(int argc, char** argv)
                         downSizeFilterMap.filter(*featsArray[ind]);
                     }
                 }
-                
             #endif
-            t5 = omp_get_wtime();
+                t5 = omp_get_wtime();
+            }
                 
             /******* Publish current frame points in world coordinates:  *******/
             laserCloudFullRes2->clear();
