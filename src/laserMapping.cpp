@@ -106,6 +106,7 @@ double last_timestamp_lidar = -1;
 double last_timestamp_imu   = -1;
 double HALF_FOV_COS = 0.0;
 double res_mean_last = 0.05;
+double copy_time, readd_time;
 
 std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer;
 std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer;
@@ -264,6 +265,8 @@ void lasermap_fov_segment()
     int  cube_index = 0;
     cub_needrm.clear();
     cub_needad.clear();
+    T2.push_back(Measures.lidar_beg_time);
+    double t_begin = omp_get_wtime();
 
     while (centerCubeI < 3)
     {
@@ -517,8 +520,8 @@ void lasermap_fov_segment()
         }
     }
 
-    T2.push_back(Measures.lidar_beg_time);
-    double t_begin = omp_get_wtime();
+    copy_time = omp_get_wtime() - t_begin;
+
 #ifdef USE_ikdtree
     if(cub_needrm.size() > 0)               ikdtree.Delete_Point_Boxes(cub_needrm);
     // s_plot4.push_back(omp_get_wtime() - t_begin); t_begin = omp_get_wtime();
@@ -527,6 +530,7 @@ void lasermap_fov_segment()
     if(cube_points_add->points.size() > 0)  ikdtree.Add_Points(cube_points_add->points);
 #endif
     s_plot6.push_back(omp_get_wtime() - t_begin);
+    readd_time = omp_get_wtime() - t_begin;
 }
 
 void feat_points_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg) 
@@ -793,10 +797,11 @@ int main(int argc, char** argv)
                 t1 = omp_get_wtime();
             
             #ifdef USE_ikdtree
-                // PointVector ().swap(ikdtree.PCL_Storage);
-                // ikdtree.traverse_for_rebuild(ikdtree.Root_Node, ikdtree.PCL_Storage);
-                // featsFromMap->clear();
-                // featsFromMap->points = ikdtree.PCL_Storage;
+                PointVector ().swap(ikdtree.PCL_Storage);
+                ikdtree.traverse_for_rebuild(ikdtree.Root_Node, ikdtree.PCL_Storage);
+                t2 = omp_get_wtime();
+                featsFromMap->clear();
+                featsFromMap->points = ikdtree.PCL_Storage;
             #else
                 kdtreeSurfFromMap->setInputCloud(featsFromMap);
             #endif
@@ -807,7 +812,7 @@ int main(int argc, char** argv)
                 
                 int  rematch_num = 0;
                 bool rematch_en = 0;
-                t2 = omp_get_wtime();
+                
                 for (iterCount = 0; iterCount < NUM_MAX_ITERATIONS; iterCount++) 
                 {
                     match_start = omp_get_wtime();
@@ -1248,7 +1253,7 @@ int main(int argc, char** argv)
             s_plot4.push_back(float(feats_down_size/10000.0));
             s_plot5.push_back(float(laserCloudSelNum/10000.0));
 
-            std::cout<<"[ mapping ]: time: segm "<<t1-t0 <<" kdtree build: "<<t2-t1<<" match "<<match_time<<" solve "<<solve_time<<" map incre "<<t5-t3<<" total "<<aver_time_consu<<std::endl;
+            std::cout<<"[ mapping ]: time: copy map "<<t2-t1 <<" readd: "<<readd_time<<" match "<<match_time<<" solve "<<solve_time<<"acquire: "<<t4-t3<<" map incre "<<t5-t4<<" total "<<t5 - t0<<std::endl;
             // fout_out << std::setw(10) << Measures.lidar_beg_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
             // <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<< std::endl;
             fout_out<<std::setw(8)<<laserCloudSelNum<<" "<<Measures.lidar_beg_time<<" "<<t2-t0<<" "<<match_time<<" "<<t5-t3<<" "<<t5-t0<<std::endl;
