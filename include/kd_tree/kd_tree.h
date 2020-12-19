@@ -94,7 +94,6 @@ private:
     float delete_criterion_param = 0.5f;
     float balance_criterion_param = 0.7f;
     float downsample_size = 0.2f;   
-    float Maximal_Point_Num = 10;
     bool Delete_Storage_Disabled = false;
     KD_TREE_NODE * STATIC_ROOT_NODE = nullptr;
     PointVector Points_deleted;
@@ -123,11 +122,12 @@ private:
     static bool point_cmp_z(PointType a, PointType b); 
 
 public:
-    KD_TREE(float, float, float, int);
+    KD_TREE(float, float, float);
     ~KD_TREE();
     void Set_delete_criterion_param(float delete_param);
     void Set_balance_criterion_param(float balance_param);
-    void set_downsample_param(float box_length, int Maximal_Point_Num);
+    void set_downsample_param(float box_length);
+    void InitializeKDTree(float delete_param = 0.5, float balance_param = 0.7, float box_length = 0.2);
     int size();
     void Build(PointVector point_cloud);
     void Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> & Point_Distance);
