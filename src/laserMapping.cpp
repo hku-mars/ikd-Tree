@@ -123,7 +123,7 @@ bool                _last_inFOV[laserCloudNum];
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr laserCloudFullResColor(new pcl::PointCloud<pcl::PointXYZRGB>());
 
 #ifdef USE_ikdtree
-KD_TREE ikdtree(0.5, 0.7, 0.2, 1);
+KD_TREE ikdtree(0.5, 0.7, 0.2);
 #else
 pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfFromMap(new pcl::KdTreeFLANN<PointType>());
 #endif
@@ -755,6 +755,7 @@ int main(int argc, char** argv)
             if((feats_down->points.size() > 1) && (ikdtree.Root_Node == nullptr))
             {
                 // std::vector<PointType> points_init = feats_down->points;
+                ikdtree.set_downsample_param(filter_size_map_min);
                 ikdtree.Build(feats_down->points);
                 flg_map_inited = true;
                 continue;

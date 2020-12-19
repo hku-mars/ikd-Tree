@@ -11,7 +11,7 @@
 #define EPS 1e-6
 #define Minimal_Unbalanced_Tree_Size 10 
 #define Multi_Thread_Rebuild_Minimal_Percent 0.2
-#define Multi_Thread_Rebuild_Point_Num 2000
+#define Multi_Thread_Rebuild_Point_Num 200000
 #define DOWNSAMPLE_SWITCH true
 
 using namespace std;
@@ -127,7 +127,7 @@ public:
     void Set_delete_criterion_param(float delete_param);
     void Set_balance_criterion_param(float balance_param);
     void set_downsample_param(float box_length);
-    void InitializeKDTree(float delete_param = 0.5, float balance_param = 0.7, float box_length = 0.2);
+    void InitializeKDTree(float, float, float);
     int size();
     void Build(PointVector point_cloud);
     void Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> & Point_Distance);
