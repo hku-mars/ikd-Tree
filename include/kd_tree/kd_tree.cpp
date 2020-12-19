@@ -73,8 +73,9 @@ int KD_TREE::size(){
         return Root_Node->TreeSize;
     } else {
         if (!pthread_mutex_trylock(&working_flag_mutex)){
-            return Root_Node->TreeSize;
+            s = Root_Node->TreeSize;
             pthread_mutex_unlock(&working_flag_mutex);
+            return s;
         } else {
             return Treesize_tmp;
         }
@@ -84,7 +85,7 @@ int KD_TREE::size(){
 void KD_TREE::start_thread(){
     pthread_mutex_init(&termination_flag_mutex_lock, NULL);   
     pthread_mutex_init(&rebuild_ptr_mutex_lock, NULL);     
-    pthread_mutex_init(&rebuild_logger_mutex_lock, NULL);    
+    pthread_mutex_init(&rebuild_logger_mutex_lock, NULL);
     pthread_mutex_init(&points_deleted_rebuild_mutex_lock, NULL); 
     pthread_mutex_init(&working_flag_mutex, NULL);
     pthread_mutex_init(&search_flag_mutex, NULL);
@@ -98,7 +99,7 @@ void KD_TREE::stop_thread(){
     if (rebuild_thread) pthread_join(rebuild_thread, NULL);
     pthread_mutex_destroy(&termination_flag_mutex_lock);
     pthread_mutex_destroy(&rebuild_logger_mutex_lock);
-    pthread_mutex_destroy(&rebuild_ptr_mutex_lock);   
+    pthread_mutex_destroy(&rebuild_ptr_mutex_lock);
     pthread_mutex_destroy(&points_deleted_rebuild_mutex_lock);
     pthread_mutex_destroy(&working_flag_mutex);
     pthread_mutex_destroy(&search_flag_mutex);     
@@ -118,42 +119,49 @@ void KD_TREE::multi_thread_rebuild(){
     // Not sure whether we need a flag to notice this thread to finish and stop
     while (!terminated){
         pthread_mutex_lock(&rebuild_ptr_mutex_lock);
-        pthread_mutex_lock(&working_flag_mutex);        
+        pthread_mutex_lock(&working_flag_mutex);
         if (Rebuild_Ptr != nullptr ){                    
-            /* 
-            // Start rebuilding the tree. Add, delete and delete box operations on this tree are blocked.
-            // The blocked operations will be temporarily stored in the Rebuild_Logger
-            */
+
             // printf("    ============= Tree size %d\n",(*Rebuild_Ptr)->TreeSize);
+
+            /* Traverse and copy */
+            rebuild_flag = true;
             max_rebuild_num = max(max_rebuild_num, (*Rebuild_Ptr)->TreeSize);
             if (*Rebuild_Ptr == Root_Node) Treesize_tmp = Root_Node->TreeSize;
             KD_TREE_NODE * old_root_node = (*Rebuild_Ptr);                            
             printf("    =============   Rebuild size is %d\n", (*Rebuild_Ptr)->TreeSize);
-            printf("    =============   Is root %d\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",(*Rebuild_Ptr) == Root_Node);
+            printf("    =============   Is root %d",(*Rebuild_Ptr) == Root_Node);
             father_ptr = (*Rebuild_Ptr)->father_ptr;   
             PointVector ().swap(Rebuild_PCL_Storage);
-            traverse_for_rebuild(*Rebuild_Ptr, Rebuild_PCL_Storage);                        
+            traverse_for_rebuild(*Rebuild_Ptr, Rebuild_PCL_Storage); 
+            pthread_mutex_unlock(&working_flag_mutex);
+
+            printf("    =============   Finished copy and update \n");        
+            /* Rebuild and update missed operations*/
+            Operation_Logger_Type Operation;
             KD_TREE_NODE * new_root_node = nullptr;            
             if (int(Rebuild_PCL_Storage.size()) > 0){               
                 BuildTree(&new_root_node, 0, Rebuild_PCL_Storage.size()-1, Rebuild_PCL_Storage);             
-                // Rebuild has been done. Updates the blocked operations into the new tree
-                Operation_Logger_Type Operation;
+                // Rebuild has been done. Updates the blocked operations into the new tree  
                 pthread_mutex_lock(&rebuild_logger_mutex_lock);
                 while (!Rebuild_Logger.empty()){
                     Operation = Rebuild_Logger.back();
                     Rebuild_Logger.pop_back();
                     // printf("    Type %d\n", Operation.op);
                     pthread_mutex_unlock(&rebuild_logger_mutex_lock);                  
-                    run_operation(&new_root_node, Operation);                   
+                    run_operation(&new_root_node, Operation);                                       
                     pthread_mutex_lock(&rebuild_logger_mutex_lock);               
                 }   
                pthread_mutex_unlock(&rebuild_logger_mutex_lock);
             }
+            printf("    =============   Finished rebuild and update \n");   
+            /* Replace to original tree*/          
+            pthread_mutex_lock(&working_flag_mutex);      
             pthread_mutex_lock(&search_flag_mutex);
             while (search_mutex_counter != 0){
                 pthread_mutex_unlock(&search_flag_mutex);
                 printf("        ======================mutex counter is: %d\n",search_mutex_counter);
-                usleep(100);
+                usleep(10);             
                 pthread_mutex_lock(&search_flag_mutex);
             }
             search_mutex_counter = -1;
@@ -166,14 +174,18 @@ void KD_TREE::multi_thread_rebuild(){
                 printf("Error: Father ptr incompatible with current node\n");
             }
             if (new_root_node != nullptr) new_root_node->father_ptr = father_ptr;
-            (*Rebuild_Ptr) = new_root_node;                      
-            if (father_ptr == STATIC_ROOT_NODE) Root_Node = STATIC_ROOT_NODE->left_son_ptr;
+            (*Rebuild_Ptr) = new_root_node;                 
+            if (father_ptr == STATIC_ROOT_NODE) Root_Node = STATIC_ROOT_NODE->left_son_ptr;             
             pthread_mutex_lock(&search_flag_mutex);
             search_mutex_counter = 0;
             pthread_mutex_unlock(&search_flag_mutex);
             Rebuild_Ptr = nullptr;
-            pthread_mutex_unlock(&working_flag_mutex);            
+            pthread_mutex_unlock(&working_flag_mutex);
+            rebuild_flag = false;          
+            printf("    =============   Finished replace \n");               
+            /* Delete discarded tree nodes */  
             delete_tree_nodes(&old_root_node, MULTI_THREAD_REC);
+            printf("    =============   Finished Delete \n\n\n\n\n\n\n\n\n\n");              
         } else {
             pthread_mutex_unlock(&working_flag_mutex);             
         }
@@ -281,39 +293,38 @@ void KD_TREE::Add_Points(PointVector & PointToAdd){
                 downsample_result = Downsample_Storage[index];
             }
         }
-        // printf("=================(%0.3f,%0.3f,%0.3f) (%0.3f,%0.3f,%0.3f) \n",downsample_result.x,downsample_result.y,downsample_result.z, mid_point.x, mid_point.y, mid_point.z);
-        // printf("================= Downsample size is %d Mindist is %0.3f \n",int(Downsample_Storage.size()),sqrt(min_dist));
         if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){
             if (DOWNSAMPLE_SWITCH){
-                Delete_by_range(&Root_Node, Box_of_Point, true, true);
-                Add_by_point(&Root_Node, downsample_result, true);  
+                Delete_by_range(&Root_Node, Box_of_Point, true, true);     
+                Add_by_point(&Root_Node, downsample_result, true);              
             } else {        
                 Add_by_point(&Root_Node, PointToAdd[i], true);        
             }
-        } else {
-            if (!pthread_mutex_trylock(&working_flag_mutex)){
-                if (DOWNSAMPLE_SWITCH){
-                    Delete_by_range(&Root_Node, Box_of_Point, true, true);
-                    Add_by_point(&Root_Node, downsample_result, true);  
-                } else {        
-                    Add_by_point(&Root_Node, PointToAdd[i], true);        
+        } else {       
+            Operation_Logger_Type  operation_delete, operation;
+            operation_delete.boxpoint = Box_of_Point;
+            operation_delete.op = DOWNSAMPLE_DELETE;
+            operation.point = downsample_result;
+            operation.op = ADD_POINT;
+            pthread_mutex_lock(&working_flag_mutex);
+            if (DOWNSAMPLE_SWITCH){                       
+                Delete_by_range(&Root_Node, Box_of_Point, true, true);                 
+                Add_by_point(&Root_Node, downsample_result, true);
+                if (rebuild_flag){
+                    pthread_mutex_lock(&rebuild_logger_mutex_lock);
+                    Rebuild_Logger.push_back(operation_delete);
+                    Rebuild_Logger.push_back(operation);
+                    pthread_mutex_unlock(&rebuild_logger_mutex_lock);
                 }
-                pthread_mutex_unlock(&working_flag_mutex);               
-            } else {
-                pthread_mutex_lock(&rebuild_logger_mutex_lock);
-                if (DOWNSAMPLE_SWITCH){
-                    Operation_Logger_Type  operation_delete;
-                    operation_delete.boxpoint = Box_of_Point;
-                    operation_delete.op = DOWNSAMPLE_DELETE; 
-                    Rebuild_Logger.push_back(operation_delete);                   
-                }
-                Operation_Logger_Type operation;
-                operation.point = PointToAdd[i];
-                operation.op = ADD_POINT;                
-                Rebuild_Logger.push_back(operation);
-                pthread_mutex_unlock(&rebuild_logger_mutex_lock);
-                continue;
-            }
+            } else {        
+                Add_by_point(&Root_Node, PointToAdd[i], true);
+                if (rebuild_flag){
+                    pthread_mutex_lock(&rebuild_logger_mutex_lock);
+                    Rebuild_Logger.push_back(operation);
+                    pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+                }                    
+            }         
+            pthread_mutex_unlock(&working_flag_mutex);         
         }
     }
     return;
@@ -324,18 +335,17 @@ void KD_TREE::Add_Point_Boxes(vector<BoxPointType> & BoxPoints){
         if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){                 
             Add_by_range(&Root_Node ,BoxPoints[i], true);
         } else {
-            if (!pthread_mutex_trylock(&working_flag_mutex)){
-                Add_by_range(&Root_Node ,BoxPoints[i], true);
-                pthread_mutex_unlock(&working_flag_mutex);
-            } else {
-                Operation_Logger_Type operation;
-                operation.boxpoint = BoxPoints[i];
-                operation.op = ADD_BOX;
+            Operation_Logger_Type operation;
+            operation.boxpoint = BoxPoints[i];
+            operation.op = ADD_BOX;
+            pthread_mutex_lock(&working_flag_mutex);
+            Add_by_range(&Root_Node ,BoxPoints[i], false);
+            if (rebuild_flag){
                 pthread_mutex_lock(&rebuild_logger_mutex_lock);
                 Rebuild_Logger.push_back(operation);
                 pthread_mutex_unlock(&rebuild_logger_mutex_lock);
-                continue;                
-            }
+            }               
+            pthread_mutex_unlock(&working_flag_mutex);
         }        
     } 
     return;
@@ -346,18 +356,17 @@ void KD_TREE::Delete_Points(PointVector & PointToDel){
         if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){                 
             Delete_by_point(&Root_Node, PointToDel[i], true);
         } else {
-            if (!pthread_mutex_trylock(&working_flag_mutex)){
-                Delete_by_point(&Root_Node, PointToDel[i], true);
-                pthread_mutex_unlock(&working_flag_mutex);
-            } else {
-                Operation_Logger_Type operation;
-                operation.point = PointToDel[i];
-                operation.op = DELETE_POINT;
+            Operation_Logger_Type operation;
+            operation.point = PointToDel[i];
+            operation.op = DELETE_POINT;
+            pthread_mutex_lock(&working_flag_mutex);        
+            Delete_by_point(&Root_Node, PointToDel[i], false);
+            if (rebuild_flag){
                 pthread_mutex_lock(&rebuild_logger_mutex_lock);
                 Rebuild_Logger.push_back(operation);
                 pthread_mutex_unlock(&rebuild_logger_mutex_lock);
-                continue;                
             }
+            pthread_mutex_unlock(&working_flag_mutex);
         }        
     }      
     return;
@@ -368,18 +377,17 @@ void KD_TREE::Delete_Point_Boxes(vector<BoxPointType> & BoxPoints){
         if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){                 
             Delete_by_range(&Root_Node ,BoxPoints[i], true, false);
         } else {
-            if (!pthread_mutex_trylock(&working_flag_mutex)){
-                Delete_by_range(&Root_Node ,BoxPoints[i], true, false);
-                pthread_mutex_unlock(&working_flag_mutex);
-            } else {
-                Operation_Logger_Type operation;
-                operation.boxpoint = BoxPoints[i];
-                operation.op = DELETE_BOX;
+            Operation_Logger_Type operation;
+            operation.boxpoint = BoxPoints[i];
+            operation.op = DELETE_BOX;     
+            pthread_mutex_lock(&working_flag_mutex);
+            Delete_by_range(&Root_Node ,BoxPoints[i], false, false);
+            if (rebuild_flag){
                 pthread_mutex_lock(&rebuild_logger_mutex_lock);
                 Rebuild_Logger.push_back(operation);
                 pthread_mutex_unlock(&rebuild_logger_mutex_lock);
-                continue;                
-            }
+            }                
+            pthread_mutex_unlock(&working_flag_mutex);
         }
     } 
     return;
@@ -453,7 +461,7 @@ void KD_TREE::BuildTree(KD_TREE_NODE ** root, int l, int r, PointVector & Storag
 void KD_TREE::Rebuild(KD_TREE_NODE ** root){    
     KD_TREE_NODE * father_ptr;
     // Clear the PCL_Storage vector and release memory
-    if ((*root)->TreeSize >= Multi_Thread_Rebuild_Point_Num) { //Multi_Thread_Rebuild_Minimal_Percent * Root_Node->TreeSize
+    if ((*root)->TreeSize >= Multi_Thread_Rebuild_Point_Num) { 
         max_need_rebuild_num = max((*root)->TreeSize,max_need_rebuild_num);
         if (!pthread_mutex_trylock(&rebuild_ptr_mutex_lock)){     
             if (Rebuild_Ptr == nullptr || ((*root)->TreeSize > (*Rebuild_Ptr)->TreeSize)) {
@@ -462,7 +470,6 @@ void KD_TREE::Rebuild(KD_TREE_NODE ** root){
             pthread_mutex_unlock(&rebuild_ptr_mutex_lock);
         }
     } else {
-        //printf("    Rebuild Tree size in main thread: %d\n", (*root)->TreeSize);
         father_ptr = (*root)->father_ptr;
         rebuild_counter += (*root)->TreeSize;
         int size_rec = (*root)->TreeSize;
@@ -471,11 +478,7 @@ void KD_TREE::Rebuild(KD_TREE_NODE ** root){
         delete_tree_nodes(root, DELETE_POINTS_REC);
         BuildTree(root, 0, PCL_Storage.size()-1, PCL_Storage);
         if (*root != nullptr) (*root)->father_ptr = father_ptr;
-    }
-    // if (!pthread_mutex_trylock(&rebuild_ptr_mutex_lock)){     
-    //     if (Rebuild_Ptr == nullptr || ((*root)->TreeSize > (*Rebuild_Ptr)->TreeSize)) Rebuild_Ptr = root;   
-    //     pthread_mutex_unlock(&rebuild_ptr_mutex_lock);
-    // }    
+    } 
     return;
 }
 
@@ -504,7 +507,6 @@ void KD_TREE::Delete_by_range(KD_TREE_NODE ** root,  BoxPointType boxpoint, bool
         (*root)->point_deleted = true;
         if (is_downsample) (*root)->point_downsample_deleted = true;       
     }
-    int left_lock_retval = -1, right_lock_retval = -1;
     Operation_Logger_Type delete_box_log;
     struct timespec Timeout;    
     if (is_downsample) delete_box_log.op = DOWNSAMPLE_DELETE;
@@ -513,32 +515,31 @@ void KD_TREE::Delete_by_range(KD_TREE_NODE ** root,  BoxPointType boxpoint, bool
     if ((Rebuild_Ptr == nullptr) || (*root)->left_son_ptr != *Rebuild_Ptr){
         Delete_by_range(&((*root)->left_son_ptr), boxpoint, allow_rebuild, is_downsample);
     } else {
-        left_lock_retval = pthread_mutex_trylock(&working_flag_mutex);
-        if (!left_lock_retval){
-            Delete_by_range(&((*root)->left_son_ptr), boxpoint, allow_rebuild, is_downsample);
-        } else {
+        pthread_mutex_lock(&working_flag_mutex);
+        Delete_by_range(&((*root)->left_son_ptr), boxpoint, false, is_downsample);
+        if (rebuild_flag){
             pthread_mutex_lock(&rebuild_logger_mutex_lock);
             Rebuild_Logger.push_back(delete_box_log);
-            pthread_mutex_unlock(&rebuild_logger_mutex_lock);            
+            pthread_mutex_unlock(&rebuild_logger_mutex_lock);                 
         }
+        pthread_mutex_unlock(&working_flag_mutex);
     }
     if ((Rebuild_Ptr == nullptr) || (*root)->right_son_ptr != *Rebuild_Ptr){
         Delete_by_range(&((*root)->right_son_ptr), boxpoint, allow_rebuild, is_downsample);
     } else {
-        right_lock_retval = pthread_mutex_trylock(&working_flag_mutex);
-        if (!right_lock_retval){
-            Delete_by_range(&((*root)->right_son_ptr), boxpoint, allow_rebuild, is_downsample);         
-        } else {
+        pthread_mutex_lock(&working_flag_mutex);
+        Delete_by_range(&((*root)->right_son_ptr), boxpoint, false, is_downsample);
+        if (rebuild_flag){
             pthread_mutex_lock(&rebuild_logger_mutex_lock);
             Rebuild_Logger.push_back(delete_box_log);
-            pthread_mutex_unlock(&rebuild_logger_mutex_lock);                  
+            pthread_mutex_unlock(&rebuild_logger_mutex_lock);                 
         }
+        pthread_mutex_unlock(&working_flag_mutex);
     }    
     Update((*root));
     if (Rebuild_Ptr != nullptr && *Rebuild_Ptr == *root && (*root)->TreeSize < Multi_Thread_Rebuild_Point_Num) Rebuild_Ptr = nullptr;     
     bool need_rebuild = allow_rebuild & Criterion_Check((*root));
-    if (need_rebuild) Rebuild(root);
-    if (!left_lock_retval || !right_lock_retval) pthread_mutex_unlock(&working_flag_mutex);    
+    if (need_rebuild) Rebuild(root);   
     return;
 }
 
@@ -551,7 +552,6 @@ void KD_TREE::Delete_by_point(KD_TREE_NODE ** root, PointType point, bool allow_
         if ((*root)->invalid_point_num == (*root)->TreeSize) (*root)->tree_deleted = true;    
         return;
     }
-    int retval = -1;
     Operation_Logger_Type delete_log;
     struct timespec Timeout;    
     delete_log.op = DELETE_POINT;
@@ -560,34 +560,33 @@ void KD_TREE::Delete_by_point(KD_TREE_NODE ** root, PointType point, bool allow_
         if ((Rebuild_Ptr == nullptr) || (*root)->left_son_ptr != *Rebuild_Ptr){          
             Delete_by_point(&(*root)->left_son_ptr, point, allow_rebuild);         
         } else {
-            retval = pthread_mutex_trylock(&working_flag_mutex);
-            if (!retval){        
-                Delete_by_point(&(*root)->left_son_ptr, point, allow_rebuild);         
-            } else {
+            pthread_mutex_lock(&working_flag_mutex);
+            Delete_by_point(&(*root)->left_son_ptr, point,false);
+            if (rebuild_flag){
                 pthread_mutex_lock(&rebuild_logger_mutex_lock);
                 Rebuild_Logger.push_back(delete_log);
-                pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+                pthread_mutex_unlock(&rebuild_logger_mutex_lock);                 
             }
+            pthread_mutex_unlock(&working_flag_mutex);
         }
     } else {       
         if ((Rebuild_Ptr == nullptr) || (*root)->right_son_ptr != *Rebuild_Ptr){         
             Delete_by_point(&(*root)->right_son_ptr, point, allow_rebuild);         
         } else {
-            retval = pthread_mutex_trylock(&working_flag_mutex);
-            if (!retval){          
-                Delete_by_point(&(*root)->right_son_ptr, point, allow_rebuild);       
-            } else {
+            pthread_mutex_lock(&working_flag_mutex); 
+            Delete_by_point(&(*root)->right_son_ptr, point, false);
+            if (rebuild_flag){
                 pthread_mutex_lock(&rebuild_logger_mutex_lock);
                 Rebuild_Logger.push_back(delete_log);
-                pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+                pthread_mutex_unlock(&rebuild_logger_mutex_lock);                 
             }
+            pthread_mutex_unlock(&working_flag_mutex);
         }        
     }
     Update(*root);
     if (Rebuild_Ptr != nullptr && *Rebuild_Ptr == *root && (*root)->TreeSize < Multi_Thread_Rebuild_Point_Num) Rebuild_Ptr = nullptr; 
     bool need_rebuild = allow_rebuild & Criterion_Check((*root));
     if (need_rebuild) Rebuild(root);
-    if (retval == 0) pthread_mutex_unlock(&working_flag_mutex);
     return;
 }
 
@@ -610,7 +609,6 @@ void KD_TREE::Add_by_range(KD_TREE_NODE ** root, BoxPointType boxpoint, bool all
     if (boxpoint.vertex_min[0]-EPS < (*root)->point.x && boxpoint.vertex_max[0]+EPS > (*root)->point.x && boxpoint.vertex_min[1]-EPS < (*root)->point.y && boxpoint.vertex_max[1]+EPS > (*root)->point.y && boxpoint.vertex_min[2]-EPS < (*root)->point.z && boxpoint.vertex_max[2]+EPS > (*root)->point.z){
         (*root)->point_deleted = (*root)->point_downsample_deleted;
     }
-    int left_lock_retval = -1, right_lock_retval = -1;
     Operation_Logger_Type add_box_log;
     struct timespec Timeout;    
     add_box_log.op = ADD_BOX;
@@ -618,33 +616,31 @@ void KD_TREE::Add_by_range(KD_TREE_NODE ** root, BoxPointType boxpoint, bool all
     if ((Rebuild_Ptr == nullptr) || (*root)->left_son_ptr != *Rebuild_Ptr){
         Add_by_range(&((*root)->left_son_ptr), boxpoint, allow_rebuild);
     } else {
-        left_lock_retval = pthread_mutex_trylock(&working_flag_mutex);
-        if (!left_lock_retval){
-            Add_by_range(&((*root)->left_son_ptr), boxpoint, allow_rebuild);
-        } else {
+        pthread_mutex_lock(&working_flag_mutex);
+        Add_by_range(&((*root)->left_son_ptr), boxpoint, false);
+        if (rebuild_flag){
             pthread_mutex_lock(&rebuild_logger_mutex_lock);
             Rebuild_Logger.push_back(add_box_log);
-            pthread_mutex_unlock(&rebuild_logger_mutex_lock);            
-        }
+            pthread_mutex_unlock(&rebuild_logger_mutex_lock);                 
+        }        
+        pthread_mutex_unlock(&working_flag_mutex);
     }
     if ((Rebuild_Ptr == nullptr) || (*root)->right_son_ptr != *Rebuild_Ptr){
         Add_by_range(&((*root)->right_son_ptr), boxpoint, allow_rebuild);
     } else {
-        right_lock_retval = pthread_mutex_trylock(&working_flag_mutex);
-        if (!right_lock_retval){
-            Add_by_range(&((*root)->right_son_ptr), boxpoint, allow_rebuild);
-            pthread_mutex_unlock(&working_flag_mutex);           
-        } else {
+        pthread_mutex_lock(&working_flag_mutex);
+        Add_by_range(&((*root)->right_son_ptr), boxpoint, false);
+        if (rebuild_flag){
             pthread_mutex_lock(&rebuild_logger_mutex_lock);
             Rebuild_Logger.push_back(add_box_log);
-            pthread_mutex_unlock(&rebuild_logger_mutex_lock);                  
+            pthread_mutex_unlock(&rebuild_logger_mutex_lock);                 
         }
+        pthread_mutex_unlock(&working_flag_mutex);
     }
     Update((*root));
     if (Rebuild_Ptr != nullptr && *Rebuild_Ptr == *root && (*root)->TreeSize < Multi_Thread_Rebuild_Point_Num) Rebuild_Ptr = nullptr; 
     bool need_rebuild = allow_rebuild & Criterion_Check((*root));
     if (need_rebuild) Rebuild(root);
-    if (!left_lock_retval || !right_lock_retval) pthread_mutex_unlock(&working_flag_mutex);
     return;
 }
 
@@ -656,7 +652,6 @@ void KD_TREE::Add_by_point(KD_TREE_NODE ** root, PointType point, bool allow_reb
         Update(*root);
         return;
     }           
-    int retval = -1;
     Operation_Logger_Type add_log;
     struct timespec Timeout;    
     add_log.op = ADD_POINT;
@@ -666,35 +661,33 @@ void KD_TREE::Add_by_point(KD_TREE_NODE ** root, PointType point, bool allow_reb
         if ((Rebuild_Ptr == nullptr) || (*root)->left_son_ptr != *Rebuild_Ptr){          
             Add_by_point(&(*root)->left_son_ptr, point, allow_rebuild);
         } else {
-            retval = pthread_mutex_trylock(&working_flag_mutex);
-            if (!retval){        
-                Add_by_point(&(*root)->left_son_ptr, point, allow_rebuild);
-            } else {
+            pthread_mutex_lock(&working_flag_mutex);
+            Add_by_point(&(*root)->left_son_ptr, point, false);
+            if (rebuild_flag){
                 pthread_mutex_lock(&rebuild_logger_mutex_lock);
                 Rebuild_Logger.push_back(add_log);
-                pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+                pthread_mutex_unlock(&rebuild_logger_mutex_lock);                 
             }
+            pthread_mutex_unlock(&working_flag_mutex);            
         }
     } else {  
         if ((Rebuild_Ptr == nullptr) || (*root)->right_son_ptr != *Rebuild_Ptr){         
             Add_by_point(&(*root)->right_son_ptr, point, allow_rebuild);
         } else {
-            retval = pthread_mutex_trylock(&working_flag_mutex);
-            if (!retval){          
-                Add_by_point(&(*root)->right_son_ptr, point, allow_rebuild);       
-
-            } else {
+            pthread_mutex_lock(&working_flag_mutex);
+            Add_by_point(&(*root)->right_son_ptr, point, false);       
+            if (rebuild_flag){
                 pthread_mutex_lock(&rebuild_logger_mutex_lock);
                 Rebuild_Logger.push_back(add_log);
-                pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+                pthread_mutex_unlock(&rebuild_logger_mutex_lock);                 
             }
+            pthread_mutex_unlock(&working_flag_mutex); 
         }
     }
     Update(*root);
     if (Rebuild_Ptr != nullptr && *Rebuild_Ptr == *root && (*root)->TreeSize < Multi_Thread_Rebuild_Point_Num) Rebuild_Ptr = nullptr; 
     bool need_rebuild = allow_rebuild & Criterion_Check((*root));
-    if (need_rebuild) Rebuild(root);
-    if (!retval) pthread_mutex_unlock(&working_flag_mutex);        
+    if (need_rebuild) Rebuild(root);     
     return;
 }
 
@@ -902,16 +895,15 @@ void KD_TREE::Push_Down(KD_TREE_NODE *root){
             root->left_son_ptr->need_push_down_to_right = true;
             root->need_push_down_to_left = false;                
         } else {
-            if (!pthread_mutex_trylock(&working_flag_mutex)){
-                root->left_son_ptr->tree_downsample_deleted |= root->tree_downsample_deleted;
-                root->left_son_ptr->point_downsample_deleted |= root->tree_downsample_deleted;
-                root->left_son_ptr->tree_deleted = root->tree_deleted || root->left_son_ptr->tree_downsample_deleted;
-                root->left_son_ptr->point_deleted = root->left_son_ptr->tree_deleted || root->left_son_ptr->point_downsample_deleted;
-                root->left_son_ptr->need_push_down_to_left = true;
-                root->left_son_ptr->need_push_down_to_right = true;
-                root->need_push_down_to_left = false;
-                pthread_mutex_unlock(&working_flag_mutex);            
-            }
+            pthread_mutex_lock(&working_flag_mutex);
+            root->left_son_ptr->tree_downsample_deleted |= root->tree_downsample_deleted;
+            root->left_son_ptr->point_downsample_deleted |= root->tree_downsample_deleted;
+            root->left_son_ptr->tree_deleted = root->tree_deleted || root->left_son_ptr->tree_downsample_deleted;
+            root->left_son_ptr->point_deleted = root->left_son_ptr->tree_deleted || root->left_son_ptr->point_downsample_deleted;
+            root->left_son_ptr->need_push_down_to_left = true;
+            root->left_son_ptr->need_push_down_to_right = true;
+            root->need_push_down_to_left = false;
+            pthread_mutex_unlock(&working_flag_mutex);            
         }
     }
     if (root->need_push_down_to_right && root->right_son_ptr != nullptr){
@@ -924,16 +916,15 @@ void KD_TREE::Push_Down(KD_TREE_NODE *root){
             root->right_son_ptr->need_push_down_to_right = true;
             root->need_push_down_to_right = false;
         } else {
-            if (!pthread_mutex_trylock(&working_flag_mutex)){
-                root->right_son_ptr->tree_downsample_deleted |= root->tree_downsample_deleted;
-                root->right_son_ptr->point_downsample_deleted |= root->tree_downsample_deleted;
-                root->right_son_ptr->tree_deleted = root->tree_deleted || root->right_son_ptr->tree_downsample_deleted;
-                root->right_son_ptr->point_deleted = root->right_son_ptr->tree_deleted || root->right_son_ptr->point_downsample_deleted;
-                root->right_son_ptr->need_push_down_to_left = true;
-                root->right_son_ptr->need_push_down_to_right = true;
-                root->need_push_down_to_right = false;
-                pthread_mutex_unlock(&working_flag_mutex);
-            }
+            pthread_mutex_lock(&working_flag_mutex);
+            root->right_son_ptr->tree_downsample_deleted |= root->tree_downsample_deleted;
+            root->right_son_ptr->point_downsample_deleted |= root->tree_downsample_deleted;
+            root->right_son_ptr->tree_deleted = root->tree_deleted || root->right_son_ptr->tree_downsample_deleted;
+            root->right_son_ptr->point_deleted = root->right_son_ptr->tree_deleted || root->right_son_ptr->point_downsample_deleted;
+            root->right_son_ptr->need_push_down_to_left = true;
+            root->right_son_ptr->need_push_down_to_right = true;
+            root->need_push_down_to_right = false;
+            pthread_mutex_unlock(&working_flag_mutex);
         }
     }
     return;
