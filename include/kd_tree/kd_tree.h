@@ -122,12 +122,12 @@ private:
     static bool point_cmp_z(PointType a, PointType b); 
 
 public:
-    KD_TREE(float, float, float);
+    KD_TREE(float delete_param = 0.5, float balance_param = 0.7, float box_length = 0.2);
     ~KD_TREE();
     void Set_delete_criterion_param(float delete_param);
     void Set_balance_criterion_param(float balance_param);
     void set_downsample_param(float box_length);
-    void InitializeKDTree(float, float, float);
+    void InitializeKDTree(float delete_param = 0.5, float balance_param = 0.7, float box_length = 0.2);
     int size();
     void Build(PointVector point_cloud);
     void Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> & Point_Distance);

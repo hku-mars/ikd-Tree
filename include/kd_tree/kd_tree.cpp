@@ -6,7 +6,7 @@ Author: Yixi Cai
 email: yixicai@connect.hku.hk
 */
 
-KD_TREE::KD_TREE(float delete_param = 0.5, float balance_param = 0.7, float box_length = 0.2) {
+KD_TREE::KD_TREE(float delete_param, float balance_param, float box_length) {
     delete_criterion_param = delete_param;
     balance_criterion_param = balance_param;
     downsample_size = box_length;
@@ -39,7 +39,7 @@ void KD_TREE::set_downsample_param(float downsample_param){
     downsample_size = downsample_param;
 }
 
-void KD_TREE::InitializeKDTree(float delete_param = 0.5, float balance_param = 0.7, float box_length = 0.2){
+void KD_TREE::InitializeKDTree(float delete_param, float balance_param, float box_length){
     Set_delete_criterion_param(delete_param);
     Set_balance_criterion_param(balance_param);
     set_downsample_param(box_length);
