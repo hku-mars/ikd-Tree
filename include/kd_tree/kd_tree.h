@@ -11,7 +11,7 @@
 #define EPS 1e-6
 #define Minimal_Unbalanced_Tree_Size 10 
 #define Multi_Thread_Rebuild_Minimal_Percent 0.2
-#define Multi_Thread_Rebuild_Point_Num 2000000
+#define Multi_Thread_Rebuild_Point_Num 1000000
 #define DOWNSAMPLE_SWITCH true
 
 using namespace std;
@@ -32,7 +32,6 @@ struct KD_TREE_NODE
     bool need_push_down_to_left = false;
     bool need_push_down_to_right = false;
     pthread_mutex_t push_down_mutex_lock;
-    int leftson_search_flag, rightson_search_flag;
     float node_range_x[2], node_range_y[2], node_range_z[2];   
     KD_TREE_NODE *left_son_ptr = nullptr;
     KD_TREE_NODE *right_son_ptr = nullptr;
@@ -84,6 +83,7 @@ private:
     vector<Operation_Logger_Type> Rebuild_Logger;
     PointVector Rebuild_PCL_Storage;
     KD_TREE_NODE ** Rebuild_Ptr;
+    int search_mutex_counter = 0;
     static void * multi_thread_ptr(void *arg);
     void multi_thread_rebuild();
     void start_thread();
