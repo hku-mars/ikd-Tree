@@ -123,7 +123,7 @@ bool                _last_inFOV[laserCloudNum];
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr laserCloudFullResColor(new pcl::PointCloud<pcl::PointXYZRGB>());
 
 #ifdef USE_ikdtree
-KD_TREE ikdtree(0.5, 0.7, 0.2, 1);
+KD_TREE ikdtree(0.5, 0.7, 0.2);
 #else
 pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfFromMap(new pcl::KdTreeFLANN<PointType>());
 #endif

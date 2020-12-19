@@ -77,10 +77,12 @@ private:
     int max_need_rebuild_num = 0;
     // Multi-thread Tree Rebuild
     bool termination_flag = false;
+    bool rebuild_flag = false;
+    bool copy_flag = false;
     pthread_t rebuild_thread;
     pthread_mutex_t termination_flag_mutex_lock, rebuild_ptr_mutex_lock, working_flag_mutex, search_flag_mutex;
-    pthread_mutex_t rebuild_logger_mutex_lock, points_deleted_rebuild_mutex_lock;
-    vector<Operation_Logger_Type> Rebuild_Logger;
+    pthread_mutex_t rebuild_logger_mutex_lock, copy_logger_mutex_lock, points_deleted_rebuild_mutex_lock;
+    vector<Operation_Logger_Type> Rebuild_Logger, Copy_Logger;
     PointVector Rebuild_PCL_Storage;
     KD_TREE_NODE ** Rebuild_Ptr;
     int search_mutex_counter = 0;
@@ -127,7 +129,7 @@ public:
     void Set_delete_criterion_param(float delete_param);
     void Set_balance_criterion_param(float balance_param);
     void set_downsample_param(float box_length);
-    void InitializeKDTree(float delete_param = 0.5, float balance_param = 0.7, float box_length = 0.2);
+    void InitializeKDTree(float delete_param = 0.5, float balance_param = 0.7, float box_length = 0.2); 
     int size();
     void Build(PointVector point_cloud);
     void Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> & Point_Distance);
