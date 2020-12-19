@@ -123,7 +123,7 @@ bool                _last_inFOV[laserCloudNum];
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr laserCloudFullResColor(new pcl::PointCloud<pcl::PointXYZRGB>());
 
 #ifdef USE_ikdtree
-KD_TREE ikdtree(0.5, 0.7, 0.2);
+KD_TREE ikdtree;
 #else
 pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfFromMap(new pcl::KdTreeFLANN<PointType>());
 #endif
@@ -755,6 +755,7 @@ int main(int argc, char** argv)
             if((feats_down->points.size() > 1) && (ikdtree.Root_Node == nullptr))
             {
                 // std::vector<PointType> points_init = feats_down->points;
+                ikdtree.set_downsample_param(filter_size_map_min);
                 ikdtree.Build(feats_down->points);
                 flg_map_inited = true;
                 continue;
@@ -792,10 +793,10 @@ int main(int argc, char** argv)
                 t1 = omp_get_wtime();
             
             #ifdef USE_ikdtree
-                // PointVector ().swap(ikdtree.PCL_Storage);
-                // ikdtree.traverse_for_rebuild(ikdtree.Root_Node, ikdtree.PCL_Storage);
-                // featsFromMap->clear();
-                // featsFromMap->points = ikdtree.PCL_Storage;
+                PointVector ().swap(ikdtree.PCL_Storage);
+                ikdtree.traverse_for_rebuild(ikdtree.Root_Node, ikdtree.PCL_Storage);
+                featsFromMap->clear();
+                featsFromMap->points = ikdtree.PCL_Storage;
             #else
                 kdtreeSurfFromMap->setInputCloud(featsFromMap);
             #endif

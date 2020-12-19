@@ -11,7 +11,7 @@
 #define EPS 1e-6
 #define Minimal_Unbalanced_Tree_Size 10 
 #define Multi_Thread_Rebuild_Minimal_Percent 0.2
-#define Multi_Thread_Rebuild_Point_Num 2000
+#define Multi_Thread_Rebuild_Point_Num 1000
 #define DOWNSAMPLE_SWITCH true
 
 using namespace std;
@@ -71,8 +71,6 @@ class KD_TREE
 {
 private:
     // debug
-    int add_counter;
-    int delete_counter;
     int max_rebuild_num = 0;
     int max_need_rebuild_num = 0;
     // Multi-thread Tree Rebuild
@@ -81,8 +79,8 @@ private:
     bool copy_flag = false;
     pthread_t rebuild_thread;
     pthread_mutex_t termination_flag_mutex_lock, rebuild_ptr_mutex_lock, working_flag_mutex, search_flag_mutex;
-    pthread_mutex_t rebuild_logger_mutex_lock, copy_logger_mutex_lock, points_deleted_rebuild_mutex_lock;
-    vector<Operation_Logger_Type> Rebuild_Logger, Copy_Logger;
+    pthread_mutex_t rebuild_logger_mutex_lock, points_deleted_rebuild_mutex_lock;
+    vector<Operation_Logger_Type> Rebuild_Logger;
     PointVector Rebuild_PCL_Storage;
     KD_TREE_NODE ** Rebuild_Ptr;
     int search_mutex_counter = 0;
@@ -124,7 +122,7 @@ private:
     static bool point_cmp_z(PointType a, PointType b); 
 
 public:
-    KD_TREE(float, float, float);
+    KD_TREE(float delete_param = 0.5, float balance_param = 0.7, float box_length = 0.2);
     ~KD_TREE();
     void Set_delete_criterion_param(float delete_param);
     void Set_balance_criterion_param(float balance_param);
