@@ -13,16 +13,16 @@
 #define Z_MAX 2
 #define Z_MIN 0
 
-#define Point_Num 10000
-#define New_Point_Num 200
-#define Delete_Point_Num 0
+#define Point_Num 12000
+#define New_Point_Num 1200
+#define Delete_Point_Num 1200
 #define Nearest_Num 5
 #define Test_Time 1000
-#define Search_Time 100
+#define Search_Time 200
 #define Box_Length 0.5
 #define Box_Num 1
-#define Delete_Box_Switch true
-#define Add_Box_Switch true
+#define Delete_Box_Switch false
+#define Add_Box_Switch false
 
 PointVector point_cloud;
 PointVector cloud_increment;
@@ -33,7 +33,7 @@ PointVector raw_cmp_result;
 PointVector DeletePoints;
 PointVector removed_points;
 
-KD_TREE scapegoat_kd_tree(0.5,0.6,0.1,10);
+KD_TREE scapegoat_kd_tree(0.5,0.7,0.2);
 
 float rand_float(float x_min, float x_max){
     float rand_ratio = rand()/(float)RAND_MAX;
@@ -190,6 +190,7 @@ int main(int argc, char** argv){
     bool flag = true;
     vector<BoxPointType> Delete_Boxes;
     vector<BoxPointType> Add_Boxes;
+    vector<float> PointDist;
     float max_total_time = 0.0;
     float box_delete_time = 0.0;
     float box_add_time = 0.0;
@@ -275,7 +276,7 @@ int main(int argc, char** argv){
             PointVector ().swap(search_result);             
             target = generate_target_point();    
             t1 = chrono::high_resolution_clock::now();
-            scapegoat_kd_tree.Nearest_Search(target, Nearest_Num, search_result);
+            scapegoat_kd_tree.Nearest_Search(target, Nearest_Num, search_result, PointDist);
             t2 = chrono::high_resolution_clock::now();
             search_duration += chrono::duration_cast<chrono::microseconds>(t2-t1).count();
         }

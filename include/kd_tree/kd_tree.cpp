@@ -61,6 +61,8 @@ void KD_TREE::InitTreeNode(KD_TREE_NODE * root){
     root->invalid_point_num = 0;
     root->point_deleted = false;
     root->tree_deleted = false;
+    root->need_push_down_to_left = false;
+    root->need_push_down_to_right = false;
     root->point_downsample_deleted = false;
     pthread_mutex_init(&(root->push_down_mutex_lock),NULL);
 }   
@@ -231,8 +233,10 @@ void KD_TREE::Build(PointVector point_cloud){
     Root_Node = STATIC_ROOT_NODE->left_son_ptr;    
 }
 
-void KD_TREE::Nearest_Search(PointType point, int k_nearest, PointVector& Nearest_Points, vector<float> & Point_Distance){
+void KD_TREE::Nearest_Search(PointType point, int k_nearest, PointVector& Nearest_Points, vector<float> & Point_Distance){   
     priority_queue<PointType_CMP> q; // Clear the priority queue;
+    PointVector ().swap(Nearest_Points);
+    vector<float> ().swap(Point_Distance);
     if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){
         Search(Root_Node, k_nearest, point, q);
     } else {
@@ -266,42 +270,37 @@ void KD_TREE::Add_Points(PointVector & PointToAdd){
     PointType downsample_result, mid_point;
     float min_dist, tmp_dist;
     for (int i=0; i<PointToAdd.size();i++){
-        Box_of_Point.vertex_min[0] = floor(PointToAdd[i].x/downsample_size)*downsample_size;
-        Box_of_Point.vertex_max[0] = Box_of_Point.vertex_min[0]+downsample_size;
-        Box_of_Point.vertex_min[1] = floor(PointToAdd[i].y/downsample_size)*downsample_size;
-        Box_of_Point.vertex_max[1] = Box_of_Point.vertex_min[1]+downsample_size; 
-        Box_of_Point.vertex_min[2] = floor(PointToAdd[i].z/downsample_size)*downsample_size;
-        Box_of_Point.vertex_max[2] = Box_of_Point.vertex_min[2]+downsample_size;   
-        mid_point.x = Box_of_Point.vertex_min[0] + (Box_of_Point.vertex_max[0]-Box_of_Point.vertex_min[0])/2.0;
-        mid_point.y = Box_of_Point.vertex_min[1] + (Box_of_Point.vertex_max[1]-Box_of_Point.vertex_min[1])/2.0;
-        mid_point.z = Box_of_Point.vertex_min[2] + (Box_of_Point.vertex_max[2]-Box_of_Point.vertex_min[2])/2.0;
-        PointVector ().swap(Downsample_Storage);
-        Search_by_range(Root_Node, Box_of_Point, Downsample_Storage);
-        min_dist = calc_dist(PointToAdd[i],mid_point);
-        downsample_result = PointToAdd[i];                
-        for (int index = 0; index < Downsample_Storage.size(); index++){
-            tmp_dist = calc_dist(Downsample_Storage[index], mid_point);
-            if (tmp_dist < min_dist){
-                min_dist = tmp_dist;
-                downsample_result = Downsample_Storage[index];
-            }
-        }
-        if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){
-            if (DOWNSAMPLE_SWITCH){
-
+        if (DOWNSAMPLE_SWITCH){
+            Box_of_Point.vertex_min[0] = floor(PointToAdd[i].x/downsample_size)*downsample_size;
+            Box_of_Point.vertex_max[0] = Box_of_Point.vertex_min[0]+downsample_size;
+            Box_of_Point.vertex_min[1] = floor(PointToAdd[i].y/downsample_size)*downsample_size;
+            Box_of_Point.vertex_max[1] = Box_of_Point.vertex_min[1]+downsample_size; 
+            Box_of_Point.vertex_min[2] = floor(PointToAdd[i].z/downsample_size)*downsample_size;
+            Box_of_Point.vertex_max[2] = Box_of_Point.vertex_min[2]+downsample_size;   
+            mid_point.x = Box_of_Point.vertex_min[0] + (Box_of_Point.vertex_max[0]-Box_of_Point.vertex_min[0])/2.0;
+            mid_point.y = Box_of_Point.vertex_min[1] + (Box_of_Point.vertex_max[1]-Box_of_Point.vertex_min[1])/2.0;
+            mid_point.z = Box_of_Point.vertex_min[2] + (Box_of_Point.vertex_max[2]-Box_of_Point.vertex_min[2])/2.0;
+            PointVector ().swap(Downsample_Storage);
+            Search_by_range(Root_Node, Box_of_Point, Downsample_Storage);
+            min_dist = calc_dist(PointToAdd[i],mid_point);
+            downsample_result = PointToAdd[i];                
+            for (int index = 0; index < Downsample_Storage.size(); index++){
+                tmp_dist = calc_dist(Downsample_Storage[index], mid_point);
+                if (tmp_dist < min_dist){
+                    min_dist = tmp_dist;
+                    downsample_result = Downsample_Storage[index];
+                }
+            }            
+            if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){  
                 Delete_by_range(&Root_Node, Box_of_Point, true, true);     
-                Add_by_point(&Root_Node, downsample_result, true);              
-            } else {        
-                Add_by_point(&Root_Node, PointToAdd[i], true);        
-            }
-        } else {       
-            Operation_Logger_Type  operation_delete, operation;
-            operation_delete.boxpoint = Box_of_Point;
-            operation_delete.op = DOWNSAMPLE_DELETE;
-            operation.point = downsample_result;
-            operation.op = ADD_POINT;
-            pthread_mutex_lock(&working_flag_mutex);
-            if (DOWNSAMPLE_SWITCH){                       
+                Add_by_point(&Root_Node, downsample_result, true);  
+            } else {
+                Operation_Logger_Type  operation_delete, operation;
+                operation_delete.boxpoint = Box_of_Point;
+                operation_delete.op = DOWNSAMPLE_DELETE;
+                operation.point = downsample_result;
+                operation.op = ADD_POINT;
+                pthread_mutex_lock(&working_flag_mutex);
                 Delete_by_range(&Root_Node, Box_of_Point, false , true);                 
                 Add_by_point(&Root_Node, downsample_result, false);
                 if (rebuild_flag){
@@ -310,21 +309,32 @@ void KD_TREE::Add_Points(PointVector & PointToAdd){
                     Rebuild_Logger.push_back(operation);
                     pthread_mutex_unlock(&rebuild_logger_mutex_lock);
                 }
-            } else {        
+                pthread_mutex_unlock(&working_flag_mutex);         
+            }
+        } else {
+            if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){
+                Add_by_point(&Root_Node, PointToAdd[i], true);     
+            } else {
+                Operation_Logger_Type  operation_delete, operation;
+                operation_delete.boxpoint = Box_of_Point;
+                operation_delete.op = DOWNSAMPLE_DELETE;
+                operation.point = PointToAdd[i];
+                operation.op = ADD_POINT;                
+                pthread_mutex_lock(&working_flag_mutex);
                 Add_by_point(&Root_Node, PointToAdd[i], false);
                 if (rebuild_flag){
                     pthread_mutex_lock(&rebuild_logger_mutex_lock);
                     Rebuild_Logger.push_back(operation);
                     pthread_mutex_unlock(&rebuild_logger_mutex_lock);
-                }                    
-            }         
-            pthread_mutex_unlock(&working_flag_mutex);         
+                }
+                pthread_mutex_unlock(&working_flag_mutex);       
+            }
         }
     }
     return;
 }
 
-void KD_TREE::Add_Point_Boxes(vector<BoxPointType> & BoxPoints){
+void KD_TREE::Add_Point_Boxes(vector<BoxPointType> & BoxPoints){     
     for (int i=0;i < BoxPoints.size();i++){
         if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){
             Add_by_range(&Root_Node ,BoxPoints[i], true);
@@ -345,7 +355,7 @@ void KD_TREE::Add_Point_Boxes(vector<BoxPointType> & BoxPoints){
     return;
 }
 
-void KD_TREE::Delete_Points(PointVector & PointToDel){   
+void KD_TREE::Delete_Points(PointVector & PointToDel){        
     for (int i=0;i<PointToDel.size();i++){
         if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){               
             Delete_by_point(&Root_Node, PointToDel[i], true);
@@ -366,7 +376,7 @@ void KD_TREE::Delete_Points(PointVector & PointToDel){
     return;
 }
 
-void KD_TREE::Delete_Point_Boxes(vector<BoxPointType> & BoxPoints){
+void KD_TREE::Delete_Point_Boxes(vector<BoxPointType> & BoxPoints){      
     for (int i=0;i < BoxPoints.size();i++){ 
         if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){               
             Delete_by_range(&Root_Node ,BoxPoints[i], true, false);
@@ -528,16 +538,16 @@ void KD_TREE::Delete_by_range(KD_TREE_NODE ** root,  BoxPointType boxpoint, bool
         }
         pthread_mutex_unlock(&working_flag_mutex);
     }    
-    Update((*root));
-    if (Rebuild_Ptr != nullptr && *Rebuild_Ptr == *root && (*root)->TreeSize < Multi_Thread_Rebuild_Point_Num) Rebuild_Ptr = nullptr;     
+    Update(*root);
+    if (Rebuild_Ptr != nullptr && *Rebuild_Ptr == *root && (*root)->TreeSize < Multi_Thread_Rebuild_Point_Num) Rebuild_Ptr = nullptr; 
     bool need_rebuild = allow_rebuild & Criterion_Check((*root));
-    if (need_rebuild) Rebuild(root);   
+    if (need_rebuild) Rebuild(root);
     return;
 }
 
 void KD_TREE::Delete_by_point(KD_TREE_NODE ** root, PointType point, bool allow_rebuild){   
     if ((*root) == nullptr || (*root)->tree_deleted) return;
-    Push_Down((*root));
+    Push_Down(*root);
     if (same_point((*root)->point, point) && !(*root)->point_deleted) {          
         (*root)->point_deleted = true;
         (*root)->invalid_point_num += 1;
@@ -627,7 +637,7 @@ void KD_TREE::Add_by_range(KD_TREE_NODE ** root, BoxPointType boxpoint, bool all
         }
         pthread_mutex_unlock(&working_flag_mutex);
     }
-    Update((*root));
+    Update(*root);
     if (Rebuild_Ptr != nullptr && *Rebuild_Ptr == *root && (*root)->TreeSize < Multi_Thread_Rebuild_Point_Num) Rebuild_Ptr = nullptr; 
     bool need_rebuild = allow_rebuild & Criterion_Check((*root));
     if (need_rebuild) Rebuild(root);
@@ -646,7 +656,7 @@ void KD_TREE::Add_by_point(KD_TREE_NODE ** root, PointType point, bool allow_reb
     struct timespec Timeout;    
     add_log.op = ADD_POINT;
     add_log.point = point; 
-    Push_Down(*root);      
+    Push_Down(*root);
     if (((*root)->division_axis == 0 && point.x < (*root)->point.x) || ((*root)->division_axis == 1 && point.y < (*root)->point.y) || ((*root)->division_axis == 2 && point.z < (*root)->point.z)){
         if ((Rebuild_Ptr == nullptr) || (*root)->left_son_ptr != *Rebuild_Ptr){          
             Add_by_point(&(*root)->left_son_ptr, point, allow_rebuild);
@@ -677,7 +687,7 @@ void KD_TREE::Add_by_point(KD_TREE_NODE ** root, PointType point, bool allow_reb
     Update(*root);
     if (Rebuild_Ptr != nullptr && *Rebuild_Ptr == *root && (*root)->TreeSize < Multi_Thread_Rebuild_Point_Num) Rebuild_Ptr = nullptr; 
     bool need_rebuild = allow_rebuild & Criterion_Check((*root));
-    if (need_rebuild) Rebuild(root);     
+    if (need_rebuild) Rebuild(root);
     return;
 }
 

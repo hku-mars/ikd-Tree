@@ -9,7 +9,7 @@
 #include <time.h>
 
 #define EPS 1e-6
-#define Minimal_Unbalanced_Tree_Size 10 
+#define Minimal_Unbalanced_Tree_Size 10
 #define Multi_Thread_Rebuild_Minimal_Percent 0.2
 #define Multi_Thread_Rebuild_Point_Num 2500
 #define DOWNSAMPLE_SWITCH true
