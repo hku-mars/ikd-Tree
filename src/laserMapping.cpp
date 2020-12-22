@@ -742,10 +742,10 @@ int main(int argc, char** argv)
             Eigen::Vector3d euler_cur = RotMtoEuler(state.rot_end);
             fout_pre << std::setw(10) << Measures.lidar_beg_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
             <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<< std::endl;
-            #ifdef DEBUG_PRINT
+            // #ifdef DEBUG_PRINT
             std::cout<<"current lidar time "<<Measures.lidar_beg_time<<" "<<"first lidar time "<<first_lidar_time<<std::endl;
             std::cout<<"pre-integrated states: "<<euler_cur.transpose()*57.3<<" "<<state.pos_end.transpose()<<" "<<state.vel_end.transpose()<<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<std::endl;
-            #endif
+            // #endif
             
             /*** Segment the map in lidar FOV ***/
             lasermap_fov_segment();
@@ -1111,7 +1111,7 @@ int main(int argc, char** argv)
                 }
                 t4 = omp_get_wtime();
                 ikdtree.Add_Points(feats_down_updated->points);
-            
+                std::cout<< "Finished Add Points"<<std::endl;
             #else
                 std::cout<<"kkkkkkk: "<<feats_down_updated->points.size()<<std::endl;
                 bool if_cube_updated[laserCloudNum] = {0};
