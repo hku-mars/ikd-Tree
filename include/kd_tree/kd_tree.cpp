@@ -233,8 +233,7 @@ void KD_TREE::Build(PointVector point_cloud){
     Root_Node = STATIC_ROOT_NODE->left_son_ptr;    
 }
 
-void KD_TREE::Nearest_Search(PointType point, int k_nearest, PointVector& Nearest_Points, vector<float> & Point_Distance){
-    printf("    Nearest Search\n");    
+void KD_TREE::Nearest_Search(PointType point, int k_nearest, PointVector& Nearest_Points, vector<float> & Point_Distance){   
     priority_queue<PointType_CMP> q; // Clear the priority queue;
     PointVector ().swap(Nearest_Points);
     vector<float> ().swap(Point_Distance);
@@ -269,7 +268,6 @@ void KD_TREE::Nearest_Search(PointType point, int k_nearest, PointVector& Neares
 void KD_TREE::Add_Points(PointVector & PointToAdd){
     BoxPointType Box_of_Point;
     PointType downsample_result, mid_point;
-    printf("    Add points\n");
     float min_dist, tmp_dist;
     for (int i=0; i<PointToAdd.size();i++){
         if (DOWNSAMPLE_SWITCH){
@@ -336,8 +334,7 @@ void KD_TREE::Add_Points(PointVector & PointToAdd){
     return;
 }
 
-void KD_TREE::Add_Point_Boxes(vector<BoxPointType> & BoxPoints){
-    printf("    Add Point Boxes\n");     
+void KD_TREE::Add_Point_Boxes(vector<BoxPointType> & BoxPoints){     
     for (int i=0;i < BoxPoints.size();i++){
         if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){
             Add_by_range(&Root_Node ,BoxPoints[i], true);
@@ -358,8 +355,7 @@ void KD_TREE::Add_Point_Boxes(vector<BoxPointType> & BoxPoints){
     return;
 }
 
-void KD_TREE::Delete_Points(PointVector & PointToDel){   
-    printf("    Delete Point\n");      
+void KD_TREE::Delete_Points(PointVector & PointToDel){        
     for (int i=0;i<PointToDel.size();i++){
         if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){               
             Delete_by_point(&Root_Node, PointToDel[i], true);
@@ -380,8 +376,7 @@ void KD_TREE::Delete_Points(PointVector & PointToDel){
     return;
 }
 
-void KD_TREE::Delete_Point_Boxes(vector<BoxPointType> & BoxPoints){
-    printf("    Delete Point Boxes\n");      
+void KD_TREE::Delete_Point_Boxes(vector<BoxPointType> & BoxPoints){      
     for (int i=0;i < BoxPoints.size();i++){ 
         if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){               
             Delete_by_range(&Root_Node ,BoxPoints[i], true, false);
