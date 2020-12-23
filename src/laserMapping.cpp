@@ -801,7 +801,7 @@ int main(int argc, char** argv)
             
             #ifdef USE_ikdtree
                 // PointVector ().swap(ikdtree.PCL_Storage);
-                // ikdtree.traverse_for_rebuild(ikdtree.Root_Node, ikdtree.PCL_Storage);
+                // ikdtree.flatten(ikdtree.Root_Node, ikdtree.PCL_Storage);
                 // featsFromMap->clear();
                 // featsFromMap->points = ikdtree.PCL_Storage;
             #else

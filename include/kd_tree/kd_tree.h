@@ -135,7 +135,7 @@ public:
     void Add_Point_Boxes(vector<BoxPointType> & BoxPoints);
     void Delete_Points(PointVector & PointToDel);
     void Delete_Point_Boxes(vector<BoxPointType> & BoxPoints);
-    void traverse_for_rebuild(KD_TREE_NODE * root, PointVector &Storage);
+    void flatten(KD_TREE_NODE * root, PointVector &Storage);
     void acquire_removed_points(PointVector & removed_points);
     PointVector PCL_Storage;     
     KD_TREE_NODE * Root_Node = nullptr;  

@@ -130,7 +130,7 @@ void KD_TREE::multi_thread_rebuild(){
             // printf("    =============   Start Rebuild, Rebuild size is %d\n", (*Rebuild_Ptr)->TreeSize);
             father_ptr = (*Rebuild_Ptr)->father_ptr;  
             PointVector ().swap(Rebuild_PCL_Storage);
-            traverse_for_rebuild(*Rebuild_Ptr, Rebuild_PCL_Storage); 
+            flatten(*Rebuild_Ptr, Rebuild_PCL_Storage); 
             pthread_mutex_unlock(&working_flag_mutex);
 
             //printf("    =============   Finished copy and update \n");        
@@ -478,7 +478,7 @@ void KD_TREE::Rebuild(KD_TREE_NODE ** root){
         rebuild_counter += (*root)->TreeSize;
         int size_rec = (*root)->TreeSize;
         PCL_Storage.clear();
-        traverse_for_rebuild(*root, PCL_Storage);       
+        flatten(*root, PCL_Storage);       
         delete_tree_nodes(root, DELETE_POINTS_REC);
         BuildTree(root, 0, PCL_Storage.size()-1, PCL_Storage);
         if (*root != nullptr) (*root)->father_ptr = father_ptr;
@@ -841,7 +841,7 @@ void KD_TREE::Search_by_range(KD_TREE_NODE *root, BoxPointType boxpoint, PointVe
     if (boxpoint.vertex_max[1] + EPS < root->node_range_y[0] || boxpoint.vertex_min[1] - EPS > root->node_range_y[1]) return;
     if (boxpoint.vertex_max[2] + EPS < root->node_range_z[0] || boxpoint.vertex_min[2] - EPS > root->node_range_z[1]) return;
     if (boxpoint.vertex_min[0] - EPS < root->node_range_x[0] && boxpoint.vertex_max[0]+EPS > root->node_range_x[1] && boxpoint.vertex_min[1]-EPS < root->node_range_y[0] && boxpoint.vertex_max[1]+EPS > root->node_range_y[1] && boxpoint.vertex_min[2]-EPS < root->node_range_z[0] && boxpoint.vertex_max[2]+EPS > root->node_range_z[1]){
-        traverse_for_rebuild(root, Storage);
+        flatten(root, Storage);
         return;
     }
     if (boxpoint.vertex_min[0]-EPS < root->point.x && boxpoint.vertex_max[0]+EPS > root->point.x && boxpoint.vertex_min[1]-EPS < root->point.y && boxpoint.vertex_max[1]+EPS > root->point.y && boxpoint.vertex_min[2]-EPS < root->point.z && boxpoint.vertex_max[2]+EPS > root->point.z){
@@ -984,14 +984,14 @@ void KD_TREE::Update(KD_TREE_NODE * root){
     return;
 }
 
-void KD_TREE::traverse_for_rebuild(KD_TREE_NODE * root, PointVector &Storage){
+void KD_TREE::flatten(KD_TREE_NODE * root, PointVector &Storage){
     if (root == nullptr || root->tree_deleted) return;
     Push_Down(root);
     if (!root->point_deleted) {
         Storage.push_back(root->point);
     }
-    traverse_for_rebuild(root->left_son_ptr, Storage);
-    traverse_for_rebuild(root->right_son_ptr, Storage);
+    flatten(root->left_son_ptr, Storage);
+    flatten(root->right_son_ptr, Storage);
     return;
 }
 
