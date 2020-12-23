@@ -415,6 +415,7 @@ void lasermap_fov_segment()
     cube_points_add->clear();
     featsFromMap->clear();
     bool now_inFOV[laserCloudNum] = {false};
+    BoxPointType cub_points;
 
     std::cout<<"centerCubeIJK: "<<centerCubeI<<" "<<centerCubeJ<<" "<<centerCubeK<<std::endl;
 
@@ -456,22 +457,23 @@ void lasermap_fov_segment()
 
                 #ifdef USE_ikdtree
                     /*** readd cubes and points ***/
-                    BoxPointType cub_points;
-                    if (!last_inFOV && inFOV)
+                    if (inFOV)
                     {
                         int center_index = i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k;
                         *cube_points_add += *featsArray[center_index];
                         featsArray[center_index]->clear();
-
-                        for(int i = 0; i < 3; i++)
+                        if (!last_inFOV)
                         {
-                            cub_points.vertex_max[i] = center_p[i] + 0.5 * cube_len;
-                            cub_points.vertex_min[i] = center_p[i] - 0.5 * cube_len;
+                            for(int i = 0; i < 3; i++)
+                            {
+                                cub_points.vertex_max[i] = center_p[i] + 0.5 * cube_len;
+                                cub_points.vertex_min[i] = center_p[i] - 0.5 * cube_len;
+                            }
+                            cub_needad.push_back(cub_points);
+                            laserCloudValidInd[laserCloudValidNum] = center_index;
+                            laserCloudValidNum ++;
+                            last_inFOV = inFOV;
                         }
-                        cub_needad.push_back(cub_points);
-                        laserCloudValidInd[laserCloudValidNum] = center_index;
-                        laserCloudValidNum ++;
-                        last_inFOV = inFOV;
                     }
                     
 
@@ -493,7 +495,6 @@ void lasermap_fov_segment()
 
     #ifdef USE_ikdtree
     /*** delete cubes ***/
-    BoxPointType cub_points;
     for (int ind = 0; ind < laserCloudNum; ind++) 
     {
         if(_last_inFOV[ind] && (!now_inFOV[ind]))
@@ -740,10 +741,10 @@ int main(int argc, char** argv)
             Eigen::Vector3d euler_cur = RotMtoEuler(state.rot_end);
             fout_pre << std::setw(10) << Measures.lidar_beg_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
             <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<< std::endl;
-            // #ifdef DEBUG_PRINT
+            #ifdef DEBUG_PRINT
             std::cout<<"current lidar time "<<Measures.lidar_beg_time<<" "<<"first lidar time "<<first_lidar_time<<std::endl;
             std::cout<<"pre-integrated states: "<<euler_cur.transpose()*57.3<<" "<<state.pos_end.transpose()<<" "<<state.vel_end.transpose()<<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<std::endl;
-            // #endif
+            #endif
             
             /*** Segment the map in lidar FOV ***/
             lasermap_fov_segment();
@@ -795,10 +796,10 @@ int main(int argc, char** argv)
                 t1 = omp_get_wtime();
             
             #ifdef USE_ikdtree
-                PointVector ().swap(ikdtree.PCL_Storage);
-                ikdtree.traverse_for_rebuild(ikdtree.Root_Node, ikdtree.PCL_Storage);
-                featsFromMap->clear();
-                featsFromMap->points = ikdtree.PCL_Storage;
+                // PointVector ().swap(ikdtree.PCL_Storage);
+                // ikdtree.traverse_for_rebuild(ikdtree.Root_Node, ikdtree.PCL_Storage);
+                // featsFromMap->clear();
+                // featsFromMap->points = ikdtree.PCL_Storage;
             #else
                 kdtreeSurfFromMap->setInputCloud(featsFromMap);
             #endif
