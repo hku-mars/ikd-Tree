@@ -122,6 +122,7 @@ std::vector<BoxPointType> cub_needad;
 PointCloudXYZI::Ptr laserCloudFullRes2(new PointCloudXYZI());
 PointCloudXYZI::Ptr featsArray[laserCloudNum];
 bool                _last_inFOV[laserCloudNum];
+bool                cube_updated[laserCloudNum];
 int laserCloudValidInd[laserCloudNum];
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr laserCloudFullResColor(new pcl::PointCloud<pcl::PointXYZRGB>());
 
@@ -415,9 +416,9 @@ void lasermap_fov_segment()
     cube_points_add->clear();
     featsFromMap->clear();
     bool now_inFOV[laserCloudNum] = {false};
-    BoxPointType cub_points;
 
-    std::cout<<"centerCubeIJK: "<<centerCubeI<<" "<<centerCubeJ<<" "<<centerCubeK<<std::endl;
+    // std::cout<<"centerCubeIJK: "<<centerCubeI<<" "<<centerCubeJ<<" "<<centerCubeK<<std::endl;
+    // std::cout<<"laserCloudCen: "<<laserCloudCenWidth<<" "<<laserCloudCenHeight<<" "<<laserCloudCenDepth<<std::endl;
 
     for (int i = centerCubeI - FOV_RANGE; i <= centerCubeI + FOV_RANGE; i++) 
     {
@@ -429,9 +430,9 @@ void lasermap_fov_segment()
                         j >= 0 && j < laserCloudHeight &&
                         k >= 0 && k < laserCloudDepth) 
                 {
-                    Eigen::Vector3f center_p(cube_len * (i - laserCloudCenWidth),\
-                                                cube_len * (j - laserCloudCenHeight),\
-                                                cube_len * (k - laserCloudCenDepth));
+                    Eigen::Vector3f center_p(cube_len * (i - laserCloudCenWidth), \
+                                             cube_len * (j - laserCloudCenHeight), \
+                                             cube_len * (k - laserCloudCenDepth));
 
                     float check1, check2;
                     float squaredSide1, squaredSide2;
@@ -464,6 +465,7 @@ void lasermap_fov_segment()
                         featsArray[center_index]->clear();
                         if (!last_inFOV)
                         {
+                            BoxPointType cub_points;
                             for(int i = 0; i < 3; i++)
                             {
                                 cub_points.vertex_max[i] = center_p[i] + 0.5 * cube_len;
@@ -472,14 +474,12 @@ void lasermap_fov_segment()
                             cub_needad.push_back(cub_points);
                             laserCloudValidInd[laserCloudValidNum] = center_index;
                             laserCloudValidNum ++;
-                            last_inFOV = inFOV;
+                            // std::cout<<"readd center: "<<center_p.transpose()<<std::endl;
                         }
                     }
-                    
-
 
                 #else
-                    if(inFOV)
+                    if (inFOV)
                     {
                         int center_index = i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k;
                         *featsFromMap += *featsArray[center_index];
@@ -495,26 +495,30 @@ void lasermap_fov_segment()
 
     #ifdef USE_ikdtree
     /*** delete cubes ***/
-    for (int ind = 0; ind < laserCloudNum; ind++) 
+    for (int i = 0; i < laserCloudWidth; i++) 
     {
-        if(_last_inFOV[ind] && (!now_inFOV[ind]))
+        for (int j = 0; j < laserCloudHeight; j++) 
         {
-            int i    = ind % laserCloudWidth;
-            int temp = (ind - i) / laserCloudWidth;
-            int j    = temp % laserCloudHeight;
-            int k    = temp / laserCloudHeight;
-
-            Eigen::Vector3f center_p(cube_len * (i - laserCloudCenWidth),\
-                                                cube_len * (j - laserCloudCenHeight),\
-                                                cube_len * (k - laserCloudCenDepth));
-
-            for(int i = 0; i < 3; i++)
+            for (int k = 0; k < laserCloudDepth; k++) 
             {
-                cub_points.vertex_max[i] = center_p[i] + 0.5 * cube_len;
-                cub_points.vertex_min[i] = center_p[i] - 0.5 * cube_len;
+                int ind = i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k;
+                if((!now_inFOV[ind]) && _last_inFOV[ind])
+                {
+                    BoxPointType cub_points;
+                    Eigen::Vector3f center_p(cube_len * (i - laserCloudCenWidth),\
+                                             cube_len * (j - laserCloudCenHeight),\
+                                             cube_len * (k - laserCloudCenDepth));
+                    // std::cout<<"center_p: "<<center_p.transpose()<<std::endl;
+
+                    for(int i = 0; i < 3; i++)
+                    {
+                        cub_points.vertex_max[i] = center_p[i] + 0.5 * cube_len;
+                        cub_points.vertex_min[i] = center_p[i] - 0.5 * cube_len;
+                    }
+                    cub_needrm.push_back(cub_points);
+                }
+                _last_inFOV[ind] = now_inFOV[ind];
             }
-            cub_needrm.push_back(cub_points);
-            _last_inFOV[ind] = now_inFOV[ind];
         }
     }
     #endif
@@ -1077,7 +1081,7 @@ int main(int argc, char** argv)
                 PointVector points_history;
                 ikdtree.acquire_removed_points(points_history);
                 
-                bool if_cube_updated[laserCloudNum] = {0};
+                memset(cube_updated, 0, sizeof(cube_updated));
                 std::cout<<"acquire points size: "<<points_history.size()<<std::endl;
                 for (int i = 0; i < points_history.size(); i++)
                 {
@@ -1112,8 +1116,7 @@ int main(int argc, char** argv)
                 ikdtree.Add_Points(feats_down_updated->points);
                 std::cout<< "Finished Add Points"<<std::endl;
             #else
-                std::cout<<"kkkkkkk: "<<feats_down_updated->points.size()<<std::endl;
-                bool if_cube_updated[laserCloudNum] = {0};
+                bool cube_updated[laserCloudNum] = {0};
                 for (int i = 0; i < feats_down_size; i++)
                 {
                     PointType &pointSel = feats_down_updated->points[i];
@@ -1131,14 +1134,14 @@ int main(int argc, char** argv)
                             cubeK >= 0 && cubeK < laserCloudDepth) {
                         int cubeInd = cubeI + laserCloudWidth * cubeJ + laserCloudWidth * laserCloudHeight * cubeK;
                         featsArray[cubeInd]->push_back(pointSel);
-                        if_cube_updated[cubeInd] = true;
+                        cube_updated[cubeInd] = true;
                     }
                 }
                 for (int i = 0; i < laserCloudValidNum; i++)
                 {
                     int ind = laserCloudValidInd[i];
 
-                    if(if_cube_updated[ind])
+                    if(cube_updated[ind])
                     {
                         downSizeFilterMap.setInputCloud(featsArray[ind]);
                         downSizeFilterMap.filter(*featsArray[ind]);
