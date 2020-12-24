@@ -328,7 +328,7 @@ int main(int argc, char** argv){
         printf("k d tree\n");
         print_point_vec(search_result);
         printf("Points in kd_tree\n");
-        scapegoat_kd_tree.traverse_for_rebuild(scapegoat_kd_tree.Root_Node, scapegoat_kd_tree.PCL_Storage);
+        scapegoat_kd_tree.flatten(scapegoat_kd_tree.Root_Node, scapegoat_kd_tree.PCL_Storage);
         print_point_vec(scapegoat_kd_tree.PCL_Storage);
         fclose(stdout);        
     } else {
@@ -342,7 +342,7 @@ int main(int argc, char** argv){
         printf("Corresponding point number is: %d\n",max_point_num);
         PointVector ().swap(scapegoat_kd_tree.PCL_Storage);
         t1 = chrono::high_resolution_clock::now(); 
-        if (scapegoat_kd_tree.Root_Node != nullptr) scapegoat_kd_tree.traverse_for_rebuild(scapegoat_kd_tree.Root_Node, scapegoat_kd_tree.PCL_Storage);
+        if (scapegoat_kd_tree.Root_Node != nullptr) scapegoat_kd_tree.flatten(scapegoat_kd_tree.Root_Node, scapegoat_kd_tree.PCL_Storage);
         t2 = chrono::high_resolution_clock::now();               
         auto duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
         printf("Traverse time is %0.3f ms\n",duration/1e3);
