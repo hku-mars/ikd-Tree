@@ -99,6 +99,7 @@ struct StatesGroup
         a.bias_g  = this->bias_g  + state_add.block<3,1>(9,0);
         a.bias_a  = this->bias_a  + state_add.block<3,1>(12,0);
         a.gravity = this->gravity + state_add.block<3,1>(15,0);
+        a.cov     = this->cov;
 		return a;
 	};
 

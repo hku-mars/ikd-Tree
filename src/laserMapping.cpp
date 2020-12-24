@@ -640,7 +640,7 @@ int main(int argc, char** argv)
     path.header.frame_id ="/camera_init";
 
     /*** variables definition ***/
-    bool dense_map_en, flg_EKF_inited = false, flg_map_inited = false;
+    bool dense_map_en, flg_EKF_inited = 0, flg_map_inited = 0, flg_EKF_converged = 0;
     std::string map_file_path;
     int effect_feat_num = 0, frame_num = 0;
     double filter_size_corner_min, filter_size_surf_min, filter_size_map_min, fov_deg,\
@@ -814,6 +814,9 @@ int main(int argc, char** argv)
                 
                 int  rematch_num = 0;
                 bool rematch_en = 0;
+                flg_EKF_converged = 0;
+                deltaR = 0.0;
+                deltaT = 0.0;
                 t2 = omp_get_wtime();
                 
                 for (iterCount = 0; iterCount < NUM_MAX_ITERATIONS; iterCount++) 
@@ -1025,21 +1028,30 @@ int main(int argc, char** argv)
                     {
                         auto &&Hsub_T = Hsub.transpose();
                         H_T_H.block<6,6>(0,0) = Hsub_T * Hsub;
-                        Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 = (H_T_H + (state.cov / LASER_POINT_COV).inverse()).inverse();
+                        Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 = \
+                                    (H_T_H + (state.cov / LASER_POINT_COV).inverse()).inverse();
                         K = K_1.block<DIM_OF_STATES,6>(0,0) * Hsub_T;
 
-                        solution = K * meas_vec;
-                        state += solution;
+                        // solution = K * meas_vec;
+                        // state += solution;
 
-                        // auto vec = state_propagat - state;
-                        // solution = K * (meas_vec - Hsub * vec.block<6,1>(0,0));
-                        // state = state_propagat + solution;
+                        auto vec = state_propagat - state;
+                        solution = K * (meas_vec - Hsub * vec.block<6,1>(0,0));
+                        state = state_propagat + solution;
 
                         rot_add = solution.block<3,1>(0,0);
                         t_add   = solution.block<3,1>(3,0);
 
+                        flg_EKF_converged = false;
+
+                        if (((rot_add.norm() * 57.3 - deltaR) < 0.01) \
+                           && ((t_add.norm() * 100 - deltaT) < 0.015))
+                        {
+                            flg_EKF_converged = true;
+                        }
+
                         deltaR = rot_add.norm() * 57.3;
-                        deltaT = t_add.norm() * 100.0;
+                        deltaT = t_add.norm() * 100;
                     }
 
                     euler_cur = RotMtoEuler(state.rot_end);
@@ -1051,10 +1063,11 @@ int main(int argc, char** argv)
 
                     /*** Rematch Judgement ***/
                     rematch_en = false;
-                    if ((deltaR < 0.01 && deltaT < 0.015) || ((rematch_num == 0) && (iterCount == (NUM_MAX_ITERATIONS - 2))))
+                    if (flg_EKF_converged || ((rematch_num == 0) && (iterCount == (NUM_MAX_ITERATIONS - 2))))
                     {
                         rematch_en = true;
                         rematch_num ++;
+                        std::cout<<"rematch_num: "<<rematch_num<<std::endl;
                     }
 
                     /*** Convergence Judgements and Covariance Update ***/
@@ -1082,7 +1095,7 @@ int main(int argc, char** argv)
                 ikdtree.acquire_removed_points(points_history);
                 
                 memset(cube_updated, 0, sizeof(cube_updated));
-                std::cout<<"acquire points size: "<<points_history.size()<<std::endl;
+                // std::cout<<"acquire points size: "<<points_history.size()<<std::endl;
                 for (int i = 0; i < points_history.size(); i++)
                 {
                     PointType &pointSel = points_history[i];
@@ -1114,7 +1127,6 @@ int main(int argc, char** argv)
                 }
                 t4 = omp_get_wtime();
                 ikdtree.Add_Points(feats_down_updated->points);
-                std::cout<< "Finished Add Points"<<std::endl;
             #else
                 bool cube_updated[laserCloudNum] = {0};
                 for (int i = 0; i < feats_down_size; i++)
