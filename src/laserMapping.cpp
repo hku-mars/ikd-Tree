@@ -124,7 +124,7 @@ PointCloudXYZI::Ptr featsArray[laserCloudNum];
 bool                _last_inFOV[laserCloudNum];
 bool                cube_updated[laserCloudNum];
 int laserCloudValidInd[laserCloudNum];
-pcl::PointCloud<pcl::PointXYZRGB>::Ptr laserCloudFullResColor(new pcl::PointCloud<pcl::PointXYZRGB>());
+pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudFullResColor(new pcl::PointCloud<pcl::PointXYZI>());
 
 #ifdef USE_ikdtree
 KD_TREE ikdtree;
@@ -168,7 +168,7 @@ void pointBodyToWorld(const Eigen::Matrix<T, 3, 1> &pi, Eigen::Matrix<T, 3, 1> &
     po[2] = p_global(2);
 }
 
-void RGBpointBodyToWorld(PointType const * const pi, pcl::PointXYZRGB * const po)
+void RGBpointBodyToWorld(PointType const * const pi, pcl::PointXYZI * const po)
 {
     Eigen::Vector3d p_body(pi->x, pi->y, pi->z);
     Eigen::Vector3d p_global(state.rot_end * (p_body + Lidar_offset_to_IMU) + state.pos_end);
@@ -176,43 +176,43 @@ void RGBpointBodyToWorld(PointType const * const pi, pcl::PointXYZRGB * const po
     po->x = p_global(0);
     po->y = p_global(1);
     po->z = p_global(2);
-    //po->intensity = pi->intensity;
+    po->intensity = pi->intensity;
 
     float intensity = pi->intensity;
     intensity = intensity - std::floor(intensity);
 
     int reflection_map = intensity*10000;
 
-    //std::cout<<"DEBUG reflection_map "<<reflection_map<<std::endl;
+    // //std::cout<<"DEBUG reflection_map "<<reflection_map<<std::endl;
 
-    if (reflection_map < 30)
-    {
-        int green = (reflection_map * 255 / 30);
-        po->r = 0;
-        po->g = green & 0xff;
-        po->b = 0xff;
-    }
-    else if (reflection_map < 90)
-    {
-        int blue = (((90 - reflection_map) * 255) / 60);
-        po->r = 0x0;
-        po->g = 0xff;
-        po->b = blue & 0xff;
-    }
-    else if (reflection_map < 150)
-    {
-        int red = ((reflection_map-90) * 255 / 60);
-        po->r = red & 0xff;
-        po->g = 0xff;
-        po->b = 0x0;
-    }
-    else
-    {
-        int green = (((255-reflection_map) * 255) / (255-150));
-        po->r = 0xff;
-        po->g = green & 0xff;
-        po->b = 0;
-    }
+    // if (reflection_map < 30)
+    // {
+    //     int green = (reflection_map * 255 / 30);
+    //     po->r = 0;
+    //     po->g = green & 0xff;
+    //     po->b = 0xff;
+    // }
+    // else if (reflection_map < 90)
+    // {
+    //     int blue = (((90 - reflection_map) * 255) / 60);
+    //     po->r = 0x0;
+    //     po->g = 0xff;
+    //     po->b = blue & 0xff;
+    // }
+    // else if (reflection_map < 150)
+    // {
+    //     int red = ((reflection_map-90) * 255 / 60);
+    //     po->r = red & 0xff;
+    //     po->g = 0xff;
+    //     po->b = 0x0;
+    // }
+    // else
+    // {
+    //     int green = (((255-reflection_map) * 255) / (255-150));
+    //     po->r = 0xff;
+    //     po->g = green & 0xff;
+    //     po->b = 0;
+    // }
 }
 
 int cube_ind(const int &i, const int &j, const int &k)
@@ -1169,7 +1169,7 @@ int main(int argc, char** argv)
 
             int laserCloudFullResNum = laserCloudFullRes2->points.size();
     
-            pcl::PointXYZRGB temp_point;
+            pcl::PointXYZI temp_point;
             laserCloudFullResColor->clear();
             {
             for (int i = 0; i < laserCloudFullResNum; i++)
@@ -1188,7 +1188,7 @@ int main(int argc, char** argv)
             /******* Publish Effective points *******/
             {
             laserCloudFullResColor->clear();
-            pcl::PointXYZRGB temp_point;
+            pcl::PointXYZI temp_point;
             for (int i = 0; i < laserCloudSelNum; i++)
             {
                 RGBpointBodyToWorld(&laserCloudOri->points[i], &temp_point);
