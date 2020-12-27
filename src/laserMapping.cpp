@@ -598,18 +598,20 @@ bool sync_packages(MeasureGroup &meas)
         return false;
     }
 
-    /*** push imu data, and pop from buffer ***/
+    /*** push imu data, and pop from imu buffer ***/
     double imu_time = imu_buffer.front()->header.stamp.toSec();
     meas.imu.clear();
     while ((!imu_buffer.empty()) && (imu_time < lidar_end_time))
     {
         imu_time = imu_buffer.front()->header.stamp.toSec();
+        if(imu_time > lidar_end_time + 0.02) break;
         meas.imu.push_back(imu_buffer.front());
         imu_buffer.pop_front();
     }
 
     lidar_buffer.pop_front();
     lidar_pushed = false;
+    // if (meas.imu.empty()) return false;
     // std::cout<<"[IMU Sycned]: "<<imu_time<<" "<<lidar_end_time<<std::endl;
     return true;
 }
@@ -927,7 +929,7 @@ int main(int argc, char** argv)
                             //if(fabs(pd2) > 0.1) continue;
                             float s = 1 - 0.9 * fabs(pd2) / sqrt(sqrt(pointSel_tmpt.x * pointSel_tmpt.x + pointSel_tmpt.y * pointSel_tmpt.y + pointSel_tmpt.z * pointSel_tmpt.z));
 
-                            if ((s > 0.92))// && ((std::abs(pd2) - res_last[i]) < 3 * res_mean_last))
+                            if ((s > 0.85))// && ((std::abs(pd2) - res_last[i]) < 3 * res_mean_last))
                             {
                                 // if(std::abs(pd2) > 5 * res_mean_last)
                                 // {
@@ -958,7 +960,7 @@ int main(int argc, char** argv)
 
                     for (int i = 0; i < coeffSel_tmpt->points.size(); i++)
                     {
-                        if (point_selected_surf[i])
+                        if (point_selected_surf[i] && (res_last[i] <= 2.0))
                         {
                             laserCloudOri->push_back(feats_down->points[i]);
                             coeffSel->push_back(coeffSel_tmpt->points[i]);
@@ -1265,9 +1267,9 @@ int main(int argc, char** argv)
             s_plot2.push_back(t5 - t3);
             s_plot3.push_back(match_time);
             s_plot4.push_back(float(feats_down_size/10000.0));
-            s_plot5.push_back(float(laserCloudSelNum/10000.0));
+            s_plot5.push_back(t5 - t0);
 
-            std::cout<<"[ mapping ]: time: copy map "<<copy_time<<" readd: "<<readd_time<<" match "<<match_time<<" solve "<<solve_time<<"acquire: "<<t4-t3<<" map incre "<<t5-t4<<" total "<<t5 - t0<<std::endl;
+            std::cout<<"[ mapping ]: time: copy map "<<copy_time<<" readd: "<<readd_time<<" match "<<match_time<<" solve "<<solve_time<<"acquire: "<<t4-t3<<" map incre "<<t5-t4<<" total "<<aver_time_consu<<std::endl;
             // fout_out << std::setw(10) << Measures.lidar_beg_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
             // <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<< std::endl;
             fout_out<<std::setw(8)<<laserCloudSelNum<<" "<<Measures.lidar_beg_time<<" "<<t2-t0<<" "<<match_time<<" "<<t5-t3<<" "<<t5-t0<<std::endl;
@@ -1295,11 +1297,11 @@ int main(int argc, char** argv)
     #ifndef DEPLOY
     if (!T1.empty())
     {
-        plt::named_plot("total time",T1,s_plot);
+        plt::named_plot("average time",T1,s_plot);
         plt::named_plot("add new frame",T1,s_plot2);
         plt::named_plot("search and pca",T1,s_plot3);
         plt::named_plot("newpoints number",T1,s_plot4);
-        plt::named_plot("effective number",T1,s_plot5);
+        plt::named_plot("total time",T1,s_plot5);
         // plt::named_plot("readd",T2,s_plot6);
         plt::legend();
         plt::show();

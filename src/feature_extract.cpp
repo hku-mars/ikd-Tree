@@ -838,7 +838,6 @@ void give_feature(pcl::PointCloud<PointType> &pl, vector<orgtype> &types, pcl::P
       last_surface = -1;
     }
   }
-
 }
 
 void pub_func(pcl::PointCloud<PointType> &pl, ros::Publisher pub, const ros::Time &ct)

@@ -25,12 +25,12 @@
 
   <node pkg="fast_lio" type="loam_laserMapping" name="laserMapping" output="screen">
   <param name="map_file_path" type="string" value=" " />
-  <param name="max_iteration" type="int" value="2" />
+  <param name="max_iteration" type="int" value="10" />
   <param name="dense_map_enable" type="bool" value="true" />
   <param name="fov_degree" type="double" value="70" />
   <param name="filter_size_corner" type="double" value="0.5" />
-  <param name="filter_size_surf" type="double" value="0.5" />
-  <param name="filter_size_map" type="double" value="0.5" />
+  <param name="filter_size_surf" type="double" value="0.4" />
+  <param name="filter_size_map" type="double" value="0.4" />
   <param name="cube_side_length" type="double" value="30" />
   </node>
 
