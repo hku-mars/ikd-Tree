@@ -532,7 +532,7 @@ void lasermap_fov_segment()
     // s_plot4.push_back(omp_get_wtime() - t_begin); t_begin = omp_get_wtime();
     if(cub_needad.size() > 0)               ikdtree.Add_Point_Boxes(cub_needad); 
     // s_plot5.push_back(omp_get_wtime() - t_begin); t_begin = omp_get_wtime();
-    if(cube_points_add->points.size() > 0)  ikdtree.Add_Points(cube_points_add->points, false);
+    if(cube_points_add->points.size() > 0)  ikdtree.Add_Points(cube_points_add->points, true);
 #endif
     s_plot6.push_back(omp_get_wtime() - t_begin);
     readd_time = omp_get_wtime() - t_begin - copy_time;
