@@ -265,12 +265,13 @@ void KD_TREE::Nearest_Search(PointType point, int k_nearest, PointVector& Neares
     return;
 }
 
-void KD_TREE::Add_Points(PointVector & PointToAdd){
+void KD_TREE::Add_Points(PointVector & PointToAdd, bool downsample_on){
     BoxPointType Box_of_Point;
     PointType downsample_result, mid_point;
+    bool downsample_switch = downsample_on && DOWNSAMPLE_SWITCH;
     float min_dist, tmp_dist;
     for (int i=0; i<PointToAdd.size();i++){
-        if (DOWNSAMPLE_SWITCH){
+        if (downsample_switch){
             Box_of_Point.vertex_min[0] = floor(PointToAdd[i].x/downsample_size)*downsample_size;
             Box_of_Point.vertex_max[0] = Box_of_Point.vertex_min[0]+downsample_size;
             Box_of_Point.vertex_min[1] = floor(PointToAdd[i].y/downsample_size)*downsample_size;
@@ -315,9 +316,7 @@ void KD_TREE::Add_Points(PointVector & PointToAdd){
             if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){
                 Add_by_point(&Root_Node, PointToAdd[i], true);     
             } else {
-                Operation_Logger_Type  operation_delete, operation;
-                operation_delete.boxpoint = Box_of_Point;
-                operation_delete.op = DOWNSAMPLE_DELETE;
+                Operation_Logger_Type operation;
                 operation.point = PointToAdd[i];
                 operation.op = ADD_POINT;                
                 pthread_mutex_lock(&working_flag_mutex);
