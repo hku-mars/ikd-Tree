@@ -530,7 +530,7 @@ void lasermap_fov_segment()
     // s_plot4.push_back(omp_get_wtime() - t_begin); t_begin = omp_get_wtime();
     if(cub_needad.size() > 0)               ikdtree.Add_Point_Boxes(cub_needad); 
     // s_plot5.push_back(omp_get_wtime() - t_begin); t_begin = omp_get_wtime();
-    if(cube_points_add->points.size() > 0)  ikdtree.Add_Points(cube_points_add->points);
+    if(cube_points_add->points.size() > 0)  ikdtree.Add_Points(cube_points_add->points, false);
 #endif
     s_plot6.push_back(omp_get_wtime() - t_begin);
     readd_time = omp_get_wtime() - t_begin - copy_time;
@@ -1128,7 +1128,7 @@ int main(int argc, char** argv)
                     pointBodyToWorld(&(feats_down->points[i]), &(feats_down_updated->points[i]));
                 }
                 t4 = omp_get_wtime();
-                ikdtree.Add_Points(feats_down_updated->points);
+                ikdtree.Add_Points(feats_down_updated->points, true);
             #else
                 bool cube_updated[laserCloudNum] = {0};
                 for (int i = 0; i < feats_down_size; i++)
@@ -1297,11 +1297,11 @@ int main(int argc, char** argv)
     #ifndef DEPLOY
     if (!T1.empty())
     {
-        plt::named_plot("average time",T1,s_plot);
-        plt::named_plot("add new frame",T1,s_plot2);
-        plt::named_plot("search and pca",T1,s_plot3);
-        plt::named_plot("newpoints number",T1,s_plot4);
+        // plt::named_plot("add new frame",T1,s_plot2);
+        // plt::named_plot("search and pca",T1,s_plot3);
+        // plt::named_plot("newpoints number",T1,s_plot4);
         plt::named_plot("total time",T1,s_plot5);
+        plt::named_plot("average time",T1,s_plot);
         // plt::named_plot("readd",T2,s_plot6);
         plt::legend();
         plt::show();
