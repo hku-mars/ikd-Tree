@@ -83,7 +83,7 @@ target_link_libraries(loam_laserMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${O
 target_include_directories(loam_laserMapping PRIVATE ${PYTHON_INCLUDE_DIRS})
 # target_compile_definitions(loam_laserMapping PRIVATE ROOT_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 
-# add_executable(kd_tree_test include/kd_tree/kd_tree.cpp src/kd_tree_test.cpp)
-# target_link_libraries(kd_tree_test ${PCL_LIBRARIES})
+add_executable(kd_tree_test include/kd_tree/kd_tree.cpp src/kd_tree_test.cpp)
+target_link_libraries(kd_tree_test ${PCL_LIBRARIES})
 
 

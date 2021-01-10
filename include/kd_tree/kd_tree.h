@@ -8,11 +8,11 @@
 #include <chrono>
 #include <time.h>
 
-#define EPS 1e-6
-#define Minimal_Unbalanced_Tree_Size 10
+#define EPSS 1e-6
+#define Minimal_Unbalanced_Tree_Size 5
 #define Multi_Thread_Rebuild_Minimal_Percent 0.2
-#define Multi_Thread_Rebuild_Point_Num 2500
-#define DOWNSAMPLE_SWITCH true
+#define Multi_Thread_Rebuild_Point_Num 500
+#define DOWNSAMPLE_SWITCH false
 
 using namespace std;
 
@@ -90,7 +90,7 @@ private:
     void stop_thread();
     void run_operation(KD_TREE_NODE ** root, Operation_Logger_Type operation);
     // KD Tree Functions and augmented variables
-    int Treesize_tmp = 0;
+    int Treesize_tmp = 0, Validnum_tmp = 0;
     float delete_criterion_param = 0.5f;
     float balance_criterion_param = 0.7f;
     float downsample_size = 0.2f;   
@@ -120,6 +120,7 @@ private:
     static bool point_cmp_x(PointType a, PointType b); 
     static bool point_cmp_y(PointType a, PointType b); 
     static bool point_cmp_z(PointType a, PointType b); 
+    void print_treenode(KD_TREE_NODE * root, int index, FILE *fp, float x_min, float x_max, float y_min, float y_max, float z_min, float z_max);
 
 public:
     KD_TREE(float delete_param = 0.5, float balance_param = 0.6 , float box_length = 0.2);
@@ -129,6 +130,7 @@ public:
     void set_downsample_param(float box_length);
     void InitializeKDTree(float delete_param = 0.5, float balance_param = 0.7, float box_length = 0.2); 
     int size();
+    int validnum();
     void Build(PointVector point_cloud);
     void Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> & Point_Distance);
     void Add_Points(PointVector & PointToAdd, bool downsample_on);
@@ -137,6 +139,7 @@ public:
     void Delete_Point_Boxes(vector<BoxPointType> & BoxPoints);
     void flatten(KD_TREE_NODE * root, PointVector &Storage);
     void acquire_removed_points(PointVector & removed_points);
+    void print_tree(int index, FILE *fp, float x_min, float x_max, float y_min, float y_max, float z_min, float z_max);
     PointVector PCL_Storage;     
     KD_TREE_NODE * Root_Node = nullptr;  
     vector<float> add_rec,delete_rec;

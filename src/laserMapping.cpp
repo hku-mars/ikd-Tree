@@ -799,8 +799,8 @@ int main(int argc, char** argv)
 
             if (featsFromMapNum >= 5)
             {
-                t1 = omp_get_wtime();
-            
+                t1 = omp_get_wtime();      
+                      
             #ifdef USE_ikdtree
                 // PointVector ().swap(ikdtree.PCL_Storage);
                 // ikdtree.flatten(ikdtree.Root_Node, ikdtree.PCL_Storage);
