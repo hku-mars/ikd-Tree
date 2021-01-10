@@ -107,6 +107,8 @@ double last_timestamp_lidar = -1;
 double last_timestamp_imu   = -1;
 double HALF_FOV_COS = 0.0;
 double res_mean_last = 0.05;
+double total_distance = 0.0;
+auto   position_last  = Zero3d;
 double copy_time, readd_time;
 
 std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer;
@@ -530,7 +532,7 @@ void lasermap_fov_segment()
     // s_plot4.push_back(omp_get_wtime() - t_begin); t_begin = omp_get_wtime();
     if(cub_needad.size() > 0)               ikdtree.Add_Point_Boxes(cub_needad); 
     // s_plot5.push_back(omp_get_wtime() - t_begin); t_begin = omp_get_wtime();
-    if(cube_points_add->points.size() > 0)  ikdtree.Add_Points(cube_points_add->points, false);
+    if(cube_points_add->points.size() > 0)  ikdtree.Add_Points(cube_points_add->points, true);
 #endif
     s_plot6.push_back(omp_get_wtime() - t_begin);
     readd_time = omp_get_wtime() - t_begin - copy_time;
@@ -863,6 +865,8 @@ int main(int argc, char** argv)
 
                         if (point_selected_surf[i] == false) continue;
 
+                        // match_time += omp_get_wtime() - match_start;
+
                         double pca_start = omp_get_wtime();
 
                         /// PCA (using minimum square method)
@@ -1080,6 +1084,10 @@ int main(int argc, char** argv)
                             /*** Covariance Update ***/
                             G.block<DIM_OF_STATES,6>(0,0) = K * Hsub;
                             state.cov = (I_STATE - G) * state.cov;
+                            total_distance += (state.pos_end - position_last).norm();
+                            position_last = state.pos_end;
+                            
+                            std::cout<<"position: "<<state.pos_end.transpose()<<" total distance: "<<total_distance<<std::endl;
                         }
                         solve_time += omp_get_wtime() - solve_start;
                         break;
@@ -1097,7 +1105,7 @@ int main(int argc, char** argv)
                 ikdtree.acquire_removed_points(points_history);
                 
                 memset(cube_updated, 0, sizeof(cube_updated));
-                // std::cout<<"acquire points size: "<<points_history.size()<<std::endl;
+                
                 for (int i = 0; i < points_history.size(); i++)
                 {
                     PointType &pointSel = points_history[i];
@@ -1116,7 +1124,7 @@ int main(int argc, char** argv)
                     {
                         int cubeInd = cubeI + laserCloudWidth * cubeJ + laserCloudWidth * laserCloudHeight * cubeK;
                         featsArray[cubeInd]->push_back(pointSel);
-                        // std::cout<<"acquire points: "<<pointSel.x<<" "<<pointSel.y<<" "<<pointSel.z<<std::endl;
+                        
                     }
                 }
 
