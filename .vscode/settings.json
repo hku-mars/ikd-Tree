@@ -87,5 +87,10 @@
         "normal",
         "point",
         "xyzi"
+    ],
+    "cSpell.ignoreWords": [
+        "cwise",
+        "maxn",
+        "product"
     ]
 }

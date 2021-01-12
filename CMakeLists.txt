@@ -78,7 +78,7 @@ catkin_package(
 add_executable(loam_feat_extract src/feature_extract.cpp)
 target_link_libraries(loam_feat_extract ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
-add_executable(loam_laserMapping src/laserMapping.cpp include/kd_tree/kd_tree.cpp)
+add_executable(loam_laserMapping src/laserMapping.cpp include/kd_tree/kd_tree.cpp include/FOV_Checker/FOV_Checker.cpp)
 target_link_libraries(loam_laserMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS} ${PYTHON_LIBRARIES})
 target_include_directories(loam_laserMapping PRIVATE ${PYTHON_INCLUDE_DIRS})
 # target_compile_definitions(loam_laserMapping PRIVATE ROOT_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
