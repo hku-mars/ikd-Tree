@@ -1,7 +1,9 @@
 #include "FOV_Checker.h"
 
 FOV_Checker::FOV_Checker(){
-    
+    // fp = fopen("/home/ecstasy/catkin_ws/fov_data.csv","w");
+    // fprintf(fp,"cur_pose_x,cur_pose_y,cur_pose_z,axis_x,axis_y,axis_z,theta,depth\n");
+    // fclose(fp);
 }
 
 FOV_Checker::~FOV_Checker(){
@@ -12,8 +14,28 @@ void FOV_Checker::Set_Env(BoxPointType env_param){
     env = env_param;
 }
 
-void FOV_Checker::check_fov(Eigen::Vector3d cur_pose, Eigen::Vector3d axis, double theta, double depth, double box_length, vector<BoxPointType> &boxes){
+void FOV_Checker::Set_BoxLength(double box_len_param){
+    box_length = box_len_param;
+}
+
+void round_v3d(Eigen::Vector3d &vec, int decimal){
+    double tmp;
+    int t;
+    for (int i = 0; i < 3; i++){
+        t = pow(10,decimal);
+        tmp = round(vec(i)*t);
+        vec(i) = tmp/t;
+    }
+    return;
+}
+
+void FOV_Checker::check_fov(Eigen::Vector3d cur_pose, Eigen::Vector3d axis, double theta, double depth, vector<BoxPointType> &boxes){
+    round_v3d(cur_pose,4);
+    round_v3d(axis,3);
     axis = axis/axis.norm();
+    // fp = fopen("/home/ecstasy/catkin_ws/fov_data.csv","a");
+    // fprintf(fp,"%f,%f,%f,%f,%f,%f,%0.4f,%0.1f,",cur_pose(0),cur_pose(1),cur_pose(2),axis(0),axis(1),axis(2),theta,depth);
+    // fclose(fp);
     // cout << "cur_pose: " << cur_pose.transpose() << endl;
     // cout<< "axis: " << axis.transpose() << endl;
     // cout<< "theta: " << theta << " depth: " << depth << endl;
@@ -104,7 +126,7 @@ void FOV_Checker::check_fov(Eigen::Vector3d cur_pose, Eigen::Vector3d axis, doub
             start_i = 0;
             break;
     }
-    for (i=start_i-1; i<=maxn; i++){
+    for (i=start_i; i<=maxn; i++){
         center_point = cur_pose + (abs(gap) + (i-1) * box_length)/cos(min_angle) * axis;
         if (index == 1 || index == 4){
             start_point = Eigen::Vector3d(center_point(0),floor(center_point(1)/box_length + eps_value)*box_length,floor(center_point(2)/box_length + eps_value)*box_length);           
@@ -130,12 +152,14 @@ void FOV_Checker::check_fov(Eigen::Vector3d cur_pose, Eigen::Vector3d axis, doub
                 plane_u_max = env.vertex_max[1];                
             }
         }     
-        flag = false;        
+        flag = false;    
         for (j = 1; j <= max_vN; j++){
             k = max_ulogN;
             u_min = 0;
             box_p_min = start_point.cwiseProduct(plane_w + plane_v) + plane_u * plane_u_min + plane_v * box_length * (j-1);  
             box_p_max = plane_u * plane_u_max + start_point.cwiseProduct(plane_w + plane_v) + plane_v * box_length * j +  plane_w * box_length;    
+            //printf("---- UPSIDE (%0.3f,%0.3f,%0.3f),(%0.3f,%0.3f,%0.3f)\n",box_p_min[0],box_p_min[1],box_p_min[2],box_p_max[0],box_p_max[1],box_p_max[2]);
+
             while (k>=0){
                 box_p = box_p_min + plane_u * box_length * (u_min + pow(2,k)) + plane_v * box_length + plane_w * box_length;
                 box.vertex_min[0] = box_p_min(0);
@@ -163,6 +187,7 @@ void FOV_Checker::check_fov(Eigen::Vector3d cur_pose, Eigen::Vector3d axis, doub
             }           
             u_max = max(0, max_uN - u_max - 1);           
             box_found = false;
+            //printf("---- u_min -> u_max: %d->%d\n",u_min,u_max);            
             for (k = u_min; k <= u_max; k++){
                 box_p = box_p_min  + plane_u * box_length * k;
                 box.vertex_min[0] = box_p(0);
@@ -172,6 +197,7 @@ void FOV_Checker::check_fov(Eigen::Vector3d cur_pose, Eigen::Vector3d axis, doub
                 box.vertex_max[1] = box_p(1) + box_length; 
                 box.vertex_max[2] = box_p(2) + box_length;
                 if (check_box_in_env(box)){
+                    //printf("---- FOUND: (%0.3f,%0.3f,%0.3f),(%0.3f,%0.3f,%0.3f)\n",box.vertex_min[0],box.vertex_min[1],box.vertex_min[2],box.vertex_max[0],box.vertex_max[1],box.vertex_max[2]);
                     box_found = true;
                     boxes.push_back(box); 
                 }
@@ -179,7 +205,7 @@ void FOV_Checker::check_fov(Eigen::Vector3d cur_pose, Eigen::Vector3d axis, doub
             if (box_found) { 
                 flag = true; 
             } else {
-                if (i>1) break;
+                if (j>1) break;
             }
         }
         for (j = 1; j <= max_vN; j++){
@@ -187,6 +213,8 @@ void FOV_Checker::check_fov(Eigen::Vector3d cur_pose, Eigen::Vector3d axis, doub
             u_min = 0;
             box_p_min = start_point.cwiseProduct(plane_w + plane_v) + plane_u * plane_u_min - plane_v * box_length * j;  
             box_p_max = plane_u * plane_u_max + start_point.cwiseProduct(plane_w + plane_v) - plane_v * box_length * (j-1) +  plane_w * box_length;  
+            //printf("---- DOWNSIDE (%0.3f,%0.3f,%0.3f),(%0.3f,%0.3f,%0.3f)\n",box_p_min[0],box_p_min[1],box_p_min[2],box_p_max[0],box_p_max[1],box_p_max[2]);
+
             while (k>=0){   
                 box_p = box_p_min + plane_u * box_length * (u_min + pow(2,k)) + plane_v * box_length + plane_w * box_length;
                 box.vertex_min[0] = box_p_min(0);
@@ -208,10 +236,15 @@ void FOV_Checker::check_fov(Eigen::Vector3d cur_pose, Eigen::Vector3d axis, doub
                 box.vertex_max[0] = box_p_max(0);
                 box.vertex_max[1] = box_p_max(1); 
                 box.vertex_max[2] = box_p_max(2); 
-                if (!check_box(cur_pose, axis, theta, depth, box)) u_max = u_max + pow(2,k);
+                if (!check_box(cur_pose, axis, theta, depth, box)) {
+                    u_max = u_max + pow(2,k);
+                    // printf("-------- Not Included: (%0.3f,%0.3f,%0.3f),(%0.3f,%0.3f,%0.3f)\n",box.vertex_min[0],box.vertex_min[1],box.vertex_min[2],box.vertex_max[0],box.vertex_max[1],box.vertex_max[2]);
+                }
+
                 k = k-1;
             }
             u_max = max(0, max_uN - u_max - 1);
+            //printf("---- u_min -> u_max: %d->%d\n",u_min,u_max);
             box_found = 0;
             for (k = u_min; k <= u_max; k++){
                 box_p = box_p_min  + plane_u * box_length * k;
@@ -222,6 +255,7 @@ void FOV_Checker::check_fov(Eigen::Vector3d cur_pose, Eigen::Vector3d axis, doub
                 box.vertex_max[1] = box_p(1) + box_length; 
                 box.vertex_max[2] = box_p(2) + box_length;
                 if (check_box_in_env(box)){
+                    //printf("---- FOUND: (%0.3f,%0.3f,%0.3f),(%0.3f,%0.3f,%0.3f)\n",box.vertex_min[0],box.vertex_min[1],box.vertex_min[2],box.vertex_max[0],box.vertex_max[1],box.vertex_max[2]);
                     box_found = 1;
                     boxes.push_back(box); 
                 }
@@ -229,7 +263,7 @@ void FOV_Checker::check_fov(Eigen::Vector3d cur_pose, Eigen::Vector3d axis, doub
             if (box_found) { 
                 flag = true; 
             } else {
-                if (i>1) break;
+                if (j>1) break;
             }
         }        
         if (!flag && i>0) break;
@@ -246,7 +280,16 @@ bool FOV_Checker::check_box(Eigen::Vector3d cur_pose, Eigen::Vector3d axis, doub
     vertex[4] = Eigen::Vector3d(box.vertex_max[0], box.vertex_min[1], box.vertex_min[2]);
     vertex[5] = Eigen::Vector3d(box.vertex_max[0], box.vertex_min[1], box.vertex_max[2]);
     vertex[6] = Eigen::Vector3d(box.vertex_max[0], box.vertex_max[1], box.vertex_min[2]);
-    vertex[7] = Eigen::Vector3d(box.vertex_max[0], box.vertex_max[1], box.vertex_max[2]);      
+    vertex[7] = Eigen::Vector3d(box.vertex_max[0], box.vertex_max[1], box.vertex_max[2]);
+    for (int i = 0; i < 8; i++){
+        if (check_point(cur_pose, axis, theta, depth, vertex[i])){
+            return true;
+        } 
+    }
+    Eigen::Vector3d center_point = (vertex[7]+vertex[0])/2.0;
+    if (check_point(cur_pose, axis, theta, depth, center_point)){
+        return true;
+    }
     PlaneType plane[6];
     plane[0].p[0] = vertex[0]; 
     plane[0].p[1] = vertex[2]; 
@@ -325,6 +368,9 @@ bool FOV_Checker::check_line(Eigen::Vector3d cur_pose, Eigen::Vector3d axis, dou
     vec_2 = line_p + line_vec - cur_pose;
     dot_1 = vec_1.dot(axis);
     dot_2 = vec_2.dot(axis);
+    //printf("xl yl zl: %0.4f, %0.4f, %0.4f\n", xl, yl, zl);
+    //printf("xn yn zn: %0.4f, %0.4f, %0.4f\n", xn, yn, zn);
+    //printf("dot_1, dot_2, %0.4f, %0.4f\n",dot_1, dot_2);
     if ((dot_1<0 && dot_2<0) || (dot_1>depth && dot_2>depth)){
         s = false;
         return s;
@@ -334,11 +380,19 @@ bool FOV_Checker::check_line(Eigen::Vector3d cur_pose, Eigen::Vector3d axis, dou
     pl = p(0)*xl+p(1)*yl+p(2)*zl;
     l2 = xl*xl+yl*yl+zl*zl;
     p2 = p.norm()*p.norm();
+    //printf("ln: %0.4f\n",ln);
+    //printf("pn:%0.4f\n",pn);
+    //printf("pl:%0.4f\n",pl);
+    //printf("l2:%0.4f\n",l2);
+    //printf("p2:%0.4f\n",p2);
+    //printf("theta, cos(theta):%0.4f %0.4f\n",theta,cos(theta));              
     A = ln * ln - l2 * cos(theta) * cos(theta);
     B = 2 * pn * ln - 2 * cos(theta) * cos(theta)*pl;
     C = pn * pn - p2 * cos(theta) * cos(theta);
+    //printf("A:%0.4f, B:%0.4f, C:%0.4f\n", A,B,C);
     if (!(fabs(A)<=eps_value)){
         delta = B*B - 4*A*C;
+        //printf("delta: %0.4f\n",delta);
         if (delta <= eps_value){
             if (A < -eps_value){
                 s = false;
@@ -352,11 +406,15 @@ bool FOV_Checker::check_line(Eigen::Vector3d cur_pose, Eigen::Vector3d axis, dou
             double sqrt_delta = sqrt(delta);
             t1 = (-B - sqrt_delta)/(2*A);
             t2 = (-B + sqrt_delta)/(2*A);
+            if (t1>t2) swap(t1,t2);
+            //printf("t1,t2: %0.4f,%0.4f\n",t1,t2); 
+            // printf("%d\n",check_point(cur_pose, axis, theta, depth, line_p + line_vec * t1));       
             if ((t1>=-eps_value && t1<=1+eps_value) && check_point(cur_pose, axis, theta, depth, line_p + line_vec * t1)){
                 s = true;
                 return s;
             }
-            if ((t2>=-eps_value && t2<=eps_value) && check_point(cur_pose, axis, theta, depth, line_p + line_vec * t2)){
+            // printf("%d\n",check_point(cur_pose, axis, theta, depth, line_p + line_vec * t2));
+            if ((t2>=-eps_value && t2<=1+eps_value) && check_point(cur_pose, axis, theta, depth, line_p + line_vec * t2)){
                 s = true;
                 return s;
             }
@@ -380,6 +438,7 @@ bool FOV_Checker::check_line(Eigen::Vector3d cur_pose, Eigen::Vector3d axis, dou
             return s;
         }
     }
+    return false;
 }
 
 bool FOV_Checker::check_point(Eigen::Vector3d cur_pose, Eigen::Vector3d axis, double theta, double depth, Eigen::Vector3d point){
@@ -387,12 +446,16 @@ bool FOV_Checker::check_point(Eigen::Vector3d cur_pose, Eigen::Vector3d axis, do
     double proj_len;
     bool s;
     vec = point-cur_pose;
+    if (vec.transpose()*vec < 0.4 * box_length * box_length){
+        return true;
+    }
     proj_len = vec.dot(axis);
     if (proj_len > depth){
         s = false;
         return s;
     }
-    if (fabs(vec.norm()) <= 1e-4 || acos(proj_len/vec.norm()) <= theta)
+    //printf("acos: %0.4f\n",acos(proj_len/vec.norm()));
+    if (fabs(vec.norm()) <= 1e-4 || acos(proj_len/vec.norm()) <= theta + 0.0175)
         s = true;
     else
         s = false;
@@ -406,3 +469,4 @@ bool FOV_Checker::check_box_in_env(BoxPointType box){
         return false;
     }
 }
+

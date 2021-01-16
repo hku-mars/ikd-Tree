@@ -74,6 +74,8 @@ namespace plt = matplotlibcpp;
 #define LASER_POINT_COV     (0.0015)
 #define NUM_MATCH_POINTS    (5)
 
+#define MAXN 360000
+
 std::string root_dir = ROOT_DIR;
 
 int iterCount = 0;
@@ -91,8 +93,9 @@ const int laserCloudHeight = 48;
 const int laserCloudDepth  = 48;
 const int laserCloudNum = laserCloudWidth * laserCloudHeight * laserCloudDepth;
 
-std::vector<double> T1, T2, s_plot, s_plot2, s_plot3, s_plot4, s_plot5, s_plot6;
-
+// std::vector<double> T1, T2, s_plot, s_plot2, s_plot3, s_plot4, s_plot5, s_plot6;
+double T1[MAXN], T2[MAXN], s_plot[MAXN], s_plot2[MAXN], s_plot3[MAXN], s_plot4[MAXN], s_plot5[MAXN], s_plot6[MAXN];
+int time_log_counter = 0;
 /// IMU relative variables
 std::mutex mtx_buffer;
 std::condition_variable sig_buffer;
@@ -111,7 +114,7 @@ double FOV_DEG = 0.0;
 double res_mean_last = 0.05;
 double total_distance = 0.0;
 auto   position_last  = Zero3d;
-double copy_time, readd_time;
+double copy_time, readd_time, fov_check_time, readd_box_time, delete_box_time;
 
 std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer;
 std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer;
@@ -282,7 +285,7 @@ void lasermap_fov_segment()
     int  cube_index = 0;
     cub_needrm.clear();
     cub_needad.clear();
-    T2.push_back(Measures.lidar_beg_time);
+    T2[time_log_counter] = Measures.lidar_beg_time;
     double t_begin = omp_get_wtime();
 
     std::cout<<"centerCubeIJK: "<<centerCubeI<<" "<<centerCubeJ<<" "<<centerCubeK<<std::endl;
@@ -422,39 +425,55 @@ void lasermap_fov_segment()
                 laserCloudCubeSurfPointer->clear();
             }
         }
-
         centerCubeK--;
         laserCloudCenDepth--;
     }
 
     cube_points_add->clear();
     featsFromMap->clear();
-    memset(now_inFOV, 0, sizeof(now_inFOV));    
-
+    memset(now_inFOV, 0, sizeof(now_inFOV));  
+    copy_time = omp_get_wtime() - t_begin;      
+    double fov_check_begin = omp_get_wtime();
     // std::cout<<"centerCubeIJK: "<<centerCubeI<<" "<<centerCubeJ<<" "<<centerCubeK<<std::endl;
     // std::cout<<"laserCloudCen: "<<laserCloudCenWidth<<" "<<laserCloudCenHeight<<" "<<laserCloudCenDepth<<std::endl;
     #ifdef USE_FOV_Checker
-        FOV_depth = 50;
-        theta = ceil(FOV_DEG/2.0 + 1)/180 * PI_M;
-        FOV_axis = state.rot_end.transpose() * Eigen::Vector3d(1,0,0);
-        FOV_pos = state.pos_end;
-        printf("---------Start Check\n");
-        fov_checker.check_fov(FOV_pos, FOV_axis, theta, FOV_depth, cube_len, boxes);
-        printf("---------Finish Check %d\n",int(boxes.size()));        
+        BoxPointType env_box;
+        env_box.vertex_min[0] = max(centerCubeI - FOV_RANGE, 0) * cube_len - laserCloudWidth * cube_len / 2.0;
+        env_box.vertex_max[0] = min(centerCubeI + FOV_RANGE,laserCloudWidth) * cube_len - laserCloudWidth * cube_len / 2.0;
+        env_box.vertex_min[1] = max(centerCubeJ - FOV_RANGE,0) * cube_len - laserCloudHeight * cube_len / 2.0;
+        env_box.vertex_max[1] = min(centerCubeJ + FOV_RANGE,laserCloudHeight) * cube_len - laserCloudHeight * cube_len / 2.0;
+        env_box.vertex_min[2] = max(centerCubeK - FOV_RANGE, 0) * cube_len - laserCloudDepth * cube_len / 2.0;
+        env_box.vertex_max[2] = min(centerCubeK + FOV_RANGE, laserCloudDepth) * cube_len - laserCloudDepth * cube_len /2.0;
+        fov_checker.Set_Env(env_box);
+        fov_checker.Set_BoxLength(cube_len);
+        FOV_depth = FOV_RANGE * cube_len;
+        theta = ceil(FOV_DEG/2.0)/180 * PI_M;
+        Eigen::Vector3d tmp = state.rot_end.transpose() * Eigen::Vector3d(1,0,0);
+        FOV_axis(0) = tmp(0);
+        FOV_axis(1) = -tmp(1);
+        FOV_axis(2) = -tmp(2);
+        FOV_pos = state.pos_end;        
+        fov_checker.check_fov(FOV_pos, FOV_axis, theta, FOV_depth, boxes);
+        // FILE *fp;
+        // fp = fopen("/home/ecstasy/catkin_ws/fov_data.csv","a");
+        // fprintf(fp,"%d,",int(boxes.size()));    
+        // fprintf(fp,"%f,%f,%f,",tmp(0), tmp(1), tmp(2));
         int cube_i, cube_j, cube_k;
         for (int i = 0; i < boxes.size(); i++){
             cube_i = floor((boxes[i].vertex_min[0] + eps_value + laserCloudWidth * cube_len / 2.0) / cube_len);
             cube_j = floor((boxes[i].vertex_min[1] + eps_value + laserCloudHeight * cube_len / 2.0)/ cube_len);
             cube_k = floor((boxes[i].vertex_min[2] + eps_value + laserCloudDepth * cube_len / 2.0) / cube_len);
             cube_index = cube_ind(cube_i, cube_j, cube_k);
+            *cube_points_add += *featsArray[cube_index];
+            featsArray[cube_index]->clear();            
             now_inFOV[cube_index] = true;
-            laserCloudValidInd[laserCloudValidNum] = cube_index;
-            laserCloudValidNum++;
             if (!_last_inFOV[cube_index]) {
                 cub_needad.push_back(boxes[i]);
-                printf("Add boxes: (%d,%d,%d), (%0.3f,%0.3f%0.3f) (%0.3f,%0.3f,%0.3f)\n", cube_i,cube_j,cube_k, boxes[i].vertex_min[0],boxes[i].vertex_min[1],boxes[i].vertex_min[2],boxes[i].vertex_max[0],boxes[i].vertex_max[1],boxes[i].vertex_max[2]);
-            }
-        }
+                laserCloudValidInd[laserCloudValidNum] = cube_index;
+                laserCloudValidNum++;
+                _last_inFOV[cube_index] = true;
+           }
+        }       
         BoxPointType rm_box;
         for (int i = 0; i < laserCloudNum; i++){
             if (_last_inFOV[i] && !now_inFOV[i]){
@@ -468,10 +487,11 @@ void lasermap_fov_segment()
                 rm_box.vertex_min[2] = cube_k * cube_len - laserCloudDepth * cube_len / 2.0;
                 rm_box.vertex_max[2] = rm_box.vertex_min[2] + cube_len;
                 cub_needrm.push_back(rm_box);
-                printf("Delete boxes: (%d %d %d) (%0.3f,%0.3f%0.3f) (%0.3f,%0.3f,%0.3f)\n", cube_i, cube_j,cube_k, rm_box.vertex_min[0],rm_box.vertex_min[1],rm_box.vertex_min[2],rm_box.vertex_max[0],rm_box.vertex_max[1],rm_box.vertex_max[2]);
+                _last_inFOV[i] = false;
             }
         }
-        memcpy(_last_inFOV, now_inFOV, sizeof(now_inFOV));
+        // fprintf(fp,"\n");
+        // fclose(fp);
     #else
         for (int i = centerCubeI - FOV_RANGE; i <= centerCubeI + FOV_RANGE; i++) 
         {
@@ -576,17 +596,20 @@ void lasermap_fov_segment()
         }
         #endif
     #endif
-    copy_time = omp_get_wtime() - t_begin;
+    fov_check_time = omp_get_wtime()- fov_check_begin;    
 
+    double readd_begin = omp_get_wtime();
 #ifdef USE_ikdtree
     if(cub_needrm.size() > 0)               ikdtree.Delete_Point_Boxes(cub_needrm);
+    delete_box_time = omp_get_wtime() - readd_begin;
     // s_plot4.push_back(omp_get_wtime() - t_begin); t_begin = omp_get_wtime();
     if(cub_needad.size() > 0)               ikdtree.Add_Point_Boxes(cub_needad); 
+    readd_box_time = omp_get_wtime() - readd_begin - delete_box_time;
     // s_plot5.push_back(omp_get_wtime() - t_begin); t_begin = omp_get_wtime();
     if(cube_points_add->points.size() > 0)  ikdtree.Add_Points(cube_points_add->points, true);
 #endif
-    s_plot6.push_back(omp_get_wtime() - t_begin);
-    readd_time = omp_get_wtime() - t_begin - copy_time;
+    readd_time = omp_get_wtime()- readd_begin - delete_box_time - readd_box_time;
+    // s_plot6.push_back(omp_get_wtime() - t_begin);
 }
 
 void feat_points_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg) 
@@ -1331,14 +1354,15 @@ int main(int argc, char** argv)
             frame_num ++;
             aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t5 - t0) / frame_num;
             // aver_time_consu = aver_time_consu * 0.8 + (t5 - t0) * 0.2;
-            T1.push_back(Measures.lidar_beg_time);
-            s_plot.push_back(aver_time_consu);
-            s_plot2.push_back(t5 - t3);
-            s_plot3.push_back(match_time);
-            s_plot4.push_back(float(feats_down_size/10000.0));
-            s_plot5.push_back(t5 - t0);
-
-            std::cout<<"[ mapping ]: time: copy map "<<copy_time<<" readd: "<<readd_time<<" match "<<match_time<<" solve "<<solve_time<<"acquire: "<<t4-t3<<" map incre "<<t5-t4<<" total "<<aver_time_consu<<std::endl;
+            T1[time_log_counter] = Measures.lidar_beg_time;
+            s_plot[time_log_counter] = aver_time_consu;
+            s_plot2[time_log_counter] = delete_box_time;
+            s_plot3[time_log_counter] = fov_check_time;
+            s_plot4[time_log_counter] = readd_time;
+            s_plot5[time_log_counter] = t5 - t0;
+            s_plot6[time_log_counter] = readd_box_time;
+            time_log_counter ++;
+            std::cout<<"[ mapping ]: time: fov_check "<< fov_check_time <<" copy map "<<copy_time<<" readd: "<<readd_time<<" match "<<match_time<<" solve "<<solve_time<<"acquire: "<<t4-t3<<" map incre "<<t5-t4<<" total "<<aver_time_consu<<std::endl;
             // fout_out << std::setw(10) << Measures.lidar_beg_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
             // <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<< std::endl;
             fout_out<<std::setw(8)<<laserCloudSelNum<<" "<<Measures.lidar_beg_time<<" "<<t2-t0<<" "<<match_time<<" "<<t5-t3<<" "<<t5-t0<<std::endl;
@@ -1364,14 +1388,30 @@ int main(int argc, char** argv)
     // }
 
     #ifndef DEPLOY
-    if (!T1.empty())
-    {
-        // plt::named_plot("add new frame",T1,s_plot2);
-        // plt::named_plot("search and pca",T1,s_plot3);
-        // plt::named_plot("newpoints number",T1,s_plot4);
-        plt::named_plot("total time",T1,s_plot5);
-        plt::named_plot("average time",T1,s_plot);
-        // plt::named_plot("readd",T2,s_plot6);
+    std::vector<double> t, s_vec, s_vec2, s_vec3, s_vec4, s_vec5, s_vec6;    
+    FILE *fp;
+    fp = fopen("/home/ecstasy/catkin_ws/fast_lio_time_log.csv","w");
+    fprintf(fp,"time_stamp, average time, delete box time, fov check time, readd time, total time, readd box time\n");
+    for (int i = 0;i<time_log_counter; i++){
+        fprintf(fp,"%f,%f,%f,%f,%f,%f,%f\n",T1[i],s_plot[i],s_plot2[i],s_plot3[i],s_plot4[i],s_plot5[i],s_plot6[i]);
+        t.push_back(T1[i]);
+        s_vec.push_back(s_plot[i]);
+        s_vec2.push_back(s_plot2[i]);
+        s_vec3.push_back(s_plot3[i]);
+        s_vec4.push_back(s_plot4[i]);
+        s_vec5.push_back(s_plot5[i]);
+        s_vec6.push_back(s_plot6[i]);                        
+    }
+    fclose(fp);
+    if (!t.empty())
+    {               
+        plt::named_plot("copy time",t,s_vec2);
+        plt::named_plot("fov check time",t,s_vec3);
+        plt::named_plot("readd time",t,s_vec4);
+        // printf("Size 4 is %d\n", int(s_plot4.size()));
+        plt::named_plot("total time",t,s_vec5);
+        plt::named_plot("average time",t,s_vec);
+        plt::named_plot("copy + fov_check + readd",t,s_vec6);
         plt::legend();
         plt::show();
         plt::pause(0.5);
