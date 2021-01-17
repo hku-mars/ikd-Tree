@@ -1026,11 +1026,7 @@ void KD_TREE::delete_tree_nodes(KD_TREE_NODE ** root, delete_point_storage_set s
     case DELETE_POINTS_REC:
         if ((*root)->point_deleted && !(*root)->point_downsample_deleted) {
             Points_deleted.push_back((*root)->point);
-        }
-        // if (Rebuild_Ptr != nullptr && *root == *Rebuild_Ptr){
-        //     printf("\n\n\n--------------BIG ERROR!!!! \n");
-        //     printf("%d\n\n\n",(*Rebuild_Ptr)->TreeSize);
-        // }            
+        }       
         break;
     case MULTI_THREAD_REC:
         pthread_mutex_lock(&points_deleted_rebuild_mutex_lock);    

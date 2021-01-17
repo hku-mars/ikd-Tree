@@ -12,15 +12,15 @@
 #define X_MIN -5
 #define Y_MAX 5
 #define Y_MIN -5
-#define Z_MAX 10
-#define Z_MIN 0
+#define Z_MAX 5
+#define Z_MIN -5
 
-#define Point_Num 100
-#define New_Point_Num 10
+#define Point_Num 5000
+#define New_Point_Num 200
 #define Delete_Point_Num 0
 #define Nearest_Num 5
-#define Test_Time 20
-#define Search_Time 20
+#define Test_Time 1000
+#define Search_Time 200
 #define Box_Length 1.5
 #define Box_Num 4
 #define Delete_Box_Switch true
@@ -36,7 +36,6 @@ PointVector DeletePoints;
 PointVector removed_points;
 
 KD_TREE scapegoat_kd_tree(0.3,0.6,0.2);
-KD_TREE ori_kd_tree(0.3,0.5,0.2);
 
 float rand_float(float x_min, float x_max){
     float rand_ratio = rand()/(float)RAND_MAX;
@@ -234,7 +233,12 @@ int main(int argc, char** argv){
     while (counter < Test_Time){
         printf("Test %d:\n",counter+1);      
         // Incremental Operation
-        generate_increment_point_cloud(New_Point_Num);
+        if ((counter+1) % 100  == 0){
+            printf("Large scale add\n");
+            generate_increment_point_cloud(New_Point_Num * 10);
+        } else {
+            generate_increment_point_cloud(New_Point_Num);
+        }
         printf("Start add\n");
         // printf("New Points are\n");
         // print_point_vec(cloud_increment);
@@ -257,7 +261,7 @@ int main(int argc, char** argv){
         auto box_delete_duration = chrono::duration_cast<chrono::microseconds>(t2-t2).count();
         // delete_tmp_rebuild_counter = scapegoat_kd_tree.rebuild_counter;        
         // Box Decremental Operation
-        if (Delete_Box_Switch && (counter+1) % 50  == 0){ 
+        if (Delete_Box_Switch && (counter+1) % 50  == 0 && (counter+1) % 100 != 0){ 
             printf("Wrong answer with counter %d\n", wa_rec);               
             generate_box_decrement(Delete_Boxes, Box_Length, Box_Num);
             t1 = chrono::high_resolution_clock::now();
@@ -281,11 +285,9 @@ int main(int argc, char** argv){
         }
         total_duration += box_add_duration;               
         // Search Operation
-        printf("Original K-D Tree Reconstruction:\n");    
-        // ori_kd_tree.Build(PointVector ());  // Release Memory         
+        printf("Original K-D Tree Reconstruction:\n");          
         featsFromMap->points = point_cloud;   
         t1 = chrono::high_resolution_clock::now();
-        // ori_kd_tree.Build(point_cloud);
         kdtreeSurfFromMap->setInputCloud(featsFromMap);
         t2 = chrono::high_resolution_clock::now();
         auto ori_build_duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();        
@@ -301,7 +303,6 @@ int main(int argc, char** argv){
             t2 = chrono::high_resolution_clock::now();
             search_duration += chrono::duration_cast<chrono::microseconds>(t2-t1).count();
             t1 = chrono::high_resolution_clock::now();
-            // ori_kd_tree.Nearest_Search(target, Nearest_Num, search_result, PointDist);
             std::vector<int> tmptmp;
             kdtreeSurfFromMap->nearestKSearch(target, Nearest_Num, tmptmp, PointDist);
             t2 = chrono::high_resolution_clock::now();

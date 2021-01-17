@@ -115,6 +115,7 @@ double res_mean_last = 0.05;
 double total_distance = 0.0;
 auto   position_last  = Zero3d;
 double copy_time, readd_time, fov_check_time, readd_box_time, delete_box_time;
+double kdtree_incremental_time, kdtree_search_time;
 
 std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer;
 std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer;
@@ -464,32 +465,40 @@ void lasermap_fov_segment()
             cube_j = floor((boxes[i].vertex_min[1] + eps_value + laserCloudHeight * cube_len / 2.0)/ cube_len);
             cube_k = floor((boxes[i].vertex_min[2] + eps_value + laserCloudDepth * cube_len / 2.0) / cube_len);
             cube_index = cube_ind(cube_i, cube_j, cube_k);
-            *cube_points_add += *featsArray[cube_index];
-            featsArray[cube_index]->clear();            
-            now_inFOV[cube_index] = true;
-            if (!_last_inFOV[cube_index]) {
-                cub_needad.push_back(boxes[i]);
+            #ifdef USE_ikdtree
+                *cube_points_add += *featsArray[cube_index];
+                featsArray[cube_index]->clear();            
+                now_inFOV[cube_index] = true;
+                if (!_last_inFOV[cube_index]) {
+                    cub_needad.push_back(boxes[i]);
+                    laserCloudValidInd[laserCloudValidNum] = cube_index;
+                    laserCloudValidNum++;
+                    _last_inFOV[cube_index] = true;
+                }
+            #else
+                *featsFromMap += *featsArray[cube_index];
                 laserCloudValidInd[laserCloudValidNum] = cube_index;
                 laserCloudValidNum++;
-                _last_inFOV[cube_index] = true;
-           }
-        }       
-        BoxPointType rm_box;
-        for (int i = 0; i < laserCloudNum; i++){
-            if (_last_inFOV[i] && !now_inFOV[i]){
-                cube_i = i % laserCloudWidth;
-                cube_j = (i % (laserCloudWidth * laserCloudHeight))/laserCloudWidth;
-                cube_k = i / (laserCloudWidth * laserCloudHeight);
-                rm_box.vertex_min[0] = cube_i * cube_len - laserCloudWidth * cube_len / 2.0;
-                rm_box.vertex_max[0] = rm_box.vertex_min[0] + cube_len;
-                rm_box.vertex_min[1] = cube_j * cube_len - laserCloudHeight * cube_len / 2.0;
-                rm_box.vertex_max[1] = rm_box.vertex_min[1] + cube_len;
-                rm_box.vertex_min[2] = cube_k * cube_len - laserCloudDepth * cube_len / 2.0;
-                rm_box.vertex_max[2] = rm_box.vertex_min[2] + cube_len;
-                cub_needrm.push_back(rm_box);
-                _last_inFOV[i] = false;
-            }
+            #endif
         }
+        #ifdef USE_ikdtree
+            BoxPointType rm_box;
+            for (int i = 0; i < laserCloudNum; i++){
+                if (_last_inFOV[i] && !now_inFOV[i]){
+                    cube_i = i % laserCloudWidth;
+                    cube_j = (i % (laserCloudWidth * laserCloudHeight))/laserCloudWidth;
+                    cube_k = i / (laserCloudWidth * laserCloudHeight);
+                    rm_box.vertex_min[0] = cube_i * cube_len - laserCloudWidth * cube_len / 2.0;
+                    rm_box.vertex_max[0] = rm_box.vertex_min[0] + cube_len;
+                    rm_box.vertex_min[1] = cube_j * cube_len - laserCloudHeight * cube_len / 2.0;
+                    rm_box.vertex_max[1] = rm_box.vertex_min[1] + cube_len;
+                    rm_box.vertex_min[2] = cube_k * cube_len - laserCloudDepth * cube_len / 2.0;
+                    rm_box.vertex_max[2] = rm_box.vertex_min[2] + cube_len;
+                    cub_needrm.push_back(rm_box);
+                    _last_inFOV[i] = false;
+                }
+            }
+        #endif
         // fprintf(fp,"\n");
         // fclose(fp);
     #else
@@ -804,6 +813,7 @@ int main(int argc, char** argv)
 
             double t0,t1,t2,t3,t4,t5,match_start, match_time, solve_start, solve_time, pca_time, svd_time;
             match_time = 0;
+            kdtree_search_time = 0;
             solve_time = 0;
             pca_time   = 0;
             svd_time   = 0;
@@ -894,6 +904,7 @@ int main(int argc, char** argv)
                 // featsFromMap->points = ikdtree.PCL_Storage;
             #else
                 kdtreeSurfFromMap->setInputCloud(featsFromMap);
+                kdtree_incremental_time = omp_get_wtime() - t1;
             #endif
 
                 std::vector<bool> point_selected_surf(feats_down_size, true);
@@ -920,7 +931,7 @@ int main(int argc, char** argv)
                     {
                         PointType &pointOri_tmpt = feats_down->points[i];
                         PointType &pointSel_tmpt = feats_down_updated->points[i];
-
+                        double search_start = omp_get_wtime();
                         /* transform to world frame */
                         pointBodyToWorld(&pointOri_tmpt, &pointSel_tmpt);
                         std::vector<float> pointSearchSqDis_surf;
@@ -946,7 +957,7 @@ int main(int argc, char** argv)
                                 point_selected_surf[i] = false;
                             }
                         }
-
+                        kdtree_search_time = omp_get_wtime() - search_start;
                         if (point_selected_surf[i] == false) continue;
 
                         // match_time += omp_get_wtime() - match_start;
@@ -1221,6 +1232,7 @@ int main(int argc, char** argv)
                 }
                 t4 = omp_get_wtime();
                 ikdtree.Add_Points(feats_down_updated->points, true);
+                kdtree_incremental_time = omp_get_wtime() - t4 + readd_time + readd_box_time + delete_box_time;
             #else
                 bool cube_updated[laserCloudNum] = {0};
                 for (int i = 0; i < feats_down_size; i++)
@@ -1356,9 +1368,9 @@ int main(int argc, char** argv)
             // aver_time_consu = aver_time_consu * 0.8 + (t5 - t0) * 0.2;
             T1[time_log_counter] = Measures.lidar_beg_time;
             s_plot[time_log_counter] = aver_time_consu;
-            s_plot2[time_log_counter] = delete_box_time;
-            s_plot3[time_log_counter] = fov_check_time;
-            s_plot4[time_log_counter] = readd_time;
+            s_plot2[time_log_counter] = kdtree_incremental_time;
+            s_plot3[time_log_counter] = kdtree_search_time;
+            s_plot4[time_log_counter] = fov_check_time;
             s_plot5[time_log_counter] = t5 - t0;
             s_plot6[time_log_counter] = readd_box_time;
             time_log_counter ++;
@@ -1391,7 +1403,7 @@ int main(int argc, char** argv)
     std::vector<double> t, s_vec, s_vec2, s_vec3, s_vec4, s_vec5, s_vec6;    
     FILE *fp;
     fp = fopen("/home/ecstasy/catkin_ws/fast_lio_time_log.csv","w");
-    fprintf(fp,"time_stamp, average time, delete box time, fov check time, readd time, total time, readd box time\n");
+    fprintf(fp,"time_stamp, average time, incremental time, search time,fov check time, total time, readd box time\n");
     for (int i = 0;i<time_log_counter; i++){
         fprintf(fp,"%f,%f,%f,%f,%f,%f,%f\n",T1[i],s_plot[i],s_plot2[i],s_plot3[i],s_plot4[i],s_plot5[i],s_plot6[i]);
         t.push_back(T1[i]);
@@ -1404,14 +1416,15 @@ int main(int argc, char** argv)
     }
     fclose(fp);
     if (!t.empty())
-    {               
-        plt::named_plot("copy time",t,s_vec2);
-        plt::named_plot("fov check time",t,s_vec3);
-        plt::named_plot("readd time",t,s_vec4);
+    {      
+                 
+        plt::named_plot("incremental time",t,s_vec2);
+        plt::named_plot("search_time",t,s_vec3);
+        plt::named_plot("fov check time",t,s_vec4);
         // printf("Size 4 is %d\n", int(s_plot4.size()));
         plt::named_plot("total time",t,s_vec5);
-        plt::named_plot("average time",t,s_vec);
-        plt::named_plot("copy + fov_check + readd",t,s_vec6);
+        plt::named_plot("average time",t,s_vec);        
+        // plt::named_plot("copy + fov_check + readd",t,s_vec6);
         plt::legend();
         plt::show();
         plt::pause(0.5);
