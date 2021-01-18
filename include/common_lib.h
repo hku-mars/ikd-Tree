@@ -14,7 +14,7 @@
 
 
 // #define DEBUG_PRINT
-// #define USE_ikdtree
+#define USE_ikdtree
 // #define USE_FOV_Checker
 
 #define PI_M (3.14159265358)
