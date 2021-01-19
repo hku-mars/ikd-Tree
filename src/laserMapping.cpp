@@ -1405,11 +1405,11 @@ int main(int argc, char** argv)
 
     #ifndef DEPLOY
     std::vector<double> t, s_vec, s_vec2, s_vec3, s_vec4, s_vec5, s_vec6;    
-    FILE *fp;
-    fp = fopen("/home/ecstasy/catkin_ws/fast_lio_time_log.csv","w");
-    fprintf(fp,"time_stamp, average time, incremental time, search time,fov check time, total time, readd box time\n");
+    // FILE *fp;
+    // fp = fopen("/home/ecstasy/catkin_ws/fast_lio_time_log.csv","w");
+    // fprintf(fp,"time_stamp, average time, incremental time, search time,fov check time, total time, readd box time\n");
     for (int i = 0;i<time_log_counter; i++){
-        fprintf(fp,"%f,%f,%f,%f,%f,%f,%f\n",T1[i],s_plot[i],s_plot2[i],s_plot3[i],s_plot4[i],s_plot5[i],s_plot6[i]);
+        // fprintf(fp,"%f,%f,%f,%f,%f,%f,%f\n",T1[i],s_plot[i],s_plot2[i],s_plot3[i],s_plot4[i],s_plot5[i],s_plot6[i]);
         t.push_back(T1[i]);
         s_vec.push_back(s_plot[i]);
         s_vec2.push_back(s_plot2[i]);
@@ -1418,7 +1418,7 @@ int main(int argc, char** argv)
         s_vec5.push_back(s_plot5[i]);
         s_vec6.push_back(s_plot6[i]);                        
     }
-    fclose(fp);
+    // fclose(fp);
     if (!t.empty())
     {      
                  
