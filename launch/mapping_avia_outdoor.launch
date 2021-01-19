@@ -34,8 +34,8 @@
   <param name="cube_side_length" type="double" value="40" />
   </node>
 
-  <group if="$(arg rviz)">
+  <!-- <group if="$(arg rviz)">
     <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find fast_lio)/rviz_cfg/loam_livox.rviz" />
-  </group>
+  </group> -->
 
 </launch>
