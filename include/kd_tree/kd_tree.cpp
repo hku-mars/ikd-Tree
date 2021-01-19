@@ -70,7 +70,11 @@ void KD_TREE::InitTreeNode(KD_TREE_NODE * root){
 int KD_TREE::size(){
     int s = 0;
     if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){
-        return Root_Node->TreeSize;
+        if (Root_Node != nullptr) {
+            return Root_Node->TreeSize;
+        } else {
+            return 0;
+        }
     } else {
         if (!pthread_mutex_trylock(&working_flag_mutex)){
             s = Root_Node->TreeSize;
@@ -171,7 +175,15 @@ void KD_TREE::multi_thread_rebuild(){
             }
             //printf("    =============   Finished rebuild and update \n");   
             /* Replace to original tree*/          
-            pthread_mutex_lock(&working_flag_mutex);      
+            pthread_mutex_lock(&working_flag_mutex);
+            if (Drop_MultiThread_Rebuild){
+                delete_tree_nodes(&new_root_node, NOT_RECORD);
+                rebuild_flag = false;   
+                Rebuild_Ptr = nullptr;
+                Drop_MultiThread_Rebuild = false;
+                pthread_mutex_unlock(&working_flag_mutex);
+                continue;
+            }
             pthread_mutex_lock(&search_flag_mutex);
             while (search_mutex_counter != 0){
                 pthread_mutex_unlock(&search_flag_mutex);
@@ -285,6 +297,18 @@ void KD_TREE::Nearest_Search(PointType point, int k_nearest, PointVector& Neares
 }
 
 void KD_TREE::Add_Points(PointVector & PointToAdd, bool downsample_on){
+    int NewPointSize = PointToAdd.size();
+    int tree_size = size();
+    if (tree_size>0 && NewPointSize > Multi_Thread_Rebuild_Point_Num && float(NewPointSize)/float(tree_size) > ForceRebuildPercentage){
+        pthread_mutex_lock(&working_flag_mutex);
+        Drop_MultiThread_Rebuild = true;
+        Rebuild_Ptr = nullptr;
+        flatten(Root_Node, PCL_Storage);
+        PCL_Storage.insert(PCL_Storage.end(), PointToAdd.begin(),PointToAdd.end());
+        Build(PCL_Storage);
+        pthread_mutex_unlock(&working_flag_mutex);
+        return;
+    }
     BoxPointType Box_of_Point;
     PointType downsample_result, mid_point;
     bool downsample_switch = downsample_on && DOWNSAMPLE_SWITCH;

@@ -616,9 +616,17 @@ void lasermap_fov_segment()
     readd_box_time = omp_get_wtime() - readd_begin - delete_box_time;
     // s_plot5.push_back(omp_get_wtime() - t_begin); t_begin = omp_get_wtime();
     if(cube_points_add->points.size() > 0)  ikdtree.Add_Points(cube_points_add->points, true);
-#endif
     readd_time = omp_get_wtime()- readd_begin - delete_box_time - readd_box_time;
-    // s_plot6.push_back(omp_get_wtime() - t_begin);
+    int ikdtree_size = ikdtree.size();
+    s_plot4[time_log_counter] = float(ikdtree_size);
+    if (ikdtree_size>0) {
+        s_plot6[time_log_counter] = float(cube_points_add->points.size())/float(ikdtree_size);
+    } else {
+        s_plot6[time_log_counter] = 0.0;
+    }
+#endif
+
+
 }
 
 void feat_points_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg) 
@@ -1374,9 +1382,9 @@ int main(int argc, char** argv)
             s_plot[time_log_counter] = aver_time_consu;
             s_plot2[time_log_counter] = kdtree_incremental_time;
             s_plot3[time_log_counter] = kdtree_search_time;
-            s_plot4[time_log_counter] = fov_check_time;
+            // s_plot4[time_log_counter] = fov_check_time;
             s_plot5[time_log_counter] = t5 - t0;
-            s_plot6[time_log_counter] = readd_box_time;
+            // s_plot6[time_log_counter] = readd_box_time;
             time_log_counter ++;
             std::cout<<"[ mapping ]: time: fov_check "<< fov_check_time <<" copy map "<<copy_time<<" readd: "<<readd_time<<" match "<<match_time<<" solve "<<solve_time<<" map incre "<<t5-t4<<" total "<<aver_time_consu<<std::endl;
             // fout_out << std::setw(10) << Measures.lidar_beg_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
@@ -1405,11 +1413,12 @@ int main(int argc, char** argv)
 
     #ifndef DEPLOY
     std::vector<double> t, s_vec, s_vec2, s_vec3, s_vec4, s_vec5, s_vec6;    
-    // FILE *fp;
-    // fp = fopen("/home/ecstasy/catkin_ws/fast_lio_time_log.csv","w");
-    // fprintf(fp,"time_stamp, average time, incremental time, search time,fov check time, total time, readd box time\n");
+    FILE *fp;
+    std::string log_dir = root_dir + "/Log/fast_lio_time_log.csv";
+    fp = fopen(log_dir.c_str(),"w");
+    fprintf(fp,"time_stamp, average time, incremental time, search time,fov check time, total time, percentage of readd\n");
     for (int i = 0;i<time_log_counter; i++){
-        // fprintf(fp,"%f,%f,%f,%f,%f,%f,%f\n",T1[i],s_plot[i],s_plot2[i],s_plot3[i],s_plot4[i],s_plot5[i],s_plot6[i]);
+        fprintf(fp,"%f,%f,%f,%f,%f,%f,%f\n",T1[i],s_plot[i],s_plot2[i],s_plot3[i],s_plot4[i],s_plot5[i],s_plot6[i]);
         t.push_back(T1[i]);
         s_vec.push_back(s_plot[i]);
         s_vec2.push_back(s_plot2[i]);
@@ -1418,17 +1427,16 @@ int main(int argc, char** argv)
         s_vec5.push_back(s_plot5[i]);
         s_vec6.push_back(s_plot6[i]);                        
     }
-    // fclose(fp);
+    fclose(fp);
     if (!t.empty())
     {      
                  
         plt::named_plot("incremental time",t,s_vec2);
         plt::named_plot("search_time",t,s_vec3);
-        plt::named_plot("fov check time",t,s_vec4);
-        // printf("Size 4 is %d\n", int(s_plot4.size()));
+        // plt::named_plot("fov check time",t,s_vec4);
         plt::named_plot("total time",t,s_vec5);
         plt::named_plot("average time",t,s_vec);        
-        // plt::named_plot("copy + fov_check + readd",t,s_vec6);
+        // plt::named_plot("Percentage",t,s_vec6);
         plt::legend();
         plt::show();
         plt::pause(0.5);

@@ -12,6 +12,7 @@
 #define Minimal_Unbalanced_Tree_Size 5
 #define Multi_Thread_Rebuild_Point_Num 1500
 #define DOWNSAMPLE_SWITCH true
+#define ForceRebuildPercentage 0.2
 
 using namespace std;
 
@@ -92,7 +93,8 @@ private:
     int Treesize_tmp = 0, Validnum_tmp = 0;
     float delete_criterion_param = 0.5f;
     float balance_criterion_param = 0.7f;
-    float downsample_size = 0.2f;   
+    float downsample_size = 0.2f;
+    bool Drop_MultiThread_Rebuild = false;
     bool Delete_Storage_Disabled = false;
     KD_TREE_NODE * STATIC_ROOT_NODE = nullptr;
     PointVector Points_deleted;
