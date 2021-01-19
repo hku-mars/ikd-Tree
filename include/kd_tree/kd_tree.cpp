@@ -310,26 +310,30 @@ void KD_TREE::Add_Points(PointVector & PointToAdd, bool downsample_on){
                     min_dist = tmp_dist;
                     downsample_result = Downsample_Storage[index];
                 }
-            }            
+            }
             if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){  
-                Delete_by_range(&Root_Node, Box_of_Point, true, true);     
-                Add_by_point(&Root_Node, downsample_result, true);  
-            } else {
-                Operation_Logger_Type  operation_delete, operation;
-                operation_delete.boxpoint = Box_of_Point;
-                operation_delete.op = DOWNSAMPLE_DELETE;
-                operation.point = downsample_result;
-                operation.op = ADD_POINT;
-                pthread_mutex_lock(&working_flag_mutex);
-                Delete_by_range(&Root_Node, Box_of_Point, false , true);                 
-                Add_by_point(&Root_Node, downsample_result, false);
-                if (rebuild_flag){
-                    pthread_mutex_lock(&rebuild_logger_mutex_lock);
-                    Rebuild_Logger.push_back(operation_delete);
-                    Rebuild_Logger.push_back(operation);
-                    pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+                if (same_point(PointToAdd[i], downsample_result)){
+                    Delete_by_range(&Root_Node, Box_of_Point, true, true);     
+                    Add_by_point(&Root_Node, downsample_result, true);                      
                 }
-                pthread_mutex_unlock(&working_flag_mutex);         
+            } else {
+                if (same_point(PointToAdd[i], downsample_result)){
+                    Operation_Logger_Type  operation_delete, operation;
+                    operation_delete.boxpoint = Box_of_Point;
+                    operation_delete.op = DOWNSAMPLE_DELETE;
+                    operation.point = downsample_result;
+                    operation.op = ADD_POINT;
+                    pthread_mutex_lock(&working_flag_mutex);
+                    Delete_by_range(&Root_Node, Box_of_Point, false , true);                 
+                    Add_by_point(&Root_Node, downsample_result, false);
+                    if (rebuild_flag){
+                        pthread_mutex_lock(&rebuild_logger_mutex_lock);
+                        Rebuild_Logger.push_back(operation_delete);
+                        Rebuild_Logger.push_back(operation);
+                        pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+                    }
+                    pthread_mutex_unlock(&working_flag_mutex);
+                }
             }
         } else {
             if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){
