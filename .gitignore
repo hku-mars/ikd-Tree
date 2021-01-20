@@ -1,4 +1,5 @@
 build
 Log/*.png
 Log/*.txt
+Log/*.csv
 Log/time.pdf

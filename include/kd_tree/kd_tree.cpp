@@ -299,7 +299,7 @@ void KD_TREE::Nearest_Search(PointType point, int k_nearest, PointVector& Neares
 void KD_TREE::Add_Points(PointVector & PointToAdd, bool downsample_on){
     int NewPointSize = PointToAdd.size();
     int tree_size = size();
-    if (tree_size>0 && NewPointSize > Multi_Thread_Rebuild_Point_Num && float(NewPointSize)/float(tree_size) > ForceRebuildPercentage){
+    if (tree_size>0 && NewPointSize > 2500 && float(NewPointSize)/float(tree_size) > ForceRebuildPercentage){
         pthread_mutex_lock(&working_flag_mutex);
         Drop_MultiThread_Rebuild = true;
         Rebuild_Ptr = nullptr;
