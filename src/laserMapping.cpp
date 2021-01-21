@@ -906,10 +906,10 @@ int main(int argc, char** argv)
                 t1 = omp_get_wtime();      
                       
             #ifdef USE_ikdtree
-                // PointVector ().swap(ikdtree.PCL_Storage);
-                // ikdtree.flatten(ikdtree.Root_Node, ikdtree.PCL_Storage);
-                // featsFromMap->clear();
-                // featsFromMap->points = ikdtree.PCL_Storage;
+                PointVector ().swap(ikdtree.PCL_Storage);
+                ikdtree.flatten(ikdtree.Root_Node, ikdtree.PCL_Storage);
+                featsFromMap->clear();
+                featsFromMap->points = ikdtree.PCL_Storage;
             #else
                 kdtreeSurfFromMap->setInputCloud(featsFromMap);
                 kdtree_incremental_time = omp_get_wtime() - t1;

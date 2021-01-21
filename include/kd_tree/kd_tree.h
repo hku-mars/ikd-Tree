@@ -12,7 +12,7 @@
 #define Minimal_Unbalanced_Tree_Size 5
 #define Multi_Thread_Rebuild_Point_Num 1500
 #define DOWNSAMPLE_SWITCH true
-#define ForceRebuildPercentage 0.2
+#define ForceRebuildPercentage 0.4
 
 using namespace std;
 

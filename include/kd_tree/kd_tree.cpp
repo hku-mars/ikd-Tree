@@ -113,6 +113,7 @@ void KD_TREE::start_thread(){
 }
 
 void KD_TREE::stop_thread(){
+
     pthread_mutex_lock(&termination_flag_mutex_lock);
     termination_flag = true;
     pthread_mutex_unlock(&termination_flag_mutex_lock);
@@ -182,37 +183,37 @@ void KD_TREE::multi_thread_rebuild(){
                 Rebuild_Ptr = nullptr;
                 Drop_MultiThread_Rebuild = false;
                 pthread_mutex_unlock(&working_flag_mutex);
-                continue;
-            }
-            pthread_mutex_lock(&search_flag_mutex);
-            while (search_mutex_counter != 0){
-                pthread_mutex_unlock(&search_flag_mutex);
-                // printf("        ======================mutex counter is: %d\n",search_mutex_counter);
-                usleep(10);             
-                pthread_mutex_lock(&search_flag_mutex);
-            }
-            search_mutex_counter = -1;
-            pthread_mutex_unlock(&search_flag_mutex);
-            if (father_ptr->left_son_ptr == *Rebuild_Ptr) {
-                father_ptr->left_son_ptr = new_root_node;
-            } else if (father_ptr->right_son_ptr == *Rebuild_Ptr){             
-                father_ptr->right_son_ptr = new_root_node;
             } else {
-                throw "    =============   Error: Father ptr incompatible with current node\n";
+                pthread_mutex_lock(&search_flag_mutex);
+                while (search_mutex_counter != 0){
+                    pthread_mutex_unlock(&search_flag_mutex);
+                    // printf("        ======================mutex counter is: %d\n",search_mutex_counter);
+                    usleep(10);             
+                    pthread_mutex_lock(&search_flag_mutex);
+                }
+                search_mutex_counter = -1;
+                pthread_mutex_unlock(&search_flag_mutex);
+                if (father_ptr->left_son_ptr == *Rebuild_Ptr) {
+                    father_ptr->left_son_ptr = new_root_node;
+                } else if (father_ptr->right_son_ptr == *Rebuild_Ptr){             
+                    father_ptr->right_son_ptr = new_root_node;
+                } else {
+                    throw "    =============   Error: Father ptr incompatible with current node\n";
+                }
+                if (new_root_node != nullptr) new_root_node->father_ptr = father_ptr;
+                (*Rebuild_Ptr) = new_root_node;                 
+                if (father_ptr == STATIC_ROOT_NODE) Root_Node = STATIC_ROOT_NODE->left_son_ptr;             
+                pthread_mutex_lock(&search_flag_mutex);
+                search_mutex_counter = 0;
+                pthread_mutex_unlock(&search_flag_mutex);
+                Rebuild_Ptr = nullptr;
+                pthread_mutex_unlock(&working_flag_mutex);
+                rebuild_flag = false;          
+                //printf("    =============   Finished replace \n");               
+                /* Delete discarded tree nodes */  
+                delete_tree_nodes(&old_root_node, MULTI_THREAD_REC);
+                // printf("    =============   Finished Delete \n\n\n\n\n\n\n\n\n\n");  
             }
-            if (new_root_node != nullptr) new_root_node->father_ptr = father_ptr;
-            (*Rebuild_Ptr) = new_root_node;                 
-            if (father_ptr == STATIC_ROOT_NODE) Root_Node = STATIC_ROOT_NODE->left_son_ptr;             
-            pthread_mutex_lock(&search_flag_mutex);
-            search_mutex_counter = 0;
-            pthread_mutex_unlock(&search_flag_mutex);
-            Rebuild_Ptr = nullptr;
-            pthread_mutex_unlock(&working_flag_mutex);
-            rebuild_flag = false;          
-            //printf("    =============   Finished replace \n");               
-            /* Delete discarded tree nodes */  
-            delete_tree_nodes(&old_root_node, MULTI_THREAD_REC);
-            // printf("    =============   Finished Delete \n\n\n\n\n\n\n\n\n\n");              
         } else {
             pthread_mutex_unlock(&working_flag_mutex);             
         }
@@ -303,6 +304,7 @@ void KD_TREE::Add_Points(PointVector & PointToAdd, bool downsample_on){
         pthread_mutex_lock(&working_flag_mutex);
         Drop_MultiThread_Rebuild = true;
         Rebuild_Ptr = nullptr;
+        PointVector ().swap(PCL_Storage);        
         flatten(Root_Node, PCL_Storage);
         PCL_Storage.insert(PCL_Storage.end(), PointToAdd.begin(),PointToAdd.end());
         Build(PCL_Storage);

@@ -31,7 +31,7 @@
   <param name="filter_size_corner" type="double" value="0.5" />
   <param name="filter_size_surf" type="double" value="0.5" />
   <param name="filter_size_map" type="double" value="0.5" />
-  <param name="cube_side_length" type="double" value="40" />
+  <param name="cube_side_length" type="double" value="30" />
   </node>
 
   <group if="$(arg rviz)">

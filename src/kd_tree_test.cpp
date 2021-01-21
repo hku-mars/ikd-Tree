@@ -8,22 +8,22 @@
 #include <common_lib.h>
 
 
-#define X_MAX 5
-#define X_MIN -5
-#define Y_MAX 5
-#define Y_MIN -5
-#define Z_MAX 5
-#define Z_MIN -5
+#define X_MAX 5.0
+#define X_MIN -5.0
+#define Y_MAX 5.0
+#define Y_MIN -5.0
+#define Z_MAX 5.0
+#define Z_MIN -5.0
 
-#define Point_Num 5000
-#define New_Point_Num 200
+#define Point_Num 4000
+#define New_Point_Num 4000
 #define Delete_Point_Num 0
 #define Nearest_Num 5
-#define Test_Time 1000
+#define Test_Time 50
 #define Search_Time 200
 #define Box_Length 1.5
 #define Box_Num 4
-#define Delete_Box_Switch true
+#define Delete_Box_Switch false
 #define Add_Box_Switch false
 
 PointVector point_cloud;
@@ -231,14 +231,19 @@ int main(int argc, char** argv){
     fp_kd_space = fopen("kd_tree_plot_log.csv","a");
     scapegoat_kd_tree.print_tree(0,fp_kd_space,X_MIN, X_MAX, Y_MIN, Y_MAX, Z_MIN, Z_MAX);
     while (counter < Test_Time){
+        if (counter > 0){
+            generate_initial_point_cloud(Point_Num * (counter + 1));
+            scapegoat_kd_tree.Build(point_cloud);            
+        }
         printf("Test %d:\n",counter+1);      
         // Incremental Operation
-        if ((counter+1) % 100  == 0){
-            printf("Large scale add\n");
-            generate_increment_point_cloud(New_Point_Num * 10);
-        } else {
-            generate_increment_point_cloud(New_Point_Num);
-        }
+        // if ((counter+1) % 100  == 0){
+        //     printf("Large scale add\n");
+        //     generate_increment_point_cloud(New_Point_Num * 10);
+        // } else {
+        //     generate_increment_point_cloud(New_Point_Num);
+        // }
+        generate_increment_point_cloud(New_Point_Num);
         printf("Start add\n");
         // printf("New Points are\n");
         // print_point_vec(cloud_increment);
@@ -372,11 +377,11 @@ int main(int argc, char** argv){
         printf("Search Time is: %0.3fms\n",search_time/1e3);           
         printf("Corresponding point number is: %d\n",max_point_num);
         PointVector ().swap(scapegoat_kd_tree.PCL_Storage);
-        t1 = chrono::high_resolution_clock::now(); 
-        if (scapegoat_kd_tree.Root_Node != nullptr) scapegoat_kd_tree.flatten(scapegoat_kd_tree.Root_Node, scapegoat_kd_tree.PCL_Storage);
-        t2 = chrono::high_resolution_clock::now();               
-        auto duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
-        printf("Traverse time is %0.3f ms\n",duration/1e3);
+        // t1 = chrono::high_resolution_clock::now(); 
+        // if (scapegoat_kd_tree.Root_Node != nullptr) scapegoat_kd_tree.flatten(scapegoat_kd_tree.Root_Node, scapegoat_kd_tree.PCL_Storage);
+        // t2 = chrono::high_resolution_clock::now();               
+        // auto duration = chrono::duration_cast<chrono::microseconds>(t2-t1).count();
+        // printf("Traverse time is %0.3f ms\n",duration/1e3);
         // print_point_vec(scapegoat_kd_tree.PCL_Storage);           
     }
     printf("WA counter is %d\n",wa_rec);
