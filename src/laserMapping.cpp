@@ -900,16 +900,15 @@ int main(int argc, char** argv)
             PointCloudXYZI::Ptr coeffSel_tmpt (new PointCloudXYZI(*feats_down));
             PointCloudXYZI::Ptr feats_down_updated (new PointCloudXYZI(*feats_down));
             std::vector<double> res_last(feats_down_size, 1000.0); // initial
-
+            
+            t1 = omp_get_wtime(); 
             if (featsFromMapNum >= 5)
             {
-                t1 = omp_get_wtime();      
-                      
             #ifdef USE_ikdtree
-                PointVector ().swap(ikdtree.PCL_Storage);
-                ikdtree.flatten(ikdtree.Root_Node, ikdtree.PCL_Storage);
-                featsFromMap->clear();
-                featsFromMap->points = ikdtree.PCL_Storage;
+                // PointVector ().swap(ikdtree.PCL_Storage);
+                // ikdtree.flatten(ikdtree.Root_Node, ikdtree.PCL_Storage);
+                // featsFromMap->clear();
+                // featsFromMap->points = ikdtree.PCL_Storage;
             #else
                 kdtreeSurfFromMap->setInputCloud(featsFromMap);
                 kdtree_incremental_time = omp_get_wtime() - t1;
@@ -1303,28 +1302,28 @@ int main(int argc, char** argv)
             pubLaserCloudFullRes.publish(laserCloudFullRes3);
             }
 
-            /******* Publish Effective points *******/
-            {
-            laserCloudFullResColor->clear();
-            pcl::PointXYZI temp_point;
-            for (int i = 0; i < laserCloudSelNum; i++)
-            {
-                RGBpointBodyToWorld(&laserCloudOri->points[i], &temp_point);
-                laserCloudFullResColor->push_back(temp_point);
-            }
-            sensor_msgs::PointCloud2 laserCloudFullRes3;
-            pcl::toROSMsg(*laserCloudFullResColor, laserCloudFullRes3);
-            laserCloudFullRes3.header.stamp = ros::Time::now();//.fromSec(last_timestamp_lidar);
-            laserCloudFullRes3.header.frame_id = "/camera_init";
-            pubLaserCloudEffect.publish(laserCloudFullRes3);
-            }
+            // /******* Publish Effective points *******/
+            // {
+            // laserCloudFullResColor->clear();
+            // pcl::PointXYZI temp_point;
+            // for (int i = 0; i < laserCloudSelNum; i++)
+            // {
+            //     RGBpointBodyToWorld(&laserCloudOri->points[i], &temp_point);
+            //     laserCloudFullResColor->push_back(temp_point);
+            // }
+            // sensor_msgs::PointCloud2 laserCloudFullRes3;
+            // pcl::toROSMsg(*laserCloudFullResColor, laserCloudFullRes3);
+            // laserCloudFullRes3.header.stamp = ros::Time::now();//.fromSec(last_timestamp_lidar);
+            // laserCloudFullRes3.header.frame_id = "/camera_init";
+            // pubLaserCloudEffect.publish(laserCloudFullRes3);
+            // }
 
-            /******* Publish Maps:  *******/
-            sensor_msgs::PointCloud2 laserCloudMap;
-            pcl::toROSMsg(*featsFromMap, laserCloudMap);
-            laserCloudMap.header.stamp = ros::Time::now();//ros::Time().fromSec(last_timestamp_lidar);
-            laserCloudMap.header.frame_id = "/camera_init";
-            pubLaserCloudMap.publish(laserCloudMap);
+            // /******* Publish Maps:  *******/
+            // sensor_msgs::PointCloud2 laserCloudMap;
+            // pcl::toROSMsg(*featsFromMap, laserCloudMap);
+            // laserCloudMap.header.stamp = ros::Time::now();//ros::Time().fromSec(last_timestamp_lidar);
+            // laserCloudMap.header.frame_id = "/camera_init";
+            // pubLaserCloudMap.publish(laserCloudMap);
 
             /******* Publish Odometry ******/
             geometry_msgs::Quaternion geoQuat = tf::createQuaternionMsgFromRollPitchYaw
@@ -1386,7 +1385,7 @@ int main(int argc, char** argv)
             s_plot5[time_log_counter] = t5 - t0;
             // s_plot6[time_log_counter] = readd_box_time;
             time_log_counter ++;
-            std::cout<<"[ mapping ]: time: fov_check "<< fov_check_time <<" copy map "<<copy_time<<" readd: "<<readd_time<<" match "<<match_time<<" solve "<<solve_time<<" map incre "<<t5-t4<<" total "<<aver_time_consu<<std::endl;
+            std::cout<<"[ mapping ]: time: fov_check "<< fov_check_time <<" fov_check and readd: "<<t1-t0<<" match "<<match_time<<" solve "<<solve_time<<" ICP "<<t3-t1<<" map incre "<<t5-t3<<" total "<<t5-t0<<std::endl;
             // fout_out << std::setw(10) << Measures.lidar_beg_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
             // <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<< std::endl;
             fout_out<<std::setw(8)<<laserCloudSelNum<<" "<<Measures.lidar_beg_time<<" "<<t2-t0<<" "<<match_time<<" "<<t5-t3<<" "<<t5-t0<<std::endl;
