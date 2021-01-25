@@ -1385,7 +1385,7 @@ int main(int argc, char** argv)
             s_plot5[time_log_counter] = t5 - t0;
             // s_plot6[time_log_counter] = readd_box_time;
             time_log_counter ++;
-            std::cout<<"[ mapping ]: time: fov_check "<< fov_check_time <<" fov_check and readd: "<<t1-t0<<" match "<<match_time<<" solve "<<solve_time<<" ICP "<<t3-t1<<" map incre "<<t5-t3<<" total "<<t5-t0<<std::endl;
+            std::cout<<"[ mapping ]: time: fov_check "<< fov_check_time <<" fov_check and readd: "<<t1-t0<<" match "<<match_time<<" solve "<<solve_time<<" ICP "<<t3-t1<<" map incre "<<t5-t3<<" total "<<aver_time_consu<<std::endl;
             // fout_out << std::setw(10) << Measures.lidar_beg_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
             // <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<< std::endl;
             fout_out<<std::setw(8)<<laserCloudSelNum<<" "<<Measures.lidar_beg_time<<" "<<t2-t0<<" "<<match_time<<" "<<t5-t3<<" "<<t5-t0<<std::endl;
