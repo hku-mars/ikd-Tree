@@ -45,7 +45,6 @@
 #include <Eigen/Core>
 #include <opencv2/core.hpp>
 #include <common_lib.h>
-#include <kd_tree/kd_tree.h>
 #include "IMU_Processing.hpp"
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
@@ -55,7 +54,6 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/filters/voxel_grid.h>
-#include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/io/pcd_io.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <tf/transform_datatypes.h>
@@ -64,6 +62,11 @@
 #include <geometry_msgs/Vector3.h>
 #include <FOV_Checker/FOV_Checker.h>
 
+#ifdef USE_ikdtree
+#include <kd_tree/kd_tree.h>
+#else
+#include <pcl/kdtree/kdtree_flann.h>
+#endif
 
 #ifndef DEPLOY
 #include "matplotlibcpp.h"
@@ -760,8 +763,6 @@ void publish_frame_world(const ros::Publisher & pubLaserCloudFullRes)
 
     int size = laserCloudFullRes->points.size();
 
-    std::cout<<"000"<<std::endl;
-
     PointCloudXYZI::Ptr laserCloudWorld( \
                     new PointCloudXYZI(size, 1));
 
@@ -770,8 +771,6 @@ void publish_frame_world(const ros::Publisher & pubLaserCloudFullRes)
         RGBpointBodyToWorld(&laserCloudFullRes->points[i], \
                             &laserCloudWorld->points[i]);
     }
-
-    std::cout<<"111"<<std::endl;
 
     sensor_msgs::PointCloud2 laserCloudmsg;
     pcl::toROSMsg(*laserCloudWorld, laserCloudmsg);
@@ -1316,7 +1315,6 @@ int main(int argc, char** argv)
             map_incremental();
             t5 = omp_get_wtime();
             kdtree_incremental_time = t5 - t3 + readd_time + readd_box_time + delete_box_time;
-            std::cout<<"map incremental finished"<<std::endl;
             /******* Publish functions:  *******/
             publish_frame_world(pubLaserCloudFullRes);
 
@@ -1327,7 +1325,7 @@ int main(int argc, char** argv)
             #ifdef DEPLOY
             publish_mavros(mavros_pose_publisher);
             #endif
-            std::cout<<"publish finished"<<std::endl;
+
             /*** Debug variables ***/
             frame_num ++;
             aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t5 - t0) / frame_num;
