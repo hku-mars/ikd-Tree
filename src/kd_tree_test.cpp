@@ -19,7 +19,7 @@
 #define New_Point_Num 4000
 #define Delete_Point_Num 0
 #define Nearest_Num 5
-#define Test_Time 50
+#define Test_Time 5000
 #define Search_Time 200
 #define Box_Length 1.5
 #define Box_Num 4
@@ -230,11 +230,11 @@ int main(int argc, char** argv){
     printf("Build tree time cost is: %0.3f\n",build_duration/1e3);
     fp_kd_space = fopen("kd_tree_plot_log.csv","a");
     scapegoat_kd_tree.print_tree(0,fp_kd_space,X_MIN, X_MAX, Y_MIN, Y_MAX, Z_MIN, Z_MAX);
+    int counter_div = 0;
     while (counter < Test_Time){
-        if (counter > 0){
-            generate_initial_point_cloud(Point_Num * (counter + 1));
-            scapegoat_kd_tree.Build(point_cloud);            
-        }
+        counter_div = int(counter/100 + EPSS);
+        generate_initial_point_cloud(Point_Num * (counter_div + 1));
+        scapegoat_kd_tree.Build(point_cloud);            
         printf("Test %d:\n",counter+1);      
         // Incremental Operation
         // if ((counter+1) % 100  == 0){
