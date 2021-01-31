@@ -1137,7 +1137,7 @@ int main(int argc, char** argv)
                     #ifdef USE_ikdtree
                         if (fabs(pa * points_near[j].x +
                                     pb * points_near[j].y +
-                                    pc * points_near[j].z + pd) > 0.1)
+                                    pc * points_near[j].z + pd) > 0.05)
                     #else
                         if (fabs(pa * featsFromMap->points[points_near[j]].x +
                                     pb * featsFromMap->points[points_near[j]].y +
@@ -1157,7 +1157,7 @@ int main(int argc, char** argv)
                         //if(fabs(pd2) > 0.1) continue;
                         float s = 1 - 0.9 * fabs(pd2) / sqrt(sqrt(point_world.x * point_world.x + point_world.y * point_world.y + point_world.z * point_world.z));
 
-                        if (s > 0.85)
+                        if (s > 0.92)
                         {
                             point_selected_surf[i] = true;
                             normvec->points[i].x = pa;
