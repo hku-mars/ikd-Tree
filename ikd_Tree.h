@@ -1,12 +1,10 @@
 #pragma once
-#include <pcl/point_types.h>
-#include <Eigen/StdVector>
-#include <Eigen/Geometry>
+#include <pthread.h>
 #include <stdio.h>
 #include <queue>
-#include <pthread.h>
 #include <chrono>
 #include <time.h>
+#include <Eigen/StdVector>
 
 #define EPSS 1e-6
 #define Minimal_Unbalanced_Tree_Size 5
@@ -16,8 +14,13 @@
 
 using namespace std;
 
-typedef pcl::PointXYZINormal PointType;
-typedef vector<PointType, Eigen::aligned_allocator<PointType>>  PointVector;
+struct PointType
+{
+    double x,y,z;
+};
+
+typedef vector<PointType> PointVector;
+
 
 struct KD_TREE_NODE
 {
