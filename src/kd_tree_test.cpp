@@ -1,5 +1,5 @@
 #include <pcl/kdtree/kdtree_flann.h>
-#include <kd_tree/kd_tree.h>
+#include <ikd_Tree/ikd_Tree.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <random>

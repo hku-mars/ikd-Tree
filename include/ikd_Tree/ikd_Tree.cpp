@@ -1,7 +1,7 @@
-#include "kd_tree.h"
+#include "ikd_Tree.h"
 
 /*
-Description: K-D Tree improved for a better data structure performance. 
+Description: ikd-Tree: an incremental k-d tree for robotic applications 
 Author: Yixi Cai
 email: yixicai@connect.hku.hk
 */
@@ -13,7 +13,6 @@ KD_TREE::KD_TREE(float delete_param, float balance_param, float box_length) {
     vector<Operation_Logger_Type> ().swap(Rebuild_Logger);            
     termination_flag = false;
     start_thread(); 
-    // InitTreeNode(Root_Node);
 }
 
 KD_TREE::~KD_TREE()

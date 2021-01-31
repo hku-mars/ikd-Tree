@@ -63,7 +63,7 @@
 #include <FOV_Checker/FOV_Checker.h>
 
 #ifdef USE_ikdtree
-#include <kd_tree/kd_tree.h>
+#include <ikd_Tree/ikd_Tree.h>
 #else
 #include <pcl/kdtree/kdtree_flann.h>
 #endif
