@@ -15,7 +15,7 @@
 
 // #define DEBUG_PRINT
 #define USE_ikdtree
-// #define USE_FOV_Checker
+#define USE_FOV_Checker
 
 #define PI_M (3.14159265358)
 #define G_m_s2 (9.8099)         // Gravaty const in GuangDong/China

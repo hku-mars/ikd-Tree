@@ -659,7 +659,14 @@ bool sync_packages(MeasureGroup &meas)
     {
         meas.lidar.reset(new PointCloudXYZI());
         pcl::fromROSMsg(*(lidar_buffer.front()), *(meas.lidar));
+        if(meas.lidar->points.size() <= 1)
+        {
+            lidar_buffer.pop_front();
+            return false;
+        }
         meas.lidar_beg_time = lidar_buffer.front()->header.stamp.toSec();
+        std::cout<<"scan size: "<<meas.lidar->points.size()<<std::endl;
+        std::cout<<"max offset time: "<<meas.lidar->points.back().curvature<<std::endl;
         lidar_end_time = meas.lidar_beg_time + meas.lidar->points.back().curvature / double(1000);
         lidar_pushed = true;
     }
