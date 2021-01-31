@@ -70,10 +70,9 @@ struct Operation_Logger_Type{
 class KD_TREE
 {
 private:
-    // debug
+    // Multi-thread Tree Rebuild
     int max_rebuild_num = 0;
     int max_need_rebuild_num = 0;
-    // Multi-thread Tree Rebuild
     bool termination_flag = false;
     bool rebuild_flag = false;
     bool copy_flag = false;
