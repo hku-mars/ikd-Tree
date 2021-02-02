@@ -1,10 +1,11 @@
-#pragma once
 #include <pthread.h>
 #include <stdio.h>
 #include <queue>
-#include <chrono>
 #include <time.h>
-#include <Eigen/StdVector>
+#include <chrono>
+#include <unistd.h>
+#include <math.h>
+#include <algorithm>
 
 #define EPSS 1e-6
 #define Minimal_Unbalanced_Tree_Size 5
@@ -16,7 +17,7 @@ using namespace std;
 
 struct PointType
 {
-    double x,y,z;
+    float x,y,z;
 };
 
 typedef vector<PointType> PointVector;
