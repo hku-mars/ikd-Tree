@@ -63,6 +63,8 @@ void KD_TREE::InitTreeNode(KD_TREE_NODE * root){
     root->need_push_down_to_left = false;
     root->need_push_down_to_right = false;
     root->point_downsample_deleted = false;
+    root->alpha_bal = 0.5;
+    root->alpha_del = 0.0;
     pthread_mutex_init(&(root->push_down_mutex_lock),NULL);
 }   
 
@@ -98,6 +100,25 @@ int KD_TREE::validnum(){
             return Validnum_tmp;
         }
     }
+}
+
+void KD_TREE::root_alpha(float &alpha_bal, float &alpha_del){
+    if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){
+        alpha_bal = Root_Node->alpha_bal;
+        alpha_del = Root_Node->alpha_del;
+        return;
+    } else {
+        if (!pthread_mutex_trylock(&working_flag_mutex)){
+            alpha_bal = Root_Node->alpha_bal;
+            alpha_del = Root_Node->alpha_del;
+            pthread_mutex_unlock(&working_flag_mutex);
+            return;
+        } else {
+            alpha_bal = alpha_bal_tmp;
+            alpha_del = alpha_del_tmp;      
+            return;
+        }
+    }    
 }
 
 void KD_TREE::start_thread(){
@@ -147,6 +168,8 @@ void KD_TREE::multi_thread_rebuild(){
             if (*Rebuild_Ptr == Root_Node) {
                 Treesize_tmp = Root_Node->TreeSize;
                 Validnum_tmp = Root_Node->TreeSize - Root_Node->invalid_point_num;
+                alpha_bal_tmp = Root_Node->alpha_bal;
+                alpha_del_tmp = Root_Node->alpha_del;
             }
             KD_TREE_NODE * old_root_node = (*Rebuild_Ptr);                            
             father_ptr = (*Rebuild_Ptr)->father_ptr;  
@@ -912,7 +935,7 @@ bool KD_TREE::Criterion_Check(KD_TREE_NODE * root){
     KD_TREE_NODE * son_ptr = root->left_son_ptr;
     if (son_ptr == nullptr) son_ptr = root->right_son_ptr;
     delete_evaluation = float(root->invalid_point_num)/ root->TreeSize;
-    balance_evaluation = float(son_ptr->TreeSize) / root->TreeSize;
+    balance_evaluation = float(son_ptr->TreeSize) / (root->TreeSize-1);  
     if (delete_evaluation > delete_criterion_param){
         return true;
     }
@@ -1020,6 +1043,13 @@ void KD_TREE::Update(KD_TREE_NODE * root){
     }
     if (left_son_ptr != nullptr) left_son_ptr -> father_ptr = root;
     if (right_son_ptr != nullptr) right_son_ptr -> father_ptr = root;
+    if (root == Root_Node && root->TreeSize > 3){
+        KD_TREE_NODE * son_ptr = root->left_son_ptr;
+        if (son_ptr == nullptr) son_ptr = root->right_son_ptr;
+        float tmp_bal = float(son_ptr->TreeSize) / (root->TreeSize-1);
+        root->alpha_del = float(root->invalid_point_num)/ root->TreeSize;
+        root->alpha_bal = (tmp_bal>=0.5-EPSS)?tmp_bal:1-tmp_bal;
+    }
     return;
 }
 

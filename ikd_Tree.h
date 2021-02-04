@@ -36,6 +36,9 @@ struct KD_TREE_NODE
     KD_TREE_NODE *left_son_ptr = nullptr;
     KD_TREE_NODE *right_son_ptr = nullptr;
     KD_TREE_NODE *father_ptr = nullptr;
+    // For paper data record
+    float alpha_del;
+    float alpha_bal;
 };
 
 struct PointType_CMP{
@@ -90,6 +93,7 @@ private:
     void run_operation(KD_TREE_NODE ** root, Operation_Logger_Type operation);
     // KD Tree Functions and augmented variables
     int Treesize_tmp = 0, Validnum_tmp = 0;
+    float alpha_bal_tmp = 0.5, alpha_del_tmp = 0.0;
     float delete_criterion_param = 0.5f;
     float balance_criterion_param = 0.7f;
     float downsample_size = 0.2f;
@@ -131,6 +135,7 @@ public:
     void InitializeKDTree(float delete_param = 0.5, float balance_param = 0.7, float box_length = 0.2); 
     int size();
     int validnum();
+    void root_alpha(float &alpha_bal, float &alpha_del);
     void Build(PointVector point_cloud);
     void Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> & Point_Distance);
     void Add_Points(PointVector & PointToAdd, bool downsample_on);
