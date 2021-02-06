@@ -241,9 +241,6 @@ void KD_TREE::multi_thread_rebuild(){
 }
 
 void KD_TREE::run_operation(KD_TREE_NODE ** root, Operation_Logger_Type operation){
-    BoxPointType Box_of_Point;
-    PointType downsample_result, mid_point;
-    float min_dist, tmp_dist;    
     switch (operation.op)
     {
     case ADD_POINT:      
@@ -466,9 +463,9 @@ void KD_TREE::acquire_removed_points(PointVector & removed_points){
     }
     for (int i = 0; i < Multithread_Points_deleted.size();i++){
         removed_points.push_back(Multithread_Points_deleted[i]);
-    }    
-    PointVector ().swap(Points_deleted);
-    PointVector ().swap(Multithread_Points_deleted);
+    }
+    Points_deleted.clear();
+    Multithread_Points_deleted.clear();
     pthread_mutex_unlock(&points_deleted_rebuild_mutex_lock);   
     return;
 }
@@ -664,7 +661,7 @@ void KD_TREE::Add_by_range(KD_TREE_NODE ** root, BoxPointType boxpoint, bool all
         (*root)->point_deleted = false || (*root)->point_downsample_deleted;
         (*root)->need_push_down_to_left = true;
         (*root)->need_push_down_to_right = true;
-        (*root)->invalid_point_num = 0; 
+        // (*root)->invalid_point_num = 0; 
         return;
     }
     if (boxpoint.vertex_min[0]-EPSS < (*root)->point.x && boxpoint.vertex_max[0]+EPSS > (*root)->point.x && boxpoint.vertex_min[1]-EPSS < (*root)->point.y && boxpoint.vertex_max[1]+EPSS > (*root)->point.y && boxpoint.vertex_min[2]-EPSS < (*root)->point.z && boxpoint.vertex_max[2]+EPSS > (*root)->point.z){
