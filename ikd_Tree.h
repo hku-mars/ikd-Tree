@@ -145,6 +145,7 @@ public:
     void flatten(KD_TREE_NODE * root, PointVector &Storage);
     void acquire_removed_points(PointVector & removed_points);
     void print_tree(int index, FILE *fp, float x_min, float x_max, float y_min, float y_max, float z_min, float z_max);
+    BoxPointType tree_range();
     PointVector PCL_Storage;     
     KD_TREE_NODE * Root_Node = nullptr;  
     vector<float> add_rec,delete_rec;

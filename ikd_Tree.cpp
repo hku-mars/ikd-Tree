@@ -87,6 +87,35 @@ int KD_TREE::size(){
     }
 }
 
+BoxPointType KD_TREE::tree_range(){
+    BoxPointType range;
+    if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){
+        if (Root_Node != nullptr) {
+            range.vertex_min[0] = Root_Node->node_range_x[0];
+            range.vertex_min[1] = Root_Node->node_range_y[0];
+            range.vertex_min[2] = Root_Node->node_range_z[0];
+            range.vertex_max[0] = Root_Node->node_range_x[1];
+            range.vertex_max[1] = Root_Node->node_range_y[1];
+            range.vertex_max[2] = Root_Node->node_range_z[1];
+        } else {
+            memset(&range, 0, sizeof(range));
+        }
+    } else {
+        if (!pthread_mutex_trylock(&working_flag_mutex)){
+            range.vertex_min[0] = Root_Node->node_range_x[0];
+            range.vertex_min[1] = Root_Node->node_range_y[0];
+            range.vertex_min[2] = Root_Node->node_range_z[0];
+            range.vertex_max[0] = Root_Node->node_range_x[1];
+            range.vertex_max[1] = Root_Node->node_range_y[1];
+            range.vertex_max[2] = Root_Node->node_range_z[1];
+            pthread_mutex_unlock(&working_flag_mutex);
+        } else {
+            memset(&range, 0, sizeof(range));
+        }
+    }
+    return range;
+}
+
 int KD_TREE::validnum(){
     int s = 0;
     if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){
