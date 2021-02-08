@@ -192,6 +192,9 @@ void KD_TREE::multi_thread_rebuild(){
         pthread_mutex_lock(&working_flag_mutex);
         if (Rebuild_Ptr != nullptr ){                    
             /* Traverse and copy */
+            if (Rebuild_Logger.size()>0){
+                printf("\n\n\n\n\n\n\n\n\n\n\n ERROR!!! \n\n\n\n\n\n\n\n\n");
+            }
             rebuild_flag = true;
             max_rebuild_num = max(max_rebuild_num, (*Rebuild_Ptr)->TreeSize);
             if (*Rebuild_Ptr == Root_Node) {
