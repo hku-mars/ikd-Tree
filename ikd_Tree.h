@@ -59,13 +59,14 @@ struct BoxPointType{
 };
 
 
-enum operation_set {ADD_POINT, DELETE_POINT, DELETE_BOX, ADD_BOX, DOWNSAMPLE_DELETE};
+enum operation_set {ADD_POINT, DELETE_POINT, DELETE_BOX, ADD_BOX, DOWNSAMPLE_DELETE, PUSH_DOWN};
 
 enum delete_point_storage_set {NOT_RECORD, DELETE_POINTS_REC, MULTI_THREAD_REC, DOWNSAMPLE_REC};
 
 struct Operation_Logger_Type{
     PointType point;
     BoxPointType boxpoint;
+    bool tree_deleted, tree_downsample_deleted;
     operation_set op;
 };
 
@@ -82,7 +83,8 @@ private:
     pthread_t rebuild_thread;
     pthread_mutex_t termination_flag_mutex_lock, rebuild_ptr_mutex_lock, working_flag_mutex, search_flag_mutex;
     pthread_mutex_t rebuild_logger_mutex_lock, points_deleted_rebuild_mutex_lock;
-    vector<Operation_Logger_Type> Rebuild_Logger;
+    // vector<Operation_Logger_Type> Rebuild_Logger;
+    queue<Operation_Logger_Type> Rebuild_Logger;
     PointVector Rebuild_PCL_Storage;
     KD_TREE_NODE ** Rebuild_Ptr;
     int search_mutex_counter = 0;
