@@ -231,6 +231,7 @@ void KD_TREE::multi_thread_rebuild(){
                 rebuild_flag = false;   
                 Rebuild_Ptr = nullptr;
                 Drop_MultiThread_Rebuild = false;
+                delete_tree_nodes(&new_root_node, NOT_RECORD);
                 pthread_mutex_unlock(&working_flag_mutex);
             } else {
                 pthread_mutex_lock(&search_flag_mutex);
@@ -356,6 +357,7 @@ void KD_TREE::Add_Points(PointVector & PointToAdd, bool downsample_on){
         Drop_MultiThread_Rebuild = true;
         Rebuild_Ptr = nullptr;
         PointVector ().swap(PCL_Storage);        
+        queue<Operation_Logger_Type> ().swap(Rebuild_Logger);
         flatten(Root_Node, PCL_Storage);
         PCL_Storage.insert(PCL_Storage.end(), PointToAdd.begin(),PointToAdd.end());
         Build(PCL_Storage);
