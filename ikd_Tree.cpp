@@ -149,13 +149,10 @@ void KD_TREE::multi_thread_rebuild(){
                 Validnum_tmp = Root_Node->TreeSize - Root_Node->invalid_point_num;
             }
             KD_TREE_NODE * old_root_node = (*Rebuild_Ptr);                            
-            // printf("    =============   Start Rebuild, Rebuild size is %d\n", (*Rebuild_Ptr)->TreeSize);
             father_ptr = (*Rebuild_Ptr)->father_ptr;  
             PointVector ().swap(Rebuild_PCL_Storage);
             flatten(*Rebuild_Ptr, Rebuild_PCL_Storage); 
-            pthread_mutex_unlock(&working_flag_mutex);
-
-            //printf("    =============   Finished copy and update \n");        
+            pthread_mutex_unlock(&working_flag_mutex);   
             /* Rebuild and update missed operations*/
             Operation_Logger_Type Operation;
             KD_TREE_NODE * new_root_node = nullptr;            
@@ -166,14 +163,12 @@ void KD_TREE::multi_thread_rebuild(){
                 while (!Rebuild_Logger.empty()){
                     Operation = Rebuild_Logger.back();
                     Rebuild_Logger.pop_back();
-                    // printf("    Type %d\n", Operation.op);
                     pthread_mutex_unlock(&rebuild_logger_mutex_lock);                  
                     run_operation(&new_root_node, Operation);                                       
                     pthread_mutex_lock(&rebuild_logger_mutex_lock);               
                 }   
                pthread_mutex_unlock(&rebuild_logger_mutex_lock);
-            }
-            //printf("    =============   Finished rebuild and update \n");   
+            }  
             /* Replace to original tree*/          
             pthread_mutex_lock(&working_flag_mutex);
             if (Drop_MultiThread_Rebuild){
@@ -186,7 +181,6 @@ void KD_TREE::multi_thread_rebuild(){
                 pthread_mutex_lock(&search_flag_mutex);
                 while (search_mutex_counter != 0){
                     pthread_mutex_unlock(&search_flag_mutex);
-                    // printf("        ======================mutex counter is: %d\n",search_mutex_counter);
                     usleep(10);             
                     pthread_mutex_lock(&search_flag_mutex);
                 }
@@ -197,7 +191,7 @@ void KD_TREE::multi_thread_rebuild(){
                 } else if (father_ptr->right_son_ptr == *Rebuild_Ptr){             
                     father_ptr->right_son_ptr = new_root_node;
                 } else {
-                    throw "    =============   Error: Father ptr incompatible with current node\n";
+                    throw "Error: Father ptr incompatible with current node\n";
                 }
                 if (new_root_node != nullptr) new_root_node->father_ptr = father_ptr;
                 (*Rebuild_Ptr) = new_root_node;                 
@@ -207,11 +201,9 @@ void KD_TREE::multi_thread_rebuild(){
                 pthread_mutex_unlock(&search_flag_mutex);
                 Rebuild_Ptr = nullptr;
                 pthread_mutex_unlock(&working_flag_mutex);
-                rebuild_flag = false;          
-                //printf("    =============   Finished replace \n");               
+                rebuild_flag = false;                     
                 /* Delete discarded tree nodes */  
                 delete_tree_nodes(&old_root_node, MULTI_THREAD_REC);
-                // printf("    =============   Finished Delete \n\n\n\n\n\n\n\n\n\n");  
             }
         } else {
             pthread_mutex_unlock(&working_flag_mutex);             
@@ -511,7 +503,6 @@ void KD_TREE::BuildTree(KD_TREE_NODE ** root, int l, int r, PointVector & Storag
 
 void KD_TREE::Rebuild(KD_TREE_NODE ** root){    
     KD_TREE_NODE * father_ptr;
-    // Clear the PCL_Storage vector and release memory
     if ((*root)->TreeSize >= Multi_Thread_Rebuild_Point_Num) { 
         max_need_rebuild_num = max((*root)->TreeSize,max_need_rebuild_num);
         if (!pthread_mutex_trylock(&rebuild_ptr_mutex_lock)){     
