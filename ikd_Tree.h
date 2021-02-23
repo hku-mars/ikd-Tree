@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <math.h>
 #include <algorithm>
+#include <memory.h>
 
 #define EPSS 1e-6
 #define Minimal_Unbalanced_Tree_Size 5
