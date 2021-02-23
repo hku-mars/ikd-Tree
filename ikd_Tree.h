@@ -40,6 +40,9 @@ struct KD_TREE_NODE
     KD_TREE_NODE *left_son_ptr = nullptr;
     KD_TREE_NODE *right_son_ptr = nullptr;
     KD_TREE_NODE *father_ptr = nullptr;
+    // For paper data record
+    float alpha_del;
+    float alpha_bal;
 };
 
 struct PointType_CMP{
@@ -60,13 +63,14 @@ struct BoxPointType{
 };
 
 
-enum operation_set {ADD_POINT, DELETE_POINT, DELETE_BOX, ADD_BOX, DOWNSAMPLE_DELETE};
+enum operation_set {ADD_POINT, DELETE_POINT, DELETE_BOX, ADD_BOX, DOWNSAMPLE_DELETE, PUSH_DOWN};
 
 enum delete_point_storage_set {NOT_RECORD, DELETE_POINTS_REC, MULTI_THREAD_REC, DOWNSAMPLE_REC};
 
 struct Operation_Logger_Type{
     PointType point;
     BoxPointType boxpoint;
+    bool tree_deleted, tree_downsample_deleted;
     operation_set op;
 };
 
@@ -83,7 +87,8 @@ private:
     pthread_t rebuild_thread;
     pthread_mutex_t termination_flag_mutex_lock, rebuild_ptr_mutex_lock, working_flag_mutex, search_flag_mutex;
     pthread_mutex_t rebuild_logger_mutex_lock, points_deleted_rebuild_mutex_lock;
-    vector<Operation_Logger_Type> Rebuild_Logger;
+    // vector<Operation_Logger_Type> Rebuild_Logger;
+    queue<Operation_Logger_Type> Rebuild_Logger;
     PointVector Rebuild_PCL_Storage;
     KD_TREE_NODE ** Rebuild_Ptr;
     int search_mutex_counter = 0;
@@ -94,6 +99,7 @@ private:
     void run_operation(KD_TREE_NODE ** root, Operation_Logger_Type operation);
     // KD Tree Functions and augmented variables
     int Treesize_tmp = 0, Validnum_tmp = 0;
+    float alpha_bal_tmp = 0.5, alpha_del_tmp = 0.0;
     float delete_criterion_param = 0.5f;
     float balance_criterion_param = 0.7f;
     float downsample_size = 0.2f;
@@ -135,6 +141,7 @@ public:
     void InitializeKDTree(float delete_param = 0.5, float balance_param = 0.7, float box_length = 0.2); 
     int size();
     int validnum();
+    void root_alpha(float &alpha_bal, float &alpha_del);
     void Build(PointVector point_cloud);
     void Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> & Point_Distance);
     void Add_Points(PointVector & PointToAdd, bool downsample_on);
@@ -144,6 +151,7 @@ public:
     void flatten(KD_TREE_NODE * root, PointVector &Storage);
     void acquire_removed_points(PointVector & removed_points);
     void print_tree(int index, FILE *fp, float x_min, float x_max, float y_min, float y_max, float z_min, float z_max);
+    BoxPointType tree_range();
     PointVector PCL_Storage;     
     KD_TREE_NODE * Root_Node = nullptr;  
     vector<float> add_rec,delete_rec;
