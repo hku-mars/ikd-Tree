@@ -19,7 +19,7 @@ More details please refer to our paper and video~
 
 [ikd-Tree: An Incremental K-D Tree for robotic applications](https://arxiv.org/abs/2102.10808)
 
-**The related video**: https://youtu.be/ueOunk03zxA
+**Related video**: https://youtu.be/ueOunk03zxA
 
 
 
