@@ -10,7 +10,7 @@
 #define EPSS 1e-6
 #define Minimal_Unbalanced_Tree_Size 5
 #define Multi_Thread_Rebuild_Point_Num 1500
-#define DOWNSAMPLE_SWITCH true
+#define DOWNSAMPLE_SWITCH false
 #define ForceRebuildPercentage 0.2
 
 using namespace std;
