@@ -219,13 +219,15 @@ void KD_TREE::multi_thread_rebuild(){
                     Operation = Rebuild_Logger.front();
                     Rebuild_Logger.pop();
                     pthread_mutex_unlock(&rebuild_logger_mutex_lock);                  
-                    run_operation(&new_root_node, Operation);                                       
+                    pthread_mutex_unlock(&working_flag_mutex);
+                    run_operation(&new_root_node, Operation);
+                    pthread_mutex_lock(&working_flag_mutex);
                     pthread_mutex_lock(&rebuild_logger_mutex_lock);               
                 }   
                pthread_mutex_unlock(&rebuild_logger_mutex_lock);
             }  
             /* Replace to original tree*/          
-            pthread_mutex_lock(&working_flag_mutex);
+            // pthread_mutex_lock(&working_flag_mutex);
             if (Drop_MultiThread_Rebuild){
                 delete_tree_nodes(&new_root_node, NOT_RECORD);
                 rebuild_flag = false;   
@@ -267,7 +269,7 @@ void KD_TREE::multi_thread_rebuild(){
         pthread_mutex_unlock(&rebuild_ptr_mutex_lock);         
         pthread_mutex_lock(&termination_flag_mutex_lock);
         terminated = termination_flag;
-        pthread_mutex_unlock(&termination_flag_mutex_lock);          
+        pthread_mutex_unlock(&termination_flag_mutex_lock);
         usleep(100); 
     }
     printf("Rebuild thread terminated normally\n");    
