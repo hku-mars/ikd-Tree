@@ -7,7 +7,7 @@
 
 [Yixi Cai 蔡逸熙](https://github.com/Ecstasy-EC): Data structure design and implementation
 
-[Wei Xu 徐威](https://github.com/XW-HKU): Incorporation into LiDAR-inertial odometry package ([FAST_LIO](https://github.com/hku-mars/FAST_LIO))
+[Wei Xu 徐威](https://github.com/XW-HKU): Incorporation into LiDAR-inertial odometry package ([FAST_LIO](https://github.com/hku-mars/FAST_LIO) (It will be upgraded to FAST_LIO 2.0 in March. 2021))
 
 More details please refer to our paper and video~
 
