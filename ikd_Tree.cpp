@@ -178,6 +178,7 @@ void KD_TREE::stop_thread(){
 void * KD_TREE::multi_thread_ptr(void * arg){
     KD_TREE * handle = (KD_TREE*) arg;
     handle->multi_thread_rebuild();
+    return nullptr;
 }    
 
 void KD_TREE::multi_thread_rebuild(){
