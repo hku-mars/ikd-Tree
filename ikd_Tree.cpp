@@ -221,6 +221,7 @@ void KD_TREE::multi_thread_rebuild(){
                     pthread_mutex_unlock(&rebuild_logger_mutex_lock);                  
                     pthread_mutex_unlock(&working_flag_mutex);
                     run_operation(&new_root_node, Operation);
+                    usleep(10);
                     pthread_mutex_lock(&working_flag_mutex);
                     pthread_mutex_lock(&rebuild_logger_mutex_lock);               
                 }   
