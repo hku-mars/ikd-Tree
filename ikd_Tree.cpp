@@ -215,12 +215,15 @@ void KD_TREE::multi_thread_rebuild(){
                 BuildTree(&new_root_node, 0, Rebuild_PCL_Storage.size()-1, Rebuild_PCL_Storage);             
                 // Rebuild has been done. Updates the blocked operations into the new tree  
                 pthread_mutex_lock(&rebuild_logger_mutex_lock);
+                int tmp_counter = 0;
                 while (!Rebuild_Logger.empty()){
                     Operation = Rebuild_Logger.front();
                     Rebuild_Logger.pop();
                     pthread_mutex_unlock(&rebuild_logger_mutex_lock);                  
                     pthread_mutex_unlock(&working_flag_mutex);
                     run_operation(&new_root_node, Operation);
+                    tmp_counter ++;
+                    if (tmp_counter % 10 == 0) usleep(1);
                     pthread_mutex_lock(&working_flag_mutex);
                     pthread_mutex_lock(&rebuild_logger_mutex_lock);               
                 }   
@@ -239,7 +242,7 @@ void KD_TREE::multi_thread_rebuild(){
                 pthread_mutex_lock(&search_flag_mutex);
                 while (search_mutex_counter != 0){
                     pthread_mutex_unlock(&search_flag_mutex);
-                    usleep(10);             
+                    usleep(1);             
                     pthread_mutex_lock(&search_flag_mutex);
                 }
                 search_mutex_counter = -1;
