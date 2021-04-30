@@ -25,6 +25,7 @@ struct KD_TREE_NODE
     int division_axis;  
     int TreeSize = 1;
     int invalid_point_num = 0;
+    int down_del_num = 0;
     bool point_deleted = false;
     bool tree_deleted = false; 
     bool point_downsample_deleted = false;
@@ -111,7 +112,7 @@ private:
     void Rebuild(KD_TREE_NODE ** root);
     void Delete_by_range(KD_TREE_NODE ** root, BoxPointType boxpoint, bool allow_rebuild, bool is_downsample);
     void Delete_by_point(KD_TREE_NODE ** root, PointType point, bool allow_rebuild);
-    void Add_by_point(KD_TREE_NODE ** root, PointType point, bool allow_rebuild);
+    void Add_by_point(KD_TREE_NODE ** root, PointType point, bool allow_rebuild, int father_axis);
     void Add_by_range(KD_TREE_NODE ** root, BoxPointType boxpoint, bool allow_rebuild);
     void Search(KD_TREE_NODE * root, int k_nearest, PointType point, priority_queue<PointType_CMP> &q);
     void Search_by_range(KD_TREE_NODE *root, BoxPointType boxpoint, PointVector &Storage);
@@ -145,6 +146,9 @@ public:
     void Delete_Points(PointVector & PointToDel);
     void Delete_Point_Boxes(vector<BoxPointType> & BoxPoints);
     void flatten(KD_TREE_NODE * root, PointVector &Storage);
+    void flatten_test(KD_TREE_NODE * root, PointVector &Storage, int &cnt);
+    void print_tree_states(KD_TREE_NODE * root, int level);
+    bool print_switch = false;
     void acquire_removed_points(PointVector & removed_points);
     void print_tree(int index, FILE *fp, float x_min, float x_max, float y_min, float y_max, float z_min, float z_max);
     BoxPointType tree_range();
@@ -153,5 +157,7 @@ public:
     vector<float> add_rec,delete_rec;
     vector<int>   add_counter_rec, delete_counter_rec;
     int rebuild_counter = 0;
+    FILE *fp;
+
     // void Compatibility_Check();
 };
