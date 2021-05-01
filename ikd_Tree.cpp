@@ -66,6 +66,7 @@ void KD_TREE::InitTreeNode(KD_TREE_NODE * root){
     root->need_push_down_to_left = false;
     root->need_push_down_to_right = false;
     root->point_downsample_deleted = false;
+    root->working_flag = false;
     root->alpha_bal = 0.5;
     root->alpha_del = 0.0;
     pthread_mutex_init(&(root->push_down_mutex_lock),NULL);
@@ -266,8 +267,11 @@ void KD_TREE::multi_thread_rebuild(){
                 // if (valid_old != valid_new) fprintf(fp,"Replaced!\n Old: %d;\n New: %d\n ", valid_old, valid_new);
                 if (father_ptr == STATIC_ROOT_NODE) Root_Node = STATIC_ROOT_NODE->left_son_ptr;
                 KD_TREE_NODE * update_root = *Rebuild_Ptr;
-                while (update_root != Root_Node){
+                while (update_root != nullptr && update_root != Root_Node){
                     update_root = update_root->father_ptr;
+                    if (update_root->working_flag) break;
+                    if (update_root == update_root->father_ptr->left_son_ptr && update_root->father_ptr->need_push_down_to_left) break;
+                    if (update_root == update_root->father_ptr->right_son_ptr && update_root->father_ptr->need_push_down_to_right) break;
                     Update(update_root);
                 }
                 pthread_mutex_lock(&search_flag_mutex);
@@ -640,6 +644,7 @@ void KD_TREE::Rebuild(KD_TREE_NODE ** root){
 
 void KD_TREE::Delete_by_range(KD_TREE_NODE ** root,  BoxPointType boxpoint, bool allow_rebuild, bool is_downsample){   
     if ((*root) == nullptr || (*root)->tree_deleted) return;
+    (*root)->working_flag = true;
     Push_Down(*root);     
     if (boxpoint.vertex_max[0] + EPSS < (*root)->node_range_x[0] || boxpoint.vertex_min[0] - EPSS > (*root)->node_range_x[1]) return;
     if (boxpoint.vertex_max[1] + EPSS < (*root)->node_range_y[0] || boxpoint.vertex_min[1] - EPSS > (*root)->node_range_y[1]) return;
@@ -696,11 +701,13 @@ void KD_TREE::Delete_by_range(KD_TREE_NODE ** root,  BoxPointType boxpoint, bool
     if (Rebuild_Ptr != nullptr && *Rebuild_Ptr == *root && (*root)->TreeSize < Multi_Thread_Rebuild_Point_Num) Rebuild_Ptr = nullptr; 
     bool need_rebuild = allow_rebuild & Criterion_Check((*root));
     if (need_rebuild) Rebuild(root);
+    if ((*root) != nullptr) (*root)->working_flag = false;
     return;
 }
 
 void KD_TREE::Delete_by_point(KD_TREE_NODE ** root, PointType point, bool allow_rebuild){   
     if ((*root) == nullptr || (*root)->tree_deleted) return;
+    (*root)->working_flag = true;
     Push_Down(*root);
     if (same_point((*root)->point, point) && !(*root)->point_deleted) {          
         (*root)->point_deleted = true;
@@ -743,11 +750,13 @@ void KD_TREE::Delete_by_point(KD_TREE_NODE ** root, PointType point, bool allow_
     if (Rebuild_Ptr != nullptr && *Rebuild_Ptr == *root && (*root)->TreeSize < Multi_Thread_Rebuild_Point_Num) Rebuild_Ptr = nullptr; 
     bool need_rebuild = allow_rebuild & Criterion_Check((*root));
     if (need_rebuild) Rebuild(root);
+    if ((*root) != nullptr) (*root)->working_flag = false;   
     return;
 }
 
 void KD_TREE::Add_by_range(KD_TREE_NODE ** root, BoxPointType boxpoint, bool allow_rebuild){
     if ((*root) == nullptr) return;
+    (*root)->working_flag = true;
     Push_Down(*root);       
     if (boxpoint.vertex_max[0] + EPSS < (*root)->node_range_x[0] || boxpoint.vertex_min[0] - EPSS > (*root)->node_range_x[1]) return;
     if (boxpoint.vertex_max[1] + EPSS < (*root)->node_range_y[0] || boxpoint.vertex_min[1] - EPSS > (*root)->node_range_y[1]) return;
@@ -795,6 +804,7 @@ void KD_TREE::Add_by_range(KD_TREE_NODE ** root, BoxPointType boxpoint, bool all
     if (Rebuild_Ptr != nullptr && *Rebuild_Ptr == *root && (*root)->TreeSize < Multi_Thread_Rebuild_Point_Num) Rebuild_Ptr = nullptr; 
     bool need_rebuild = allow_rebuild & Criterion_Check((*root));
     if (need_rebuild) Rebuild(root);
+    (*root)->working_flag = false;   
     return;
 }
 
@@ -806,7 +816,8 @@ void KD_TREE::Add_by_point(KD_TREE_NODE ** root, PointType point, bool allow_reb
         (*root)->division_axis = (father_axis + 1) % 3;
         Update(*root);
         return;
-    }           
+    }
+    (*root)->working_flag = true;
     Operation_Logger_Type add_log;
     struct timespec Timeout;    
     add_log.op = ADD_POINT;
@@ -842,7 +853,8 @@ void KD_TREE::Add_by_point(KD_TREE_NODE ** root, PointType point, bool allow_reb
     Update(*root);   
     if (Rebuild_Ptr != nullptr && *Rebuild_Ptr == *root && (*root)->TreeSize < Multi_Thread_Rebuild_Point_Num) Rebuild_Ptr = nullptr; 
     bool need_rebuild = allow_rebuild & Criterion_Check((*root));
-    if (need_rebuild) Rebuild(root);    
+    if (need_rebuild) Rebuild(root); 
+    (*root)->working_flag = false;   
     return;
 }
 

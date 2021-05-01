@@ -32,6 +32,7 @@ struct KD_TREE_NODE
     bool tree_downsample_deleted = false;
     bool need_push_down_to_left = false;
     bool need_push_down_to_right = false;
+    bool working_flag = false;
     pthread_mutex_t push_down_mutex_lock;
     float node_range_x[2], node_range_y[2], node_range_z[2];   
     KD_TREE_NODE *left_son_ptr = nullptr;
