@@ -10,7 +10,8 @@ KD_TREE::KD_TREE(float delete_param, float balance_param, float box_length) {
     delete_criterion_param = delete_param;
     balance_criterion_param = balance_param;
     downsample_size = box_length;
-    queue<Operation_Logger_Type> ().swap(Rebuild_Logger);            
+    // queue<Operation_Logger_Type> ().swap(Rebuild_Logger); 
+    Rebuild_Logger.clear();           
     termination_flag = false;
     start_thread();
     // fp = fopen("/home/ecstasy/catkin_ws/src/FAST_LIO/Log/add_points.txt","w");
@@ -22,7 +23,8 @@ KD_TREE::~KD_TREE()
     Delete_Storage_Disabled = true;
     delete_tree_nodes(&Root_Node, NOT_RECORD);
     PointVector ().swap(PCL_Storage);
-    queue<Operation_Logger_Type> ().swap(Rebuild_Logger); 
+    // queue<Operation_Logger_Type> ().swap(Rebuild_Logger); 
+    Rebuild_Logger.clear();           
     // fclose(fp);
 }
 
@@ -198,7 +200,7 @@ void KD_TREE::multi_thread_rebuild(){
         pthread_mutex_lock(&working_flag_mutex);
         if (Rebuild_Ptr != nullptr ){                    
             /* Traverse and copy */
-            if (Rebuild_Logger.size()>0){
+            if (!Rebuild_Logger.empty()){ //Rebuild_Logger.size()>0
                 printf("\n\n\n\n\n\n\n\n\n\n\n ERROR!!! \n\n\n\n\n\n\n\n\n");
             }
             rebuild_flag = true;
@@ -280,8 +282,10 @@ void KD_TREE::multi_thread_rebuild(){
                 Rebuild_Ptr = nullptr;
                 pthread_mutex_unlock(&working_flag_mutex);
                 rebuild_flag = false;                     
-                /* Delete discarded tree nodes */  
+                /* Delete discarded tree nodes */
+                pthread_mutex_lock(&points_deleted_rebuild_mutex_lock);    
                 delete_tree_nodes(&old_root_node, MULTI_THREAD_REC);
+                pthread_mutex_unlock(&points_deleted_rebuild_mutex_lock);     
             }
         } else {
             pthread_mutex_unlock(&working_flag_mutex);             
@@ -385,7 +389,8 @@ void KD_TREE::Add_Points(PointVector & PointToAdd, bool downsample_on){
         Drop_MultiThread_Rebuild = true;
         Rebuild_Ptr = nullptr;
         PointVector ().swap(PCL_Storage);        
-        queue<Operation_Logger_Type> ().swap(Rebuild_Logger);
+        // queue<Operation_Logger_Type> ().swap(Rebuild_Logger);
+        Rebuild_Logger.clear();
         flatten(Root_Node, PCL_Storage);
         PCL_Storage.insert(PCL_Storage.end(), PointToAdd.begin(),PointToAdd.end());
         Build(PCL_Storage);
@@ -648,10 +653,10 @@ void KD_TREE::Delete_by_range(KD_TREE_NODE ** root,  BoxPointType boxpoint, bool
     if ((*root) == nullptr || (*root)->tree_deleted) return;
     (*root)->working_flag = true;
     Push_Down(*root);     
-    if (boxpoint.vertex_max[0] + EPSS < (*root)->node_range_x[0] || boxpoint.vertex_min[0] - EPSS > (*root)->node_range_x[1]) return;
-    if (boxpoint.vertex_max[1] + EPSS < (*root)->node_range_y[0] || boxpoint.vertex_min[1] - EPSS > (*root)->node_range_y[1]) return;
-    if (boxpoint.vertex_max[2] + EPSS < (*root)->node_range_z[0] || boxpoint.vertex_min[2] - EPSS > (*root)->node_range_z[1]) return;
-    if (boxpoint.vertex_min[0] - EPSS < (*root)->node_range_x[0] && boxpoint.vertex_max[0]+EPSS > (*root)->node_range_x[1] && boxpoint.vertex_min[1]-EPSS < (*root)->node_range_y[0] && boxpoint.vertex_max[1]+EPSS > (*root)->node_range_y[1] && boxpoint.vertex_min[2]-EPSS < (*root)->node_range_z[0] && boxpoint.vertex_max[2]+EPSS > (*root)->node_range_z[1]){
+    if (boxpoint.vertex_max[0] <= (*root)->node_range_x[0] || boxpoint.vertex_min[0] > (*root)->node_range_x[1]) return;
+    if (boxpoint.vertex_max[1] <= (*root)->node_range_y[0] || boxpoint.vertex_min[1] > (*root)->node_range_y[1]) return;
+    if (boxpoint.vertex_max[2] <= (*root)->node_range_z[0] || boxpoint.vertex_min[2] > (*root)->node_range_z[1]) return;
+    if (boxpoint.vertex_min[0] <= (*root)->node_range_x[0] && boxpoint.vertex_max[0] > (*root)->node_range_x[1] && boxpoint.vertex_min[1] <= (*root)->node_range_y[0] && boxpoint.vertex_max[1] > (*root)->node_range_y[1] && boxpoint.vertex_min[2] <= (*root)->node_range_z[0] && boxpoint.vertex_max[2] > (*root)->node_range_z[1]){
         (*root)->tree_deleted = true;
         (*root)->point_deleted = true;
         (*root)->need_push_down_to_left = true;
@@ -665,7 +670,7 @@ void KD_TREE::Delete_by_range(KD_TREE_NODE ** root,  BoxPointType boxpoint, bool
         // fprintf(fp,"Delete Box range: (%0.3f,%0.3f),(%0.3f,%0.3f),(%0.3f,%0.3f) with size %d\n",(*root)->node_range_x[0],(*root)->node_range_x[1],(*root)->node_range_y[0],(*root)->node_range_y[1],(*root)->node_range_z[0],(*root)->node_range_z[1],(*root)->TreeSize);
         return;
     }
-    if (!(*root)->point_deleted && boxpoint.vertex_min[0]-EPSS < (*root)->point.x && boxpoint.vertex_max[0]+EPSS > (*root)->point.x && boxpoint.vertex_min[1]-EPSS < (*root)->point.y && boxpoint.vertex_max[1]+EPSS > (*root)->point.y && boxpoint.vertex_min[2]-EPSS < (*root)->point.z && boxpoint.vertex_max[2]+EPSS > (*root)->point.z){
+    if (!(*root)->point_deleted && boxpoint.vertex_min[0] <= (*root)->point.x && boxpoint.vertex_max[0] > (*root)->point.x && boxpoint.vertex_min[1] <= (*root)->point.y && boxpoint.vertex_max[1] > (*root)->point.y && boxpoint.vertex_min[2] <= (*root)->point.z && boxpoint.vertex_max[2] > (*root)->point.z){
         (*root)->point_deleted = true;
         // fprintf(fp,"Delete Point: (%0.3f,%0.3f,%0.3f)\n",(*root)->point.x,(*root)->point.y,(*root)->point.z);
         if (is_downsample) (*root)->point_downsample_deleted = true;
@@ -760,10 +765,10 @@ void KD_TREE::Add_by_range(KD_TREE_NODE ** root, BoxPointType boxpoint, bool all
     if ((*root) == nullptr) return;
     (*root)->working_flag = true;
     Push_Down(*root);       
-    if (boxpoint.vertex_max[0] + EPSS < (*root)->node_range_x[0] || boxpoint.vertex_min[0] - EPSS > (*root)->node_range_x[1]) return;
-    if (boxpoint.vertex_max[1] + EPSS < (*root)->node_range_y[0] || boxpoint.vertex_min[1] - EPSS > (*root)->node_range_y[1]) return;
-    if (boxpoint.vertex_max[2] + EPSS < (*root)->node_range_z[0] || boxpoint.vertex_min[2] - EPSS > (*root)->node_range_z[1]) return;
-    if (boxpoint.vertex_min[0] - EPSS < (*root)->node_range_x[0] && boxpoint.vertex_max[0]+EPSS > (*root)->node_range_x[1] && boxpoint.vertex_min[1]-EPSS < (*root)->node_range_y[0] && boxpoint.vertex_max[1]+EPSS > (*root)->node_range_y[1] && boxpoint.vertex_min[2]-EPSS < (*root)->node_range_z[0] && boxpoint.vertex_max[2]+EPSS > (*root)->node_range_z[1]){
+    if (boxpoint.vertex_max[0] <= (*root)->node_range_x[0] || boxpoint.vertex_min[0] > (*root)->node_range_x[1]) return;
+    if (boxpoint.vertex_max[1] <= (*root)->node_range_y[0] || boxpoint.vertex_min[1] > (*root)->node_range_y[1]) return;
+    if (boxpoint.vertex_max[2] <= (*root)->node_range_z[0] || boxpoint.vertex_min[2] > (*root)->node_range_z[1]) return;
+    if (boxpoint.vertex_min[0] <= (*root)->node_range_x[0] && boxpoint.vertex_max[0] > (*root)->node_range_x[1] && boxpoint.vertex_min[1] <= (*root)->node_range_y[0] && boxpoint.vertex_max[1]> (*root)->node_range_y[1] && boxpoint.vertex_min[2] <= (*root)->node_range_z[0] && boxpoint.vertex_max[2] > (*root)->node_range_z[1]){
         (*root)->tree_deleted = false || (*root)->tree_downsample_deleted;
         (*root)->point_deleted = false || (*root)->point_downsample_deleted;
         (*root)->need_push_down_to_left = true;
@@ -771,7 +776,7 @@ void KD_TREE::Add_by_range(KD_TREE_NODE ** root, BoxPointType boxpoint, bool all
         (*root)->invalid_point_num = (*root)->down_del_num; 
         return;
     }
-    if (boxpoint.vertex_min[0]-EPSS < (*root)->point.x && boxpoint.vertex_max[0]+EPSS > (*root)->point.x && boxpoint.vertex_min[1]-EPSS < (*root)->point.y && boxpoint.vertex_max[1]+EPSS > (*root)->point.y && boxpoint.vertex_min[2]-EPSS < (*root)->point.z && boxpoint.vertex_max[2]+EPSS > (*root)->point.z){
+    if (boxpoint.vertex_min[0] <= (*root)->point.x && boxpoint.vertex_max[0] > (*root)->point.x && boxpoint.vertex_min[1] <= (*root)->point.y && boxpoint.vertex_max[1] > (*root)->point.y && boxpoint.vertex_min[2] <= (*root)->point.z && boxpoint.vertex_max[2] > (*root)->point.z){
         (*root)->point_deleted = (*root)->point_downsample_deleted;
     }
     Operation_Logger_Type add_box_log;
@@ -1006,14 +1011,14 @@ void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point, MANUAL
 void KD_TREE::Search_by_range(KD_TREE_NODE *root, BoxPointType boxpoint, PointVector & Storage){
     if (root == nullptr) return;
     Push_Down(root);       
-    if (boxpoint.vertex_max[0] + EPSS < root->node_range_x[0] || boxpoint.vertex_min[0] - EPSS > root->node_range_x[1]) return;
-    if (boxpoint.vertex_max[1] + EPSS < root->node_range_y[0] || boxpoint.vertex_min[1] - EPSS > root->node_range_y[1]) return;
-    if (boxpoint.vertex_max[2] + EPSS < root->node_range_z[0] || boxpoint.vertex_min[2] - EPSS > root->node_range_z[1]) return;
-    if (boxpoint.vertex_min[0] - EPSS < root->node_range_x[0] && boxpoint.vertex_max[0]+EPSS > root->node_range_x[1] && boxpoint.vertex_min[1]-EPSS < root->node_range_y[0] && boxpoint.vertex_max[1]+EPSS > root->node_range_y[1] && boxpoint.vertex_min[2]-EPSS < root->node_range_z[0] && boxpoint.vertex_max[2]+EPSS > root->node_range_z[1]){
+    if (boxpoint.vertex_max[0] <= root->node_range_x[0] || boxpoint.vertex_min[0] > root->node_range_x[1]) return;
+    if (boxpoint.vertex_max[1] <= root->node_range_y[0] || boxpoint.vertex_min[1] > root->node_range_y[1]) return;
+    if (boxpoint.vertex_max[2] <= root->node_range_z[0] || boxpoint.vertex_min[2] > root->node_range_z[1]) return;
+    if (boxpoint.vertex_min[0] <= root->node_range_x[0] && boxpoint.vertex_max[0] > root->node_range_x[1] && boxpoint.vertex_min[1] <= root->node_range_y[0] && boxpoint.vertex_max[1] > root->node_range_y[1] && boxpoint.vertex_min[2] <= root->node_range_z[0] && boxpoint.vertex_max[2] > root->node_range_z[1]){
         flatten(root, Storage);
         return;
     }
-    if (boxpoint.vertex_min[0]-EPSS < root->point.x && boxpoint.vertex_max[0]+EPSS > root->point.x && boxpoint.vertex_min[1]-EPSS < root->point.y && boxpoint.vertex_max[1]+EPSS > root->point.y && boxpoint.vertex_min[2]-EPSS < root->point.z && boxpoint.vertex_max[2]+EPSS > root->point.z){
+    if (boxpoint.vertex_min[0] <= root->point.x && boxpoint.vertex_max[0] > root->point.x && boxpoint.vertex_min[1] <= root->point.y && boxpoint.vertex_max[1] > root->point.y && boxpoint.vertex_min[2] <= root->point.z && boxpoint.vertex_max[2] > root->point.z){
         if (!root->point_deleted) Storage.push_back(root->point);
     }
     if ((Rebuild_Ptr == nullptr) || root->left_son_ptr != *Rebuild_Ptr){
@@ -1246,11 +1251,9 @@ void KD_TREE::delete_tree_nodes(KD_TREE_NODE ** root, delete_point_storage_set s
         }       
         break;
     case MULTI_THREAD_REC:
-        pthread_mutex_lock(&points_deleted_rebuild_mutex_lock);    
         if ((*root)->point_deleted  && !(*root)->point_downsample_deleted) {
             Multithread_Points_deleted.push_back((*root)->point);
         }
-        pthread_mutex_unlock(&points_deleted_rebuild_mutex_lock);     
         break;
     case DOWNSAMPLE_REC:
         if (!(*root)->point_deleted) Downsample_Storage.push_back((*root)->point);
@@ -1329,6 +1332,7 @@ MANUAL_HEAP::MANUAL_HEAP(int max_capacity){
 }
 
 MANUAL_HEAP::~MANUAL_HEAP(){
+    delete[] heap;
 }
 
 void MANUAL_HEAP::pop(){
@@ -1385,3 +1389,44 @@ void MANUAL_HEAP::FloatUp(int heap_index){
     heap[heap_index] = tmp;
     return;
 }
+
+// manual queue
+void MANUAL_Q::clear(){
+    head = 0;
+    tail = 0;
+    counter = 0;
+    is_empty = true;
+    return;
+}
+
+void MANUAL_Q::pop(){
+    if (counter == 0) return;
+    head ++;
+    head %= Q_LEN;
+    counter --;
+    if (counter == 0) is_empty = true;
+    return;
+}
+
+Operation_Logger_Type MANUAL_Q::front(){
+    return q[head];
+}
+
+Operation_Logger_Type MANUAL_Q::back(){
+    return q[tail];
+}
+
+void MANUAL_Q::push(Operation_Logger_Type op){
+    q[tail] = op;
+    counter ++;
+    if (is_empty) is_empty = false;
+    tail ++;
+    tail %= Q_LEN;
+}
+
+bool MANUAL_Q::empty(){
+    return is_empty;
+}
+
+
+

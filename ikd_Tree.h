@@ -1,4 +1,3 @@
-#pragma once
 #include <pcl/point_types.h>
 #include <Eigen/StdVector>
 #include <Eigen/Geometry>
@@ -8,12 +7,13 @@
 #include <chrono>
 #include <time.h>
 
+
 #define EPSS 1e-6
 #define Minimal_Unbalanced_Tree_Size 10
 #define Multi_Thread_Rebuild_Point_Num 1500
 #define DOWNSAMPLE_SWITCH true
 #define ForceRebuildPercentage 0.2
-
+#define Q_LEN 10000
 
 using namespace std;
 
@@ -63,6 +63,31 @@ struct BoxPointType{
     float vertex_max[3];
 };
 
+enum operation_set {ADD_POINT, DELETE_POINT, DELETE_BOX, ADD_BOX, DOWNSAMPLE_DELETE, PUSH_DOWN};
+
+enum delete_point_storage_set {NOT_RECORD, DELETE_POINTS_REC, MULTI_THREAD_REC, DOWNSAMPLE_REC};
+
+struct Operation_Logger_Type{
+    PointType point;
+    BoxPointType boxpoint;
+    bool tree_deleted, tree_downsample_deleted;
+    operation_set op;
+};
+
+class MANUAL_Q{
+    private:
+        int head = 0,tail = 0, counter = 0;
+        Operation_Logger_Type q[Q_LEN];
+        bool is_empty;
+    public:
+        void pop();
+        Operation_Logger_Type front();
+        Operation_Logger_Type back();
+        void clear();
+        void push(Operation_Logger_Type op);
+        bool empty();
+};
+
 
 class MANUAL_HEAP
 {
@@ -82,16 +107,7 @@ class MANUAL_HEAP
         int cap = 0;
 };
 
-enum operation_set {ADD_POINT, DELETE_POINT, DELETE_BOX, ADD_BOX, DOWNSAMPLE_DELETE, PUSH_DOWN};
 
-enum delete_point_storage_set {NOT_RECORD, DELETE_POINTS_REC, MULTI_THREAD_REC, DOWNSAMPLE_REC};
-
-struct Operation_Logger_Type{
-    PointType point;
-    BoxPointType boxpoint;
-    bool tree_deleted, tree_downsample_deleted;
-    operation_set op;
-};
 
 class KD_TREE
 {
@@ -106,7 +122,8 @@ private:
     pthread_mutex_t termination_flag_mutex_lock, rebuild_ptr_mutex_lock, working_flag_mutex, search_flag_mutex;
     pthread_mutex_t rebuild_logger_mutex_lock, points_deleted_rebuild_mutex_lock;
     // vector<Operation_Logger_Type> Rebuild_Logger;
-    queue<Operation_Logger_Type> Rebuild_Logger;
+    // queue<Operation_Logger_Type> Rebuild_Logger;
+    MANUAL_Q Rebuild_Logger;    
     PointVector Rebuild_PCL_Storage;
     KD_TREE_NODE ** Rebuild_Ptr;
     int search_mutex_counter = 0;
