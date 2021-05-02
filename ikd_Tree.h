@@ -14,10 +14,13 @@
 #define DOWNSAMPLE_SWITCH true
 #define ForceRebuildPercentage 0.2
 
+
 using namespace std;
 
 typedef pcl::PointXYZINormal PointType;
 typedef vector<PointType, Eigen::aligned_allocator<PointType>>  PointVector;
+
+const PointType ZeroP;
 
 struct KD_TREE_NODE
 {
@@ -45,8 +48,8 @@ struct KD_TREE_NODE
 
 struct PointType_CMP{
     PointType point;
-    float dist;
-    PointType_CMP (PointType p, float d){
+    float dist = 0.0;
+    PointType_CMP (PointType p = ZeroP, float d = INFINITY){
         this->point = p;
         this->dist = d;
     };
@@ -61,6 +64,24 @@ struct BoxPointType{
 };
 
 
+class MANUAL_HEAP
+{
+    public:
+        MANUAL_HEAP(int max_capacity = 100);
+        ~MANUAL_HEAP();
+        void pop();
+        PointType_CMP top();
+        void push(PointType_CMP point);
+        int size();
+        void clear();
+    private:
+        PointType_CMP * heap;
+        void MoveDown(int heap_index);
+        void FloatUp(int heap_index);
+        int heap_size = 0;
+        int cap = 0;
+};
+
 enum operation_set {ADD_POINT, DELETE_POINT, DELETE_BOX, ADD_BOX, DOWNSAMPLE_DELETE, PUSH_DOWN};
 
 enum delete_point_storage_set {NOT_RECORD, DELETE_POINTS_REC, MULTI_THREAD_REC, DOWNSAMPLE_REC};
@@ -71,7 +92,6 @@ struct Operation_Logger_Type{
     bool tree_deleted, tree_downsample_deleted;
     operation_set op;
 };
-
 
 class KD_TREE
 {
@@ -115,7 +135,7 @@ private:
     void Delete_by_point(KD_TREE_NODE ** root, PointType point, bool allow_rebuild);
     void Add_by_point(KD_TREE_NODE ** root, PointType point, bool allow_rebuild, int father_axis);
     void Add_by_range(KD_TREE_NODE ** root, BoxPointType boxpoint, bool allow_rebuild);
-    void Search(KD_TREE_NODE * root, int k_nearest, PointType point, priority_queue<PointType_CMP> &q);
+    void Search(KD_TREE_NODE * root, int k_nearest, PointType point, MANUAL_HEAP &q);//priority_queue<PointType_CMP>
     void Search_by_range(KD_TREE_NODE *root, BoxPointType boxpoint, PointVector &Storage);
     bool Criterion_Check(KD_TREE_NODE * root);
     void Push_Down(KD_TREE_NODE * root);

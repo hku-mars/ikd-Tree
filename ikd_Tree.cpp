@@ -343,8 +343,10 @@ void KD_TREE::Build(PointVector point_cloud){
 }
 
 void KD_TREE::Nearest_Search(PointType point, int k_nearest, PointVector& Nearest_Points, vector<float> & Point_Distance){   
-    priority_queue<PointType_CMP> q; // Clear the priority queue;
-    PointVector ().swap(Nearest_Points);
+    // priority_queue<PointType_CMP> q; // Clear the priority queue;
+    MANUAL_HEAP q(2*k_nearest);
+    // PointVector ().swap(Nearest_Points);
+    q.clear();
     vector<float> ().swap(Point_Distance);
     if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){
         Search(Root_Node, k_nearest, point, q);
@@ -858,7 +860,7 @@ void KD_TREE::Add_by_point(KD_TREE_NODE ** root, PointType point, bool allow_reb
     return;
 }
 
-void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point, priority_queue<PointType_CMP> &q){
+void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point, MANUAL_HEAP &q){
     if (root == nullptr || root->tree_deleted) return;   
     int retval; 
     if (root->need_push_down_to_left || root->need_push_down_to_right) {
@@ -1317,4 +1319,69 @@ void KD_TREE::print_treenode(KD_TREE_NODE * root, int index, FILE *fp, float x_m
         break;
     }
     return;    
+}
+
+// Manual heap
+MANUAL_HEAP::MANUAL_HEAP(int max_capacity){
+    cap = max_capacity;
+    heap = new PointType_CMP[max_capacity];
+    heap_size = 0;
+}
+
+MANUAL_HEAP::~MANUAL_HEAP(){
+}
+
+void MANUAL_HEAP::pop(){
+    if (heap_size == 0) return;
+    heap[0] = heap[heap_size-1];
+    heap_size--;
+    MoveDown(0);
+}
+        
+PointType_CMP MANUAL_HEAP::top(){
+    return heap[0];
+}
+        
+void MANUAL_HEAP::push(PointType_CMP point){
+    if (heap_size >= cap) return;
+    heap[heap_size] = point;
+    FloatUp(heap_size);
+    heap_size++;
+}
+        
+int MANUAL_HEAP::size(){
+    return heap_size;
+}
+        
+void MANUAL_HEAP::clear(){
+    heap_size = 0;
+}
+
+void MANUAL_HEAP::MoveDown(int heap_index){
+    int l = heap_index * 2 + 1;
+    PointType_CMP tmp = heap[heap_index];
+    while (l < heap_size){
+        if (l + 1 < heap_size && heap[l] < heap[l+1]) l++;
+        if (tmp < heap[l]){
+            heap[heap_index] = heap[l];
+            heap_index = l;
+            l = heap_index * 2 + 1;
+        } else break;
+    }
+    heap[heap_index] = tmp;
+    return;
+}
+        
+void MANUAL_HEAP::FloatUp(int heap_index){
+    int ancestor = (heap_index-1)/2;
+    PointType_CMP tmp = heap[heap_index];
+    while (heap_index > 0){
+        if (heap[ancestor] < tmp){
+            heap[heap_index] = heap[ancestor];
+            heap_index = ancestor;
+            ancestor = (heap_index-1)/2;
+        } else break;
+    }
+    heap[heap_index] = tmp;
+    return;
 }
