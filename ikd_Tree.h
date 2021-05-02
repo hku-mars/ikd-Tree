@@ -54,7 +54,8 @@ struct PointType_CMP{
         this->dist = d;
     };
     bool operator < (const PointType_CMP &a)const{
-        return dist < a.dist;
+        if (fabs(dist - a.dist) < 1e-10) return point.x < a.point.x;
+          else return dist < a.dist;
     }    
 };
 
@@ -88,7 +89,6 @@ class MANUAL_Q{
         bool empty();
 };
 
-
 class MANUAL_HEAP
 {
     public:
@@ -113,15 +113,11 @@ class KD_TREE
 {
 private:
     // Multi-thread Tree Rebuild
-    int max_rebuild_num = 0;
-    int max_need_rebuild_num = 0;
     bool termination_flag = false;
     bool rebuild_flag = false;
-    bool copy_flag = false;
     pthread_t rebuild_thread;
     pthread_mutex_t termination_flag_mutex_lock, rebuild_ptr_mutex_lock, working_flag_mutex, search_flag_mutex;
     pthread_mutex_t rebuild_logger_mutex_lock, points_deleted_rebuild_mutex_lock;
-    // vector<Operation_Logger_Type> Rebuild_Logger;
     // queue<Operation_Logger_Type> Rebuild_Logger;
     MANUAL_Q Rebuild_Logger;    
     PointVector Rebuild_PCL_Storage;
@@ -138,7 +134,6 @@ private:
     float delete_criterion_param = 0.5f;
     float balance_criterion_param = 0.7f;
     float downsample_size = 0.2f;
-    bool Drop_MultiThread_Rebuild = false;
     bool Delete_Storage_Disabled = false;
     KD_TREE_NODE * STATIC_ROOT_NODE = nullptr;
     PointVector Points_deleted;
@@ -184,18 +179,9 @@ public:
     void Delete_Points(PointVector & PointToDel);
     void Delete_Point_Boxes(vector<BoxPointType> & BoxPoints);
     void flatten(KD_TREE_NODE * root, PointVector &Storage);
-    void flatten_test(KD_TREE_NODE * root, PointVector &Storage, int &cnt);
-    void print_tree_states(KD_TREE_NODE * root, int level);
-    bool print_switch = false;
     void acquire_removed_points(PointVector & removed_points);
     void print_tree(int index, FILE *fp, float x_min, float x_max, float y_min, float y_max, float z_min, float z_max);
     BoxPointType tree_range();
     PointVector PCL_Storage;     
     KD_TREE_NODE * Root_Node = nullptr;  
-    vector<float> add_rec,delete_rec;
-    vector<int>   add_counter_rec, delete_counter_rec;
-    int rebuild_counter = 0;
-    FILE *fp;
-
-    // void Compatibility_Check();
 };
