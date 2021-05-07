@@ -1,3 +1,4 @@
+#pragma once
 #include <pcl/point_types.h>
 #include <Eigen/StdVector>
 #include <Eigen/Geometry>
@@ -13,7 +14,7 @@
 #define Multi_Thread_Rebuild_Point_Num 1500
 #define DOWNSAMPLE_SWITCH true
 #define ForceRebuildPercentage 0.2
-#define Q_LEN 10000
+#define Q_LEN 100000
 
 using namespace std;
 
@@ -87,6 +88,7 @@ class MANUAL_Q{
         void clear();
         void push(Operation_Logger_Type op);
         bool empty();
+        int size();
 };
 
 class MANUAL_HEAP
@@ -183,5 +185,6 @@ public:
     void print_tree(int index, FILE *fp, float x_min, float x_max, float y_min, float y_max, float z_min, float z_max);
     BoxPointType tree_range();
     PointVector PCL_Storage;     
-    KD_TREE_NODE * Root_Node = nullptr;  
+    KD_TREE_NODE * Root_Node = nullptr;
+    int max_queue_size = 0;
 };

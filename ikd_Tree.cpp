@@ -220,12 +220,13 @@ void KD_TREE::multi_thread_rebuild(){
                 int tmp_counter = 0;
                 while (!Rebuild_Logger.empty()){
                     Operation = Rebuild_Logger.front();
+                    max_queue_size = max(max_queue_size, Rebuild_Logger.size());
                     Rebuild_Logger.pop();
                     pthread_mutex_unlock(&rebuild_logger_mutex_lock);                  
                     pthread_mutex_unlock(&working_flag_mutex);
                     run_operation(&new_root_node, Operation);
                     tmp_counter ++;
-                    if (tmp_counter % 10 == 0) usleep(1);
+                    if (tmp_counter % 50 == 0) usleep(1);
                     pthread_mutex_lock(&working_flag_mutex);
                     pthread_mutex_lock(&rebuild_logger_mutex_lock);               
                 }   
@@ -1336,5 +1337,8 @@ bool MANUAL_Q::empty(){
     return is_empty;
 }
 
+int MANUAL_Q::size(){
+    return counter;
+}
 
 
