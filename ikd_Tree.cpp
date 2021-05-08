@@ -19,7 +19,7 @@ KD_TREE::~KD_TREE()
 {
     stop_thread();
     Delete_Storage_Disabled = true;
-    delete_tree_nodes(&Root_Node, NOT_RECORD);
+    delete_tree_nodes(&Root_Node);
     PointVector ().swap(PCL_Storage);
     Rebuild_Logger.clear();           
 }
@@ -208,7 +208,24 @@ void KD_TREE::multi_thread_rebuild(){
             KD_TREE_NODE * old_root_node = (*Rebuild_Ptr);                            
             father_ptr = (*Rebuild_Ptr)->father_ptr;  
             PointVector ().swap(Rebuild_PCL_Storage);
-            flatten(*Rebuild_Ptr, Rebuild_PCL_Storage);
+            // Lock Search 
+            pthread_mutex_lock(&search_flag_mutex);
+            while (search_mutex_counter != 0){
+                pthread_mutex_unlock(&search_flag_mutex);
+                usleep(1);             
+                pthread_mutex_lock(&search_flag_mutex);
+            }
+            search_mutex_counter = -1;
+            pthread_mutex_unlock(&search_flag_mutex);
+            // Lock deleted points cache
+            pthread_mutex_lock(&points_deleted_rebuild_mutex_lock);    
+            flatten(*Rebuild_Ptr, Rebuild_PCL_Storage, MULTI_THREAD_REC);
+            // Unlock deleted points cache
+            pthread_mutex_unlock(&points_deleted_rebuild_mutex_lock);
+            // Unlock Search
+            pthread_mutex_lock(&search_flag_mutex);
+            search_mutex_counter = 0;
+            pthread_mutex_unlock(&search_flag_mutex);              
             pthread_mutex_unlock(&working_flag_mutex);   
             /* Rebuild and update missed operations*/
             Operation_Logger_Type Operation;
@@ -226,7 +243,7 @@ void KD_TREE::multi_thread_rebuild(){
                     pthread_mutex_unlock(&working_flag_mutex);
                     run_operation(&new_root_node, Operation);
                     tmp_counter ++;
-                    if (tmp_counter % 50 == 0) usleep(1);
+                    if (tmp_counter % 10 == 0) usleep(1);
                     pthread_mutex_lock(&working_flag_mutex);
                     pthread_mutex_lock(&rebuild_logger_mutex_lock);               
                 }   
@@ -269,9 +286,7 @@ void KD_TREE::multi_thread_rebuild(){
             pthread_mutex_unlock(&working_flag_mutex);
             rebuild_flag = false;                     
             /* Delete discarded tree nodes */
-            pthread_mutex_lock(&points_deleted_rebuild_mutex_lock);    
-            delete_tree_nodes(&old_root_node, MULTI_THREAD_REC);
-            pthread_mutex_unlock(&points_deleted_rebuild_mutex_lock);     
+            delete_tree_nodes(&old_root_node);
         } else {
             pthread_mutex_unlock(&working_flag_mutex);             
         }
@@ -320,7 +335,7 @@ void KD_TREE::run_operation(KD_TREE_NODE ** root, Operation_Logger_Type operatio
 
 void KD_TREE::Build(PointVector point_cloud){
     if (Root_Node != nullptr){
-        delete_tree_nodes(&Root_Node, NOT_RECORD);
+        delete_tree_nodes(&Root_Node);
     }
     if (point_cloud.size() == 0) return;
     STATIC_ROOT_NODE = new KD_TREE_NODE;
@@ -578,8 +593,8 @@ void KD_TREE::Rebuild(KD_TREE_NODE ** root){
         father_ptr = (*root)->father_ptr;
         int size_rec = (*root)->TreeSize;
         PCL_Storage.clear();
-        flatten(*root, PCL_Storage);
-        delete_tree_nodes(root, DELETE_POINTS_REC);
+        flatten(*root, PCL_Storage, DELETE_POINTS_REC);
+        delete_tree_nodes(root);
         BuildTree(root, 0, PCL_Storage.size()-1, PCL_Storage);
         if (*root != nullptr) (*root)->father_ptr = father_ptr;
         if (*root == Root_Node) STATIC_ROOT_NODE->left_son_ptr = *root;
@@ -951,7 +966,7 @@ void KD_TREE::Search_by_range(KD_TREE_NODE *root, BoxPointType boxpoint, PointVe
     if (boxpoint.vertex_max[1] <= root->node_range_y[0] || boxpoint.vertex_min[1] > root->node_range_y[1]) return;
     if (boxpoint.vertex_max[2] <= root->node_range_z[0] || boxpoint.vertex_min[2] > root->node_range_z[1]) return;
     if (boxpoint.vertex_min[0] <= root->node_range_x[0] && boxpoint.vertex_max[0] > root->node_range_x[1] && boxpoint.vertex_min[1] <= root->node_range_y[0] && boxpoint.vertex_max[1] > root->node_range_y[1] && boxpoint.vertex_min[2] <= root->node_range_z[0] && boxpoint.vertex_max[2] > root->node_range_z[1]){
-        flatten(root, Storage);
+        flatten(root, Storage, NOT_RECORD);
         return;
     }
     if (boxpoint.vertex_min[0] <= root->point.x && boxpoint.vertex_max[0] > root->point.x && boxpoint.vertex_min[1] <= root->point.y && boxpoint.vertex_max[1] > root->point.y && boxpoint.vertex_min[2] <= root->point.z && boxpoint.vertex_max[2] > root->point.z){
@@ -1131,42 +1146,40 @@ void KD_TREE::Update(KD_TREE_NODE * root){
     return;
 }
 
-void KD_TREE::flatten(KD_TREE_NODE * root, PointVector &Storage){
-    if (root == nullptr || root->tree_deleted) return;
+void KD_TREE::flatten(KD_TREE_NODE * root, PointVector &Storage, delete_point_storage_set storage_type){
+    if (root == nullptr) return;
     Push_Down(root);
     if (!root->point_deleted) {
         Storage.push_back(root->point);
     }
-    flatten(root->left_son_ptr, Storage);
-    flatten(root->right_son_ptr, Storage);
-    return;
-}
-
-void KD_TREE::delete_tree_nodes(KD_TREE_NODE ** root, delete_point_storage_set storage_type){ 
-    if (*root == nullptr) return;
-    Push_Down(*root);    
-    delete_tree_nodes(&(*root)->left_son_ptr, storage_type);
-    delete_tree_nodes(&(*root)->right_son_ptr, storage_type);  
+    flatten(root->left_son_ptr, Storage, storage_type);
+    flatten(root->right_son_ptr, Storage, storage_type);
     switch (storage_type)
     {
     case NOT_RECORD:
         break;
     case DELETE_POINTS_REC:
-        if ((*root)->point_deleted && !(*root)->point_downsample_deleted) {
-            Points_deleted.push_back((*root)->point);
+        if (root->point_deleted && !root->point_downsample_deleted) {
+            Points_deleted.push_back(root->point);
         }       
         break;
     case MULTI_THREAD_REC:
-        if ((*root)->point_deleted  && !(*root)->point_downsample_deleted) {
-            Multithread_Points_deleted.push_back((*root)->point);
+        if (root->point_deleted  && !root->point_downsample_deleted) {
+            Multithread_Points_deleted.push_back(root->point);
         }
-        break;
-    case DOWNSAMPLE_REC:
-        if (!(*root)->point_deleted) Downsample_Storage.push_back((*root)->point);
         break;
     default:
         break;
-    }               
+    }     
+    return;
+}
+
+void KD_TREE::delete_tree_nodes(KD_TREE_NODE ** root){ 
+    if (*root == nullptr) return;
+    Push_Down(*root);    
+    delete_tree_nodes(&(*root)->left_son_ptr);
+    delete_tree_nodes(&(*root)->right_son_ptr);  
+              
     delete *root;
     *root = nullptr;                    
 

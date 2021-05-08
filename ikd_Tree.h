@@ -14,7 +14,7 @@
 #define Multi_Thread_Rebuild_Point_Num 1500
 #define DOWNSAMPLE_SWITCH true
 #define ForceRebuildPercentage 0.2
-#define Q_LEN 100000
+#define Q_LEN 1000000
 
 using namespace std;
 
@@ -67,7 +67,7 @@ struct BoxPointType{
 
 enum operation_set {ADD_POINT, DELETE_POINT, DELETE_BOX, ADD_BOX, DOWNSAMPLE_DELETE, PUSH_DOWN};
 
-enum delete_point_storage_set {NOT_RECORD, DELETE_POINTS_REC, MULTI_THREAD_REC, DOWNSAMPLE_REC};
+enum delete_point_storage_set {NOT_RECORD, DELETE_POINTS_REC, MULTI_THREAD_REC};
 
 struct Operation_Logger_Type{
     PointType point;
@@ -154,7 +154,7 @@ private:
     bool Criterion_Check(KD_TREE_NODE * root);
     void Push_Down(KD_TREE_NODE * root);
     void Update(KD_TREE_NODE * root); 
-    void delete_tree_nodes(KD_TREE_NODE ** root, delete_point_storage_set storage_type);
+    void delete_tree_nodes(KD_TREE_NODE ** root);
     void downsample(KD_TREE_NODE ** root);
     bool same_point(PointType a, PointType b);
     float calc_dist(PointType a, PointType b);
@@ -180,7 +180,7 @@ public:
     void Add_Point_Boxes(vector<BoxPointType> & BoxPoints);
     void Delete_Points(PointVector & PointToDel);
     void Delete_Point_Boxes(vector<BoxPointType> & BoxPoints);
-    void flatten(KD_TREE_NODE * root, PointVector &Storage);
+    void flatten(KD_TREE_NODE * root, PointVector &Storage, delete_point_storage_set storage_type);
     void acquire_removed_points(PointVector & removed_points);
     void print_tree(int index, FILE *fp, float x_min, float x_max, float y_min, float y_max, float z_min, float z_max);
     BoxPointType tree_range();
