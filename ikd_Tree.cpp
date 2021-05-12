@@ -346,12 +346,12 @@ void KD_TREE::Build(PointVector point_cloud){
     Root_Node = STATIC_ROOT_NODE->left_son_ptr;    
 }
 
-void KD_TREE::Nearest_Search(PointType point, int k_nearest, PointVector& Nearest_Points, vector<float> & Point_Distance){   
+void KD_TREE::Nearest_Search(PointType point, int k_nearest, PointVector& Nearest_Points, vector<float> & Point_Distance, double max_dist){   
     MANUAL_HEAP q(2*k_nearest);
     q.clear();
     vector<float> ().swap(Point_Distance);
     if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node){
-        Search(Root_Node, k_nearest, point, q);
+        Search(Root_Node, k_nearest, point, q, max_dist);
     } else {
         pthread_mutex_lock(&search_flag_mutex);
         while (search_mutex_counter == -1)
@@ -362,7 +362,7 @@ void KD_TREE::Nearest_Search(PointType point, int k_nearest, PointVector& Neares
         }
         search_mutex_counter += 1;
         pthread_mutex_unlock(&search_flag_mutex);  
-        Search(Root_Node, k_nearest, point, q);  
+        Search(Root_Node, k_nearest, point, q, max_dist);  
         pthread_mutex_lock(&search_flag_mutex);
         search_mutex_counter -= 1;
         pthread_mutex_unlock(&search_flag_mutex);      
@@ -533,27 +533,43 @@ void KD_TREE::BuildTree(KD_TREE_NODE ** root, int l, int r, PointVector & Storag
     if (l>r) return;
     *root = new KD_TREE_NODE;
     InitTreeNode(*root);
-    int mid = (l+r)>>1; 
-    // Find the best division Axis
-    int i;
-    float average[3] = {0,0,0};
-    float covariance[3] = {0,0,0};
-    for (i=l;i<=r;i++){
-        average[0] += Storage[i].x;
-        average[1] += Storage[i].y;
-        average[2] += Storage[i].z;
-    }
-    for (i=0;i<3;i++) average[i] = average[i]/(r-l+1);
-    for (i=l;i<=r;i++){
-        covariance[0] += (Storage[i].x - average[0]) * (Storage[i].x - average[0]);
-        covariance[1] += (Storage[i].y - average[1]) * (Storage[i].y - average[1]);  
-        covariance[2] += (Storage[i].z - average[2]) * (Storage[i].z - average[2]);              
-    }
-    for (i=0;i<3;i++) covariance[i] = covariance[i]/(r-l+1);   
+    int mid = (l+r)>>1;
     int div_axis = 0;
-    for (i = 1;i<3;i++){
-        if (covariance[i] > covariance[div_axis]) div_axis = i;
+    int i;
+    // Find the best division Axis
+    // float average[3] = {0,0,0};
+    // float covariance[3] = {0,0,0};
+    // for (i=l;i<=r;i++){
+    //     average[0] += Storage[i].x;
+    //     average[1] += Storage[i].y;
+    //     average[2] += Storage[i].z;
+    // }
+    // for (i=0;i<3;i++) average[i] = average[i]/(r-l+1);
+    // for (i=l;i<=r;i++){
+    //     covariance[0] += (Storage[i].x - average[0]) * (Storage[i].x - average[0]);
+    //     covariance[1] += (Storage[i].y - average[1]) * (Storage[i].y - average[1]);  
+    //     covariance[2] += (Storage[i].z - average[2]) * (Storage[i].z - average[2]);              
+    // }
+    // for (i=0;i<3;i++) covariance[i] = covariance[i]/(r-l+1);   
+    // for (i = 1;i<3;i++){
+    //     if (covariance[i] > covariance[div_axis]) div_axis = i;
+    // }
+    // Select the longest dimension as division axis
+    float min_value[3] = {INFINITY, INFINITY, INFINITY};
+    float max_value[3] = {-INFINITY, -INFINITY, -INFINITY};
+    float dim_range[3] = {0,0,0};
+    for (i=l;i<=r;i++){
+        min_value[0] = min(min_value[0], Storage[i].x);
+        min_value[1] = min(min_value[1], Storage[i].y);
+        min_value[2] = min(min_value[2], Storage[i].z);
+        max_value[0] = max(max_value[0], Storage[i].x);
+        max_value[1] = max(max_value[1], Storage[i].y);
+        max_value[2] = max(max_value[2], Storage[i].z);
     }
+    for (i=0;i<3;i++) dim_range[i] = max_value[i] - min_value[i];
+    for (i=1;i<3;i++) if (dim_range[i] > dim_range[div_axis]) div_axis = i;
+    // Divide by the division axis and recursively build.
+
     (*root)->division_axis = div_axis;
     switch (div_axis)
     {
@@ -816,8 +832,10 @@ void KD_TREE::Add_by_point(KD_TREE_NODE ** root, PointType point, bool allow_reb
     return;
 }
 
-void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point, MANUAL_HEAP &q){
+void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point, MANUAL_HEAP &q, double max_dist){
     if (root == nullptr || root->tree_deleted) return;   
+    double cur_dist = calc_box_dist(root, point);
+    if (cur_dist > max_dist) return;    
     int retval; 
     if (root->need_push_down_to_left || root->need_push_down_to_right) {
         retval = pthread_mutex_trylock(&(root->push_down_mutex_lock));
@@ -831,7 +849,7 @@ void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point, MANUAL
     }
     if (!root->point_deleted){
         float dist = calc_dist(point, root->point);
-        if (q.size() < k_nearest || dist < q.top().dist){
+        if (dist <= max_dist && (q.size() < k_nearest || dist < q.top().dist)){
             if (q.size() >= k_nearest) q.pop();
             PointType_CMP current_point{root->point, dist};                    
             q.push(current_point);            
@@ -843,7 +861,7 @@ void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point, MANUAL
     if (q.size()< k_nearest || dist_left_node < q.top().dist && dist_right_node < q.top().dist){
         if (dist_left_node <= dist_right_node) {
             if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != root->left_son_ptr){
-                Search(root->left_son_ptr, k_nearest, point,q);                       
+                Search(root->left_son_ptr, k_nearest, point, q, max_dist);                       
             } else {
                 pthread_mutex_lock(&search_flag_mutex);
                 while (search_mutex_counter == -1)
@@ -854,14 +872,14 @@ void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point, MANUAL
                 }
                 search_mutex_counter += 1;
                 pthread_mutex_unlock(&search_flag_mutex);
-                Search(root->left_son_ptr, k_nearest, point,q);  
+                Search(root->left_son_ptr, k_nearest, point, q, max_dist);  
                 pthread_mutex_lock(&search_flag_mutex);
                 search_mutex_counter -= 1;
                 pthread_mutex_unlock(&search_flag_mutex);
             }
             if (q.size() < k_nearest || dist_right_node < q.top().dist) {
                 if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != root->right_son_ptr){
-                    Search(root->right_son_ptr, k_nearest, point,q);                       
+                    Search(root->right_son_ptr, k_nearest, point, q, max_dist);                       
                 } else {
                     pthread_mutex_lock(&search_flag_mutex);
                     while (search_mutex_counter == -1)
@@ -872,7 +890,7 @@ void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point, MANUAL
                     }
                     search_mutex_counter += 1;
                     pthread_mutex_unlock(&search_flag_mutex);                    
-                    Search(root->right_son_ptr, k_nearest, point,q);  
+                    Search(root->right_son_ptr, k_nearest, point, q, max_dist);  
                     pthread_mutex_lock(&search_flag_mutex);
                     search_mutex_counter -= 1;
                     pthread_mutex_unlock(&search_flag_mutex);
@@ -880,7 +898,7 @@ void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point, MANUAL
             }
         } else {
             if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != root->right_son_ptr){
-                Search(root->right_son_ptr, k_nearest, point,q);                       
+                Search(root->right_son_ptr, k_nearest, point, q, max_dist);                       
             } else {
                 pthread_mutex_lock(&search_flag_mutex);
                 while (search_mutex_counter == -1)
@@ -891,14 +909,14 @@ void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point, MANUAL
                 }
                 search_mutex_counter += 1;
                 pthread_mutex_unlock(&search_flag_mutex);                   
-                Search(root->right_son_ptr, k_nearest, point,q);  
+                Search(root->right_son_ptr, k_nearest, point, q, max_dist);  
                 pthread_mutex_lock(&search_flag_mutex);
                 search_mutex_counter -= 1;
                 pthread_mutex_unlock(&search_flag_mutex);
             }
             if (q.size() < k_nearest || dist_left_node < q.top().dist) {            
                 if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != root->left_son_ptr){
-                    Search(root->left_son_ptr, k_nearest, point,q);                       
+                    Search(root->left_son_ptr, k_nearest, point, q, max_dist);                       
                 } else {
                     pthread_mutex_lock(&search_flag_mutex);
                     while (search_mutex_counter == -1)
@@ -909,7 +927,7 @@ void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point, MANUAL
                     }
                     search_mutex_counter += 1;
                     pthread_mutex_unlock(&search_flag_mutex);  
-                    Search(root->left_son_ptr, k_nearest, point,q);  
+                    Search(root->left_son_ptr, k_nearest, point, q, max_dist);  
                     pthread_mutex_lock(&search_flag_mutex);
                     search_mutex_counter -= 1;
                     pthread_mutex_unlock(&search_flag_mutex);
@@ -919,7 +937,7 @@ void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point, MANUAL
     } else {
         if (dist_left_node < q.top().dist) {        
             if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != root->left_son_ptr){
-                Search(root->left_son_ptr, k_nearest, point,q);                       
+                Search(root->left_son_ptr, k_nearest, point, q, max_dist);                       
             } else {
                 pthread_mutex_lock(&search_flag_mutex);
                 while (search_mutex_counter == -1)
@@ -930,7 +948,7 @@ void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point, MANUAL
                 }
                 search_mutex_counter += 1;
                 pthread_mutex_unlock(&search_flag_mutex);  
-                Search(root->left_son_ptr, k_nearest, point,q);  
+                Search(root->left_son_ptr, k_nearest, point, q, max_dist);  
                 pthread_mutex_lock(&search_flag_mutex);
                 search_mutex_counter -= 1;
                 pthread_mutex_unlock(&search_flag_mutex);
@@ -938,7 +956,7 @@ void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point, MANUAL
         }
         if (dist_right_node < q.top().dist) {
             if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != root->right_son_ptr){
-                Search(root->right_son_ptr, k_nearest, point,q);                       
+                Search(root->right_son_ptr, k_nearest, point, q, max_dist);                       
             } else {
                 pthread_mutex_lock(&search_flag_mutex);
                 while (search_mutex_counter == -1)
@@ -949,7 +967,7 @@ void KD_TREE::Search(KD_TREE_NODE * root, int k_nearest, PointType point, MANUAL
                 }
                 search_mutex_counter += 1;
                 pthread_mutex_unlock(&search_flag_mutex);  
-                Search(root->right_son_ptr, k_nearest, point,q);
+                Search(root->right_son_ptr, k_nearest, point, q, max_dist);
                 pthread_mutex_lock(&search_flag_mutex);
                 search_mutex_counter -= 1;
                 pthread_mutex_unlock(&search_flag_mutex);

@@ -110,7 +110,6 @@ class MANUAL_HEAP
 };
 
 
-
 class KD_TREE
 {
 private:
@@ -149,7 +148,7 @@ private:
     void Delete_by_point(KD_TREE_NODE ** root, PointType point, bool allow_rebuild);
     void Add_by_point(KD_TREE_NODE ** root, PointType point, bool allow_rebuild, int father_axis);
     void Add_by_range(KD_TREE_NODE ** root, BoxPointType boxpoint, bool allow_rebuild);
-    void Search(KD_TREE_NODE * root, int k_nearest, PointType point, MANUAL_HEAP &q);//priority_queue<PointType_CMP>
+    void Search(KD_TREE_NODE * root, int k_nearest, PointType point, MANUAL_HEAP &q, double max_dist);//priority_queue<PointType_CMP>
     void Search_by_range(KD_TREE_NODE *root, BoxPointType boxpoint, PointVector &Storage);
     bool Criterion_Check(KD_TREE_NODE * root);
     void Push_Down(KD_TREE_NODE * root);
@@ -175,7 +174,7 @@ public:
     int validnum();
     void root_alpha(float &alpha_bal, float &alpha_del);
     void Build(PointVector point_cloud);
-    void Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> & Point_Distance);
+    void Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> & Point_Distance, double max_dist = INFINITY);
     void Add_Points(PointVector & PointToAdd, bool downsample_on);
     void Add_Point_Boxes(vector<BoxPointType> & BoxPoints);
     void Delete_Points(PointVector & PointToDel);
