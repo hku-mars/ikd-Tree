@@ -232,7 +232,8 @@ void KD_TREE::multi_thread_rebuild(){
             KD_TREE_NODE * new_root_node = nullptr;  
             if (int(Rebuild_PCL_Storage.size()) > 0){
                 BuildTree(&new_root_node, 0, Rebuild_PCL_Storage.size()-1, Rebuild_PCL_Storage);
-                // Rebuild has been done. Updates the blocked operations into the new tree  
+                // Rebuild has been done. Updates the blocked operations into the new tree
+                pthread_mutex_lock(&working_flag_mutex);
                 pthread_mutex_lock(&rebuild_logger_mutex_lock);
                 int tmp_counter = 0;
                 while (!Rebuild_Logger.empty()){
@@ -778,7 +779,7 @@ void KD_TREE::Add_by_range(KD_TREE_NODE ** root, BoxPointType boxpoint, bool all
     if (Rebuild_Ptr != nullptr && *Rebuild_Ptr == *root && (*root)->TreeSize < Multi_Thread_Rebuild_Point_Num) Rebuild_Ptr = nullptr; 
     bool need_rebuild = allow_rebuild & Criterion_Check((*root));
     if (need_rebuild) Rebuild(root);
-    (*root)->working_flag = false;   
+    if ((*root) != nullptr) (*root)->working_flag = false;   
     return;
 }
 
@@ -828,7 +829,7 @@ void KD_TREE::Add_by_point(KD_TREE_NODE ** root, PointType point, bool allow_reb
     if (Rebuild_Ptr != nullptr && *Rebuild_Ptr == *root && (*root)->TreeSize < Multi_Thread_Rebuild_Point_Num) Rebuild_Ptr = nullptr; 
     bool need_rebuild = allow_rebuild & Criterion_Check((*root));
     if (need_rebuild) Rebuild(root); 
-    (*root)->working_flag = false;   
+    if ((*root) != nullptr) (*root)->working_flag = false;   
     return;
 }
 
