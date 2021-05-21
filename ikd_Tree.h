@@ -144,7 +144,7 @@ private:
     void Test_Lock_States(KD_TREE_NODE *root);
     void BuildTree(KD_TREE_NODE ** root, int l, int r, PointVector & Storage);
     void Rebuild(KD_TREE_NODE ** root);
-    void Delete_by_range(KD_TREE_NODE ** root, BoxPointType boxpoint, bool allow_rebuild, bool is_downsample);
+    int Delete_by_range(KD_TREE_NODE ** root, BoxPointType boxpoint, bool allow_rebuild, bool is_downsample);
     void Delete_by_point(KD_TREE_NODE ** root, PointType point, bool allow_rebuild);
     void Add_by_point(KD_TREE_NODE ** root, PointType point, bool allow_rebuild, int father_axis);
     void Add_by_range(KD_TREE_NODE ** root, BoxPointType boxpoint, bool allow_rebuild);
@@ -175,10 +175,10 @@ public:
     void root_alpha(float &alpha_bal, float &alpha_del);
     void Build(PointVector point_cloud);
     void Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> & Point_Distance, double max_dist = INFINITY);
-    void Add_Points(PointVector & PointToAdd, bool downsample_on);
+    int Add_Points(PointVector & PointToAdd, bool downsample_on);
     void Add_Point_Boxes(vector<BoxPointType> & BoxPoints);
     void Delete_Points(PointVector & PointToDel);
-    void Delete_Point_Boxes(vector<BoxPointType> & BoxPoints);
+    int Delete_Point_Boxes(vector<BoxPointType> & BoxPoints);
     void flatten(KD_TREE_NODE * root, PointVector &Storage, delete_point_storage_set storage_type);
     void acquire_removed_points(PointVector & removed_points);
     void print_tree(int index, FILE *fp, float x_min, float x_max, float y_min, float y_max, float z_min, float z_max);
