@@ -26,8 +26,8 @@ More details please refer to our paper and video~
 ## Version 2
 
 - We upgraded our **ikd-Tree** to achieve a more stable and efficient performance. More details are shown as follows:
-  - Replace the queue and priority queue in STL with our code for stable performance to avoid memory conflicts.
-  - Fix some bugs in re-building in the previous version, which may result in information loss during the multi-thread re-building process. 
-  - Add a new parameter max_dist to support ranged search to achieve faster nearest search in robotic applications.
+  - Replace the queue and priority queue in STL with our code to avoid memory conflicts.
+  - Fix some bugs in re-building of the previous version, which may result in information loss during the multi-thread re-building process. 
+  - Add a new parameter `max_dist` to support ranged search to achieve faster nearest search in robotic applications.
   - Fix minor bugs to improve the overall performance. 
 
