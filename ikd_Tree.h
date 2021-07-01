@@ -161,7 +161,6 @@ private:
     static bool point_cmp_x(PointType a, PointType b); 
     static bool point_cmp_y(PointType a, PointType b); 
     static bool point_cmp_z(PointType a, PointType b); 
-    void print_treenode(KD_TREE_NODE * root, int index, FILE *fp, float x_min, float x_max, float y_min, float y_max, float z_min, float z_max);
 
 public:
     KD_TREE(float delete_param = 0.5, float balance_param = 0.6 , float box_length = 0.2);
@@ -181,7 +180,6 @@ public:
     int Delete_Point_Boxes(vector<BoxPointType> & BoxPoints);
     void flatten(KD_TREE_NODE * root, PointVector &Storage, delete_point_storage_set storage_type);
     void acquire_removed_points(PointVector & removed_points);
-    void print_tree(int index, FILE *fp, float x_min, float x_max, float y_min, float y_max, float z_min, float z_max);
     BoxPointType tree_range();
     PointVector PCL_Storage;     
     KD_TREE_NODE * Root_Node = nullptr;

@@ -65,8 +65,6 @@ void KD_TREE::InitTreeNode(KD_TREE_NODE * root){
     root->need_push_down_to_right = false;
     root->point_downsample_deleted = false;
     root->working_flag = false;
-    root->alpha_bal = 0.5;
-    root->alpha_del = 0.0;
     pthread_mutex_init(&(root->push_down_mutex_lock),NULL);
 }   
 
@@ -542,24 +540,6 @@ void KD_TREE::BuildTree(KD_TREE_NODE ** root, int l, int r, PointVector & Storag
     int div_axis = 0;
     int i;
     // Find the best division Axis
-    // float average[3] = {0,0,0};
-    // float covariance[3] = {0,0,0};
-    // for (i=l;i<=r;i++){
-    //     average[0] += Storage[i].x;
-    //     average[1] += Storage[i].y;
-    //     average[2] += Storage[i].z;
-    // }
-    // for (i=0;i<3;i++) average[i] = average[i]/(r-l+1);
-    // for (i=l;i<=r;i++){
-    //     covariance[0] += (Storage[i].x - average[0]) * (Storage[i].x - average[0]);
-    //     covariance[1] += (Storage[i].y - average[1]) * (Storage[i].y - average[1]);  
-    //     covariance[2] += (Storage[i].z - average[2]) * (Storage[i].z - average[2]);              
-    // }
-    // for (i=0;i<3;i++) covariance[i] = covariance[i]/(r-l+1);   
-    // for (i = 1;i<3;i++){
-    //     if (covariance[i] > covariance[div_axis]) div_axis = i;
-    // }
-    // Select the longest dimension as division axis
     float min_value[3] = {INFINITY, INFINITY, INFINITY};
     float max_value[3] = {-INFINITY, -INFINITY, -INFINITY};
     float dim_range[3] = {0,0,0};
@@ -571,6 +551,7 @@ void KD_TREE::BuildTree(KD_TREE_NODE ** root, int l, int r, PointVector & Storag
         max_value[1] = max(max_value[1], Storage[i].y);
         max_value[2] = max(max_value[2], Storage[i].z);
     }
+    // Select the longest dimension as division axis
     for (i=0;i<3;i++) dim_range[i] = max_value[i] - min_value[i];
     for (i=1;i<3;i++) if (dim_range[i] > dim_range[div_axis]) div_axis = i;
     // Divide by the division axis and recursively build.
@@ -1309,37 +1290,6 @@ float KD_TREE::calc_box_dist(KD_TREE_NODE * node, PointType point){
 bool KD_TREE::point_cmp_x(PointType a, PointType b) { return a.x < b.x;}
 bool KD_TREE::point_cmp_y(PointType a, PointType b) { return a.y < b.y;}
 bool KD_TREE::point_cmp_z(PointType a, PointType b) { return a.z < b.z;}
-
-void KD_TREE::print_tree(int index, FILE *fp, float x_min, float x_max, float y_min, float y_max, float z_min, float z_max){
-    pthread_mutex_lock(&working_flag_mutex);
-    print_treenode(Root_Node, index, fp, x_min,x_max,y_min,y_max,z_min,z_max);
-    pthread_mutex_unlock(&working_flag_mutex);       
-}
-
-void KD_TREE::print_treenode(KD_TREE_NODE * root, int index, FILE *fp, float x_min, float x_max, float y_min, float y_max, float z_min, float z_max){
-    if (root == nullptr) return;
-    Push_Down(root);
-    fprintf(fp,"%d,%0.3f,%0.3f,%0.3f",index,root->point.x,root->point.y,root->point.z);
-    fprintf(fp,",%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f\n",x_min,x_max,y_min,y_max,z_min,z_max);
-    switch (root->division_axis)
-    {
-    case 0:
-        print_treenode(root->left_son_ptr, index, fp, x_min,root->point.x,y_min,y_max,z_min,z_max);
-        print_treenode(root->right_son_ptr,index, fp, root->point.x,x_max,y_min,y_max,z_min,z_max);  
-        break;
-    case 1:
-        print_treenode(root->left_son_ptr, index, fp, x_min,x_max,y_min,root->point.y,z_min,z_max);
-        print_treenode(root->right_son_ptr,index, fp, x_min,x_max,root->point.y,y_max,z_min,z_max);   
-        break;
-    case 2:
-        print_treenode(root->left_son_ptr, index, fp, x_min,x_max,y_min,y_max,z_min,root->point.z);
-        print_treenode(root->right_son_ptr,index, fp, x_min,x_max,y_min,y_max,root->point.z,z_max);   
-        break;             
-    default:
-        break;
-    }
-    return;    
-}
 
 // Manual heap
 MANUAL_HEAP::MANUAL_HEAP(int max_capacity){
