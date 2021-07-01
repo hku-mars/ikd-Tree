@@ -122,7 +122,7 @@ private:
     // queue<Operation_Logger_Type> Rebuild_Logger;
     MANUAL_Q Rebuild_Logger;    
     PointVector Rebuild_PCL_Storage;
-    KD_TREE_NODE ** Rebuild_Ptr;
+    KD_TREE_NODE ** Rebuild_Ptr = nullptr;
     int search_mutex_counter = 0;
     static void * multi_thread_ptr(void *arg);
     void multi_thread_rebuild();
