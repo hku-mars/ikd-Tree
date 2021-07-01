@@ -217,7 +217,8 @@ int main(int argc, char** argv){
         printf("Delete point time cost is %0.3f ms\n",float(delete_duration)/1e3);      
         // Box-wise Delete
         auto box_delete_duration = chrono::duration_cast<chrono::microseconds>(t2-t2).count();
-        if (Delete_Box_Switch && (counter+1) % 50  == 0){ 
+        if (Delete_Box_Switch && (counter+1) % 500  == 0){
+            printf("Waiting to generate 4 cuboids for box-wise delete test...\n");
             generate_box_decrement(Delete_Boxes, Box_Length, Box_Num);
             t1 = chrono::high_resolution_clock::now();
             ikd_Tree.Delete_Point_Boxes(Delete_Boxes);
