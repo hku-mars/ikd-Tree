@@ -1258,8 +1258,9 @@ void KD_TREE::delete_tree_nodes(KD_TREE_NODE ** root){
     if (*root == nullptr) return;
     Push_Down(*root);    
     delete_tree_nodes(&(*root)->left_son_ptr);
-    delete_tree_nodes(&(*root)->right_son_ptr);  
-              
+    delete_tree_nodes(&(*root)->right_son_ptr);
+    
+	pthread_mutex_destroy( &(*root)->push_down_mutex_lock)               
     delete *root;
     *root = nullptr;                    
 
