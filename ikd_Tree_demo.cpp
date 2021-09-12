@@ -3,8 +3,9 @@
 #include <stdlib.h>
 #include <random>
 #include <algorithm>
-
-
+#include "pcl/point_types.h"
+using PointType = pcl::PointXYZINormal;
+using PointVector = std::vector<PointType>;
 
 #define X_MAX 5.0
 #define X_MIN -5.0
@@ -33,7 +34,7 @@ PointVector raw_cmp_result;
 PointVector DeletePoints;
 PointVector removed_points;
 
-KD_TREE ikd_Tree(0.3,0.6,0.2);
+KD_TREE<PointType> ikd_Tree(0.3,0.6,0.2);
 
 float rand_float(float x_min, float x_max){
     float rand_ratio = rand()/(float)RAND_MAX;
