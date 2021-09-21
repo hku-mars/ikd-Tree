@@ -27,23 +27,7 @@ KD_TREE<PointType>::~KD_TREE()
     Rebuild_Logger.clear();
 }
 
-template <typename PointType>
-void KD_TREE<PointType>::Set_delete_criterion_param(float delete_param)
-{
-    delete_criterion_param = delete_param;
-}
 
-template <typename PointType>
-void KD_TREE<PointType>::Set_balance_criterion_param(float balance_param)
-{
-    balance_criterion_param = balance_param;
-}
-
-template <typename PointType>
-void KD_TREE<PointType>::set_downsample_param(float downsample_param)
-{
-    downsample_size = downsample_param;
-}
 
 template <typename PointType>
 void KD_TREE<PointType>::InitializeKDTree(float delete_param, float balance_param, float box_length)

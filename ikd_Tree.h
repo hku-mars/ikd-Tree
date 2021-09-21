@@ -49,9 +49,13 @@ template <typename PointType>
 class KD_TREE
 {
     // using MANUAL_Q_ = MANUAL_Q<typename PointType>;
-    using PointVector = std::vector<PointType>;
+    // using PointVector = std::vector<PointType>;
+    
     // using MANUAL_Q_ = MANUAL_Q<typename PointType>;
 public:
+    using PointVector = std::vector<PointType, Eigen::aligned_allocator<PointType>>;
+    using Ptr = std::shared_ptr<KD_TREE<PointType>>;
+    
     struct KD_TREE_NODE
     {
         PointType point;
@@ -89,7 +93,7 @@ public:
     {
         PointType point;
         float dist = 0.0;
-        PointType_CMP(PointType p = PointType()  , float d = INFINITY)
+        PointType_CMP(PointType p = PointType(), float d = INFINITY)
         {
             this->point = p;
             this->dist = d;
@@ -249,7 +253,7 @@ public:
         }
     };
 
-    private:
+private:
     // Multi-thread Tree Rebuild
     bool termination_flag = false;
     bool rebuild_flag = false;
@@ -302,9 +306,18 @@ public:
 public:
     KD_TREE(float delete_param = 0.5, float balance_param = 0.6, float box_length = 0.2);
     ~KD_TREE();
-    void Set_delete_criterion_param(float delete_param);
-    void Set_balance_criterion_param(float balance_param);
-    void set_downsample_param(float box_length);
+    void Set_delete_criterion_param(float delete_param)
+    {
+        delete_criterion_param = delete_param;
+    }
+    void Set_balance_criterion_param(float balance_param)
+    {
+        balance_criterion_param = balance_param;
+    }
+    void set_downsample_param(float downsample_param)
+    {
+        downsample_size = downsample_param;
+    }
     void InitializeKDTree(float delete_param = 0.5, float balance_param = 0.7, float box_length = 0.2);
     int size();
     int validnum();
