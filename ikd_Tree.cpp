@@ -1049,7 +1049,7 @@ void KD_TREE<PointType>::Search(KD_TREE_NODE *root, int k_nearest, PointType poi
     if (root == nullptr || root->tree_deleted)
         return;
     double cur_dist = calc_box_dist(root, point);
-    if (cur_dist > max_dist)
+    if (cur_dist > max_dist * max_dist)
         return;
     int retval;
     if (root->need_push_down_to_left || root->need_push_down_to_right)
