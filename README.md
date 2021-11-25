@@ -34,7 +34,7 @@ More details please refer to our paper and video~
 
 ## Build & Run demo
 ### 1. How to build this project
-```asm
+```
 cd ~/catkin_ws/src
 git clone git@github.com:hku-mars/ikd-Tree.git
 cd ikd-Tree/build
@@ -43,7 +43,7 @@ make -j 9
 ```
 ### 2. Run our examples
 
-```asm
+```
 cd ${Your own directory}/ikd-Tree/build
 # Example 1. Check the speed of ikd-Tree
 ./ikd_tree_demo
