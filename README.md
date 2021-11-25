@@ -41,7 +41,7 @@ cd ikd-Tree/build
 cmake ..
 make -j 9
 cd ../materials
-wget https://urserver.kaist.ac.kr/publicdata/ikd-tree/global_map.pcd
+wget https://urserver.kaist.ac.kr/publicdata/ikd-tree/large_scale_map.pcd
 ```
 ### 2. Run our examples
 
