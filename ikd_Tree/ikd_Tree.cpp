@@ -460,6 +460,13 @@ void KD_TREE<PointType>::Nearest_Search(PointType point, int k_nearest, PointVec
 }
 
 template <typename PointType>
+int KD_TREE<PointType>::Search_Points_by_box(const BoxPointType &Box_of_Point, PointVector &Storage)
+{
+    Storage.clear();
+    Search_by_range(Root_Node, Box_of_Point, Storage);
+}
+
+template <typename PointType>
 int KD_TREE<PointType>::Add_Points(PointVector &PointToAdd, bool downsample_on)
 {
     int NewPointSize = PointToAdd.size();

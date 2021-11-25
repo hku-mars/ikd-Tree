@@ -324,6 +324,7 @@ public:
     void root_alpha(float &alpha_bal, float &alpha_del);
     void Build(PointVector point_cloud);
     void Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> &Point_Distance, double max_dist = INFINITY);
+    int Search_Points_by_box(const BoxPointType &Box_of_Point, PointVector &Storage);
     int Add_Points(PointVector &PointToAdd, bool downsample_on);
     void Add_Point_Boxes(vector<BoxPointType> &BoxPoints);
     void Delete_Points(PointVector &PointToDel);
