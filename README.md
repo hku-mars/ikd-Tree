@@ -40,6 +40,8 @@ git clone git@github.com:hku-mars/ikd-Tree.git
 cd ikd-Tree/build
 cmake ..
 make -j 9
+cd ../materials
+wget https://urserver.kaist.ac.kr/publicdata/ikd-tree/global_map.pcd
 ```
 ### 2. Run our examples
 
