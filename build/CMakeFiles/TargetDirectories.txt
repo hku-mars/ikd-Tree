@@ -1,5 +1,0 @@
-/home/shapelim/git/ikd-Tree/build/CMakeFiles/edit_cache.dir
-/home/shapelim/git/ikd-Tree/build/CMakeFiles/rebuild_cache.dir
-/home/shapelim/git/ikd-Tree/build/CMakeFiles/search_points_by_box.dir
-/home/shapelim/git/ikd-Tree/build/CMakeFiles/ikd_tree_demo.dir
-/home/shapelim/git/ikd-Tree/build/CMakeFiles/ikd_tree_async_demo.dir
