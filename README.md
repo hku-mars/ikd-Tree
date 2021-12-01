@@ -9,8 +9,6 @@
 
 [Wei Xu 徐威](https://github.com/XW-HKU): Incorporation into LiDAR-inertial odometry package ([FAST_LIO2 Released](https://github.com/hku-mars/FAST_LIO))
 
-[Hyungtae Lim 임형태](https://github.com/LimHyungTae): Provide application examples on point cloud. 
-
 More details please refer to our paper and video~
 
 
@@ -72,6 +70,7 @@ Original Map:
 <img src="materials/imgs/HKU_campus.png" style="zoom:50%;" />
 
 
+
 Box Delete Results:
 
 Points removed from ikd-Tree(red) |       Map after box delete        
@@ -80,3 +79,4 @@ Points removed from ikd-Tree(red) |       Map after box delete
 
 This example is to demonstrate the asynchronous phenomenon in ikd-Tree. The points are deleted by attaching 'deleted' on the tree nodes (map shown in the ) instead of being removed from the ikd-Tree immediately. They are removed from the tree when rebuilding process is performed. Please refer to our paper for more details about delete and rebuilding.
 
+Thanks [Hyungtae Lim 임형태](https://github.com/LimHyungTae) for providing application examples on point clouds. 
