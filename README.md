@@ -36,18 +36,18 @@ More details please refer to our paper and video~
 
 ## Build & Run demo
 ### 1. How to build this project
-```
+```bash
 cd ~/catkin_ws/src
 git clone git@github.com:hku-mars/ikd-Tree.git
 cd ikd-Tree/build
 cmake ..
 make -j 9
-cd ../materials
-wget https://urserver.kaist.ac.kr/publicdata/ikd-tree/large_scale_map.pcd
 ```
 ### 2. Run our examples
 
-```
+**Note: To run Example 2 & 3, please download the PCD file ([HKU_demo_pointcloud](https://drive.google.com/file/d/1tMYiBIFn-fcjisaoIrmIKA09NICGG9KJ/view?usp=sharing))  into`${Your own directory}/ikd-Tree/materials`**
+
+```bash
 cd ${Your own directory}/ikd-Tree/build
 # Example 1. Check the speed of ikd-Tree
 ./ikd_tree_demo
@@ -57,12 +57,26 @@ cd ${Your own directory}/ikd-Tree/build
 ./ikd_tree_async_demo
 ```
 
-Then, you can show the visualized examples as follows!
+**Example 2: ikd_tree_Search_demo** 
 
-Input (HKUST's Red Bird Sundial) |  Output of Example 2
+Box Search Result  |   Radius Search Result
 :-------------------------:|:-------------------------:
-![](materials/imgs/sundial.png) |  ![](materials/imgs/search_points_example.png)
+![](materials/imgs/Box_Search.png) |  ![](materials/imgs/Radius_Search.png)
 
-Input (A large scale map) |  Output of Example 3
+Points returned from the two search methods are shown in red.
+
+**Example 3: ikd_tree_Async_demo**
+
+Original Map:
+
+<img src="materials/imgs/HKU_campus.png" style="zoom:50%;" />
+
+
+Box Delete Results:
+
+Points removed from ikd-Tree(red) |       Map after box delete        
 :-------------------------:|:-------------------------:
-![](materials/imgs/large_map.png) |  ![](materials/imgs/ikd_async.png)
+![](materials/imgs/removed.png) |  ![](materials/imgs/remain.png)
+
+This example is to demonstrate the asynchronous phenomenon in ikd-Tree. The points are deleted by attaching 'deleted' on the tree nodes (map shown in the ) instead of being removed from the ikd-Tree immediately. They are removed from the tree when rebuilding process is performed. Please refer to our paper for more details about delete and rebuilding.
+

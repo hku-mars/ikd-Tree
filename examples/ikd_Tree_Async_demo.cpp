@@ -1,5 +1,5 @@
 /*
-    Description: An example to introduce the asynchronous deletion on ikd-Tree
+    Description: An example to explain the asynchronous deletion on ikd-Tree
     Author: Hyungtae Lim
 */
 
@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
 
     /*** 2. Load point cloud data */
     pcl::PointCloud<PointType>::Ptr src(new pcl::PointCloud<PointType>);
-    string filename = "../materials/large_scale_map.pcd";
+    string filename = "../materials/hku_demo_pointcloud.pcd";
     if (pcl::io::loadPCDFile<PointType>(filename, *src) == -1) //* load the file
     {
         PCL_ERROR ("Couldn't read file test_pcd.pcd \n");
@@ -74,11 +74,11 @@ int main(int argc, char **argv) {
 
     /*** 4. Set a box region and delete the corresponding region */
     PointType center_pt;
-    center_pt.x = 200.0;
-    center_pt.y = 0.0;
-    center_pt.z = 0.0;
+    center_pt.x = 5.0;
+    center_pt.y = -5.0;
+    center_pt.z = 10.0;
     BoxPointType boxpoint;
-    generate_box(boxpoint, center_pt, {50.0, 50.0, 100.0});
+    generate_box(boxpoint, center_pt, {10.0, 10.0, 20.0});
 
     start = chrono::high_resolution_clock::now();
     vector<BoxPointType> boxes = {boxpoint};
@@ -106,25 +106,24 @@ int main(int argc, char **argv) {
     printf("Finally, %d Points remain\n", static_cast<int>(Remaining_Points->points.size()));
 
     /*** Below codes are just for visualization */
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr src_colored(new pcl::PointCloud<pcl::PointXYZRGB>);
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr removed_colored(new pcl::PointCloud<pcl::PointXYZRGB>);
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr remaining_colored(new pcl::PointCloud<pcl::PointXYZRGB>);
 
-    colorize(src->points, *src_colored, {255, 0, 0});
-    colorize(Removed_Points, *removed_colored, {0, 255, 0});
-    colorize(Remaining_Points->points, *remaining_colored, {0, 0, 255});
+    pcl::visualization::PointCloudColorHandlerGenericField<PointType> src_color(src, "x");
+    pcl::visualization::PointCloudColorHandlerGenericField<PointType> remaining_color(Remaining_Points, "x");
 
-    pcl::visualization::PCLVisualizer viewer0("output");
-    viewer0.addPointCloud<pcl::PointXYZRGB>(src_colored, "src");
+    colorize(Removed_Points, *removed_colored, {255, 0, 0});
+
+    pcl::visualization::PCLVisualizer viewer0("Points removed from ikd-Tree");
+    viewer0.addPointCloud<PointType>(src,src_color, "src");
     viewer0.addPointCloud<pcl::PointXYZRGB>(removed_colored, "removed");
-    viewer0.setCameraPosition(200, 200, 800, 0, 0, 0);
-    viewer0.setSize(800, 600);
+    viewer0.setCameraPosition(-5, 30, 175,  0, 0, 0, 0.2, -1.0, 0.2);
+    viewer0.setSize(1600, 900);
 
-    pcl::visualization::PCLVisualizer viewer1("remaining");
-    viewer1.addPointCloud<pcl::PointXYZRGB>(remaining_colored, "remaining");
-    viewer1.setCameraPosition(200, 200, 800, 0, 0, 0);
-    viewer1.setPosition(800, 0);
-    viewer1.setSize(800, 600);
+    pcl::visualization::PCLVisualizer viewer1("Map after Delete");
+    viewer1.addPointCloud<PointType>(Remaining_Points,remaining_color, "remain");
+    viewer1.setCameraPosition(-5, 30, 175,  0, 0, 0, 0.2, -1.0, 0.2);
+    viewer1.setSize(1600, 900);
 
     while (!viewer0.wasStopped() && !viewer1.wasStopped()) {// } && !viewer2.wasStopped()) {
         viewer0.spinOnce();
