@@ -1,3 +1,8 @@
+/*
+Description: An example cpp for ikd-Tree.
+Author: Yixi Cai
+email: yixicai@connect.hku.hk
+*/
 #include "ikd_Tree.h"
 #include <stdio.h>
 #include <stdlib.h>

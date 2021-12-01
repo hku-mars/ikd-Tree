@@ -1,3 +1,7 @@
+/*
+    Description: An example to introduce box search and radius search using ikd-Tree
+    Author: Hyungtae Lim, Yixi Cai
+*/
 #include "ikd_Tree.h"
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,3 +1,9 @@
+/*
+    Description: An example to introduce the asynchronous deletion on ikd-Tree
+    Author: Hyungtae Lim
+*/
+
+
 #include "ikd_Tree.h"
 #include <stdio.h>
 #include <stdlib.h>

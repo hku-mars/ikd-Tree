@@ -9,6 +9,8 @@
 
 [Wei Xu 徐威](https://github.com/XW-HKU): Incorporation into LiDAR-inertial odometry package ([FAST_LIO2 Released](https://github.com/hku-mars/FAST_LIO))
 
+[Hyungtae Lim](https://github.com/LimHyungTae): Add more application examples on point cloud. 
+
 More details please refer to our paper and video~
 
 
