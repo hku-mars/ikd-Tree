@@ -31,3 +31,36 @@ More details please refer to our paper and video~
   - Add a new parameter `max_dist` to support ranged search to achieve faster nearest search in robotic applications.
   - Fix minor bugs to improve the overall performance. 
 
+
+## Build & Run demo
+### 1. How to build this project
+```
+cd ~/catkin_ws/src
+git clone git@github.com:hku-mars/ikd-Tree.git
+cd ikd-Tree/build
+cmake ..
+make -j 9
+cd ../materials
+wget https://urserver.kaist.ac.kr/publicdata/ikd-tree/large_scale_map.pcd
+```
+### 2. Run our examples
+
+```
+cd ${Your own directory}/ikd-Tree/build
+# Example 1. Check the speed of ikd-Tree
+./ikd_tree_demo
+# Example 2. Searching-points-by-box examples
+./ikd_Tree_Search_demo
+# Example 3. An aysnc. exmaple for readers' better understanding of the principle of ikd-Tree
+./ikd_tree_async_demo
+```
+
+Then, you can show the visualized examples as follows!
+
+Input (HKUST's Red Bird Sundial) |  Output of Example 2
+:-------------------------:|:-------------------------:
+![](materials/imgs/sundial.png) |  ![](materials/imgs/search_points_example.png)
+
+Input (A large scale map) |  Output of Example 3
+:-------------------------:|:-------------------------:
+![](materials/imgs/large_map.png) |  ![](materials/imgs/ikd_async.png)
