@@ -49,6 +49,7 @@ void KD_TREE<PointType>::InitTreeNode(KD_TREE_NODE *root)
     root->node_range_y[1] = 0.0f;
     root->node_range_z[0] = 0.0f;
     root->node_range_z[1] = 0.0f;
+    root->radius_sq = 0.0f;
     root->division_axis = 0;
     root->father_ptr = nullptr;
     root->left_son_ptr = nullptr;
@@ -422,7 +423,7 @@ void KD_TREE<PointType>::Build(PointVector point_cloud)
 }
 
 template <typename PointType>
-void KD_TREE<PointType>::Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> &Point_Distance, double max_dist)
+void KD_TREE<PointType>::Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> &Point_Distance, float max_dist)
 {
     MANUAL_HEAP q(2 * k_nearest);
     q.clear();
@@ -460,10 +461,17 @@ void KD_TREE<PointType>::Nearest_Search(PointType point, int k_nearest, PointVec
 }
 
 template <typename PointType>
-int KD_TREE<PointType>::Box_Search(const BoxPointType &Box_of_Point, PointVector &Storage)
+void KD_TREE<PointType>::Box_Search(const BoxPointType &Box_of_Point, PointVector &Storage)
 {
     Storage.clear();
     Search_by_range(Root_Node, Box_of_Point, Storage);
+}
+
+template <typename PointType>
+void KD_TREE<PointType>::Radius_Search(PointType point, const float radius, PointVector &Storage)
+{
+    Storage.clear();
+    Search_by_radius(Root_Node, point, radius, Storage);
 }
 
 template <typename PointType>
@@ -1051,11 +1059,11 @@ void KD_TREE<PointType>::Add_by_point(KD_TREE_NODE **root, PointType point, bool
 }
 
 template <typename PointType>
-void KD_TREE<PointType>::Search(KD_TREE_NODE *root, int k_nearest, PointType point, MANUAL_HEAP &q, double max_dist)
+void KD_TREE<PointType>::Search(KD_TREE_NODE *root, int k_nearest, PointType point, MANUAL_HEAP &q, float max_dist)
 {
     if (root == nullptr || root->tree_deleted)
         return;
-    double cur_dist = calc_box_dist(root, point);
+    float cur_dist = calc_box_dist(root, point);
     if (cur_dist > max_dist * max_dist)
         return;
     int retval;
@@ -1276,6 +1284,49 @@ void KD_TREE<PointType>::Search_by_range(KD_TREE_NODE *root, BoxPointType boxpoi
         Search_by_range(root->right_son_ptr, boxpoint, Storage);
         pthread_mutex_unlock(&search_flag_mutex);
     }
+    return;
+}
+
+template <typename PointType>
+void KD_TREE<PointType>::Search_by_radius(KD_TREE_NODE *root, PointType point, float radius, PointVector &Storage)
+{
+    if (root == nullptr)
+        return;
+    Push_Down(root);
+    PointType range_center;
+    range_center.x = (root->node_range_x[0] + root->node_range_x[1]) * 0.5;
+    range_center.y = (root->node_range_y[0] + root->node_range_y[1]) * 0.5;
+    range_center.z = (root->node_range_z[0] + root->node_range_z[1]) * 0.5;
+    float dist = sqrt(calc_dist(range_center, point));
+    if (dist > radius + sqrt(root->radius_sq)) return;
+    if (dist <= radius - sqrt(root->radius_sq)) 
+    {
+        flatten(root, Storage, NOT_RECORD);
+        return;
+    }
+    if (!root->point_deleted && calc_dist(root->point, point) <= radius * radius){
+        Storage.push_back(root->point);
+    }
+    if ((Rebuild_Ptr == nullptr) || root->left_son_ptr != *Rebuild_Ptr)
+    {
+        Search_by_radius(root->left_son_ptr, point, radius, Storage);
+    }
+    else
+    {
+        pthread_mutex_lock(&search_flag_mutex);
+        Search_by_radius(root->left_son_ptr, point, radius, Storage);
+        pthread_mutex_unlock(&search_flag_mutex);
+    }
+    if ((Rebuild_Ptr == nullptr) || root->right_son_ptr != *Rebuild_Ptr)
+    {
+        Search_by_radius(root->right_son_ptr, point, radius, Storage);
+    }
+    else
+    {
+        pthread_mutex_lock(&search_flag_mutex);
+        Search_by_radius(root->right_son_ptr, point, radius, Storage);
+        pthread_mutex_unlock(&search_flag_mutex);
+    }    
     return;
 }
 
@@ -1551,6 +1602,10 @@ void KD_TREE<PointType>::Update(KD_TREE_NODE *root)
     memcpy(root->node_range_x, tmp_range_x, sizeof(tmp_range_x));
     memcpy(root->node_range_y, tmp_range_y, sizeof(tmp_range_y));
     memcpy(root->node_range_z, tmp_range_z, sizeof(tmp_range_z));
+    float x_L = (root->node_range_x[1] - root->node_range_x[0]) * 0.5;
+    float y_L = (root->node_range_y[1] - root->node_range_y[0]) * 0.5;
+    float z_L = (root->node_range_z[1] - root->node_range_z[0]) * 0.5;
+    root->radius_sq = x_L*x_L + y_L * y_L + z_L * z_L;
     if (left_son_ptr != nullptr)
         left_son_ptr->father_ptr = root;
     if (right_son_ptr != nullptr)

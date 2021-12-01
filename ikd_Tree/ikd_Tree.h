@@ -72,6 +72,7 @@ public:
         bool working_flag = false;
         pthread_mutex_t push_down_mutex_lock;
         float node_range_x[2], node_range_y[2], node_range_z[2];
+        float radius_sq;
         KD_TREE_NODE *left_son_ptr = nullptr;
         KD_TREE_NODE *right_son_ptr = nullptr;
         KD_TREE_NODE *father_ptr = nullptr;
@@ -289,8 +290,9 @@ private:
     void Delete_by_point(KD_TREE_NODE **root, PointType point, bool allow_rebuild);
     void Add_by_point(KD_TREE_NODE **root, PointType point, bool allow_rebuild, int father_axis);
     void Add_by_range(KD_TREE_NODE **root, BoxPointType boxpoint, bool allow_rebuild);
-    void Search(KD_TREE_NODE *root, int k_nearest, PointType point, MANUAL_HEAP &q, double max_dist); //priority_queue<PointType_CMP>
+    void Search(KD_TREE_NODE *root, int k_nearest, PointType point, MANUAL_HEAP &q, float max_dist); //priority_queue<PointType_CMP>
     void Search_by_range(KD_TREE_NODE *root, BoxPointType boxpoint, PointVector &Storage);
+    void Search_by_radius(KD_TREE_NODE *root, PointType point, float radius, PointVector &Storage);
     bool Criterion_Check(KD_TREE_NODE *root);
     void Push_Down(KD_TREE_NODE *root);
     void Update(KD_TREE_NODE *root);
@@ -323,8 +325,9 @@ public:
     int validnum();
     void root_alpha(float &alpha_bal, float &alpha_del);
     void Build(PointVector point_cloud);
-    void Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> &Point_Distance, double max_dist = INFINITY);
-    int Box_Search(const BoxPointType &Box_of_Point, PointVector &Storage);
+    void Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> &Point_Distance, float max_dist = INFINITY);
+    void Box_Search(const BoxPointType &Box_of_Point, PointVector &Storage);
+    void Radius_Search(PointType point, const float radius, PointVector &Storage);
     int Add_Points(PointVector &PointToAdd, bool downsample_on);
     void Add_Point_Boxes(vector<BoxPointType> &BoxPoints);
     void Delete_Points(PointVector &PointToDel);
