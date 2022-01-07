@@ -1,8 +1,6 @@
 # ikd-Tree
 **ikd-Tree** is an incremental k-d tree designed for robotic applications. The ikd-Tree incrementally updates a k-d tree with new coming points only, leading to much lower computation time than existing static k-d trees. Besides point-wise operations, the ikd-Tree supports several features such as box-wise operations and down-sampling that are practically useful in robotic applications.
 
-
-
 ### Developers
 
 [Yixi Cai 蔡逸熙](https://github.com/Ecstasy-EC): Data structure design and implementation
@@ -18,6 +16,16 @@ More details please refer to our paper and video~
 **Related paper** available on arxiv:
 
 [ikd-Tree: An Incremental K-D Tree for robotic applications](https://arxiv.org/abs/2102.10808)
+
+Cite as:
+```
+@article{cai2021ikd,
+  title={ikd-Tree: An Incremental KD Tree for Robotic Applications},
+  author={Cai, Yixi and Xu, Wei and Zhang, Fu},
+  journal={arXiv preprint arXiv:2102.10808},
+  year={2021}
+}
+```
 
 **Related video**: https://youtu.be/ueOunk03zxA
 
