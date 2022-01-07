@@ -7,7 +7,8 @@
 #include <unistd.h>
 #include <math.h>
 #include <algorithm>
-#include <memory.h>
+#include <memory>
+#include <pcl/point_types.h>
 
 #define EPSS 1e-6
 #define Minimal_Unbalanced_Tree_Size 10
@@ -18,10 +19,10 @@
 
 using namespace std;
 
-struct PointType
+struct ikdTree_PointType
 {
     float x,y,z;
-    PointType (float px = 0.0f, float py = 0.0f, float pz = 0.0f){
+    ikdTree_PointType (float px = 0.0f, float py = 0.0f, float pz = 0.0f){
         x = px;
         y = py;
         z = pz;
@@ -57,11 +58,12 @@ class MANUAL_Q{
 
 template<typename PointType>
 class KD_TREE{
-    using PointVector = vector<PointType>;
 public:
+    using PointVector = vector<PointType, Eigen::aligned_allocator<PointType>>;
+    using Ptr = shared_ptr<KD_TREE<PointType>>;
     struct KD_TREE_NODE{
         PointType point;
-        int division_axis;  
+        uint8_t division_axis;  
         int TreeSize = 1;
         int invalid_point_num = 0;
         int down_del_num = 0;
@@ -72,6 +74,7 @@ public:
         bool need_push_down_to_left = false;
         bool need_push_down_to_right = false;
         bool working_flag = false;
+        float radius_sq;
         pthread_mutex_t push_down_mutex_lock;
         float node_range_x[2], node_range_y[2], node_range_z[2];   
         KD_TREE_NODE *left_son_ptr = nullptr;
@@ -206,6 +209,7 @@ private:
     void Add_by_range(KD_TREE_NODE ** root, BoxPointType boxpoint, bool allow_rebuild);
     void Search(KD_TREE_NODE * root, int k_nearest, PointType point, MANUAL_HEAP &q, double max_dist);//priority_queue<PointType_CMP>
     void Search_by_range(KD_TREE_NODE *root, BoxPointType boxpoint, PointVector &Storage);
+    void Search_by_radius(KD_TREE_NODE *root, PointType point, float radius, PointVector &Storage);
     bool Criterion_Check(KD_TREE_NODE * root);
     void Push_Down(KD_TREE_NODE * root);
     void Update(KD_TREE_NODE * root); 
@@ -230,6 +234,8 @@ public:
     void root_alpha(float &alpha_bal, float &alpha_del);
     void Build(PointVector point_cloud);
     void Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> & Point_Distance, double max_dist = INFINITY);
+    void Box_Search(const BoxPointType &Box_of_Point, PointVector &Storage);
+    void Radius_Search(PointType point, const float radius, PointVector &Storage);
     int Add_Points(PointVector & PointToAdd, bool downsample_on);
     void Add_Point_Boxes(vector<BoxPointType> & BoxPoints);
     void Delete_Points(PointVector & PointToDel);
@@ -242,4 +248,4 @@ public:
     int max_queue_size = 0;
 };
 
-template class KD_TREE<PointType>;
+
