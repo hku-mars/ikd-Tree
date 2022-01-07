@@ -79,4 +79,9 @@ Points removed from ikd-Tree(red) |       Map after box delete
 
 This example is to demonstrate the asynchronous phenomenon in ikd-Tree. The points are deleted by attaching 'deleted' on the tree nodes (map shown in the ) instead of being removed from the ikd-Tree immediately. They are removed from the tree when rebuilding process is performed. Please refer to our paper for more details about delete and rebuilding.
 
+
+## Acknowledgments
+Thanks [Marcus Davi](https://github.com/Marcus-Davi) for helps in templating the ikd-Tree for more general applications.
+
 Thanks [Hyungtae Lim 임형태](https://github.com/LimHyungTae) for providing application examples on point clouds. 
+
