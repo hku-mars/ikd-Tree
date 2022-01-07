@@ -1,3 +1,9 @@
+/*
+    Description: An example for using ikd-Tree
+    Author: Yixi Cai
+    Email: yixicai@connect.hku.hk
+*/
+
 #include <ikd_Tree.h>
 #include <stdio.h>
 #include <stdlib.h>
