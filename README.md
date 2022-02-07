@@ -3,22 +3,22 @@
 
 ## What does ikd-Tree support?
 
-- **Build a balanced k-d tree** - `Build()`
+- Build a balanced k-d tree - `Build()`
 
-- **Dynamically insert points to or delete points from the k-d tree** - `Add_Points() / Delete_Points()`
+- Dynamically insert points to or delete points from the k-d tree - `Add_Points() / Delete_Points()`
 
-- **Delete points inside given axis-aligned bouding boxes** - `Delete_Point_Boxes()`
+- Delete points inside given axis-aligned bouding boxes - `Delete_Point_Boxes()`
 
-- **$k$ Nearest Neighbor Search with range limitation** - `Nearest_Search()`
+- K Nearest Neighbor Search with range limitation - `Nearest_Search()`
 
-- **Acquire points insde a given axis-aligned bouding box on the k-d tree** - `Box_Search()`
+- Acquire points insde a given axis-aligned bouding box on the k-d tree - `Box_Search()`
 
-- **Acquire points inside a ball with given radius on the k-d tree** - `Radius_Search()`
+- Acquire points inside a ball with given radius on the k-d tree - `Radius_Search()`
 ## Developers
 
-- **[Yixi CAI 蔡逸熙](https://github.com/Ecstasy-EC)**: Data structure design and implementation
+- [Yixi CAI 蔡逸熙](https://github.com/Ecstasy-EC): Data structure design and implementation
 
-- **[Wei XU 徐威](https://github.com/XW-HKU)**: Incorporation into  [LiDAR-inertial odometry package FAST_LIO2 (TRO, 2022)](https://github.com/hku-mars/FAST_LIO)
+- [Wei XU 徐威](https://github.com/XW-HKU): Incorporation into  [LiDAR-inertial odometry package FAST_LIO2 (TRO, 2022)](https://github.com/hku-mars/FAST_LIO)
 
 
 ## Related paper
