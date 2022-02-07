@@ -1,23 +1,34 @@
 # ikd-Tree
 **ikd-Tree** is an incremental k-d tree designed for robotic applications. The ikd-Tree incrementally updates a k-d tree with new coming points only, leading to much lower computation time than existing static k-d trees. Besides point-wise operations, the ikd-Tree supports several features such as box-wise operations and down-sampling that are practically useful in robotic applications.
 
-### Developers
+## What does ikd-Tree support?
 
-[Yixi Cai 蔡逸熙](https://github.com/Ecstasy-EC): Data structure design and implementation
+- **Build a balanced k-d tree** - `Build()`
 
-[Wei Xu 徐威](https://github.com/XW-HKU): Incorporation into LiDAR-inertial odometry package ([FAST_LIO2 Released](https://github.com/hku-mars/FAST_LIO))
+- **Dynamically insert points to or delete points from the k-d tree** - `Add_Points() / Delete_Points()`
 
-More details please refer to our paper and video~
+- **Delete points inside given axis-aligned bouding boxes** - `Delete_Point_Boxes()`
+
+- **$k$ Nearest Neighbor Search with range limitation** - `Nearest_Search()`
+
+- **Acquire points insde a given axis-aligned bouding box on the k-d tree** - `Box_Search()`
+
+- **Acquire points inside a ball with given radius on the k-d tree** - `Radius_Search()`
+## Developers
+
+- **[Yixi CAI 蔡逸熙](https://github.com/Ecstasy-EC)**: Data structure design and implementation
+
+- **[Wei XU 徐威](https://github.com/XW-HKU)**: Incorporation into  [LiDAR-inertial odometry package FAST_LIO2 (TRO, 2022)](https://github.com/hku-mars/FAST_LIO)
 
 
+## Related paper
 
-### Related paper
+- [ikd-Tree: An Incremental K-D Tree for robotic applications](https://arxiv.org/abs/2102.10808)
 
-**Related paper** available on arxiv:
+- [FAST-LIO2: Fast Direct LiDAR-Inertial Odometry](https://ieeexplore.ieee.org/abstract/document/9697912)
 
-[ikd-Tree: An Incremental K-D Tree for robotic applications](https://arxiv.org/abs/2102.10808)
-
-Cite as:
+If you are using any code of this repo in your research, please cite at least one of the articles as following:
+- **ikd-Tree**
 ```
 @article{cai2021ikd,
   title={ikd-Tree: An Incremental KD Tree for Robotic Applications},
@@ -26,19 +37,16 @@ Cite as:
   year={2021}
 }
 ```
-
-**Related video**: https://youtu.be/ueOunk03zxA
-
-
-
-## Version 2
-
-- We upgraded our **ikd-Tree** to achieve a more stable and efficient performance. More details are shown as follows:
-  - Replace the queue and priority queue in STL with our code to avoid memory conflicts.
-  - Fix some bugs in re-building of the previous version, which may result in information loss during the multi-thread re-building process. 
-  - Add a new parameter `max_dist` to support ranged search to achieve faster nearest search in robotic applications.
-  - Fix minor bugs to improve the overall performance. 
-
+- **FAST-LIO2**
+```
+@article{xu2022fast,
+  title={Fast-lio2: Fast direct lidar-inertial odometry},
+  author={Xu, Wei and Cai, Yixi and He, Dongjiao and Lin, Jiarong and Zhang, Fu},
+  journal={IEEE Transactions on Robotics},
+  year={2022},
+  publisher={IEEE}
+}
+```
 
 ## Build & Run demo
 ### 1. How to build this project
@@ -89,7 +97,10 @@ This example is to demonstrate the asynchronous phenomenon in ikd-Tree. The poin
 
 
 ## Acknowledgments
-Thanks [Marcus Davi](https://github.com/Marcus-Davi) for helps in templating the ikd-Tree for more general applications.
+- Thanks [Marcus Davi](https://github.com/Marcus-Davi) for helps in templating the ikd-Tree for more general applications.
 
-Thanks [Hyungtae Lim 임형태](https://github.com/LimHyungTae) for providing application examples on point clouds. 
+- Thanks [Hyungtae Lim 임형태](https://github.com/LimHyungTae) for providing application examples on point clouds. 
 
+## License
+
+The source code of ikd-Tree is released under [GPLv2](http://www.gnu.org/licenses/old-licenses/gpl-2.0.html) license. For commercial use, please contact Mr. Yixi CAI (<yixicai@connect.hku.hk>) or Dr. Fu ZHANG (<fuzhang@hku.hk>).
