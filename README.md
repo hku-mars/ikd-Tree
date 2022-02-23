@@ -7,11 +7,11 @@
 
 - Dynamically insert points to or delete points from the k-d tree - `Add_Points() / Delete_Points()`
 
-- Delete points inside given axis-aligned bouding boxes - `Delete_Point_Boxes()`
+- Delete points inside given axis-aligned bounding boxes - `Delete_Point_Boxes()`
 
 - K Nearest Neighbor Search with range limitation - `Nearest_Search()`
 
-- Acquire points insde a given axis-aligned bouding box on the k-d tree - `Box_Search()`
+- Acquire points insde a given axis-aligned bounding box on the k-d tree - `Box_Search()`
 
 - Acquire points inside a ball with given radius on the k-d tree - `Radius_Search()`
 ## Developers
