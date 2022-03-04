@@ -11,9 +11,14 @@
 
 - K Nearest Neighbor Search with range limitation - `Nearest_Search()`
 
-- Acquire points insde a given axis-aligned bounding box on the k-d tree - `Box_Search()`
+- Acquire points inside a given axis-aligned bounding box on the k-d tree - `Box_Search()`
 
 - Acquire points inside a ball with given radius on the k-d tree - `Radius_Search()`
+
+## User Manual
+
+- Browse the [User Manual](https://github.com/hku-mars/ikd-Tree/blob/main/documents/UserManual.pdf) for using our ikd-Tree.
+
 ## Developers
 
 - [Yixi CAI 蔡逸熙](https://github.com/Ecstasy-EC): Data structure design and implementation
