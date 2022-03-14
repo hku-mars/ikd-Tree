@@ -1,14 +1,16 @@
 #pragma once
 #include <stdio.h>
 #include <queue>
-#include <pthread.h>
+#include <thread>
+#include <mutex>
 #include <chrono>
 #include <time.h>
-#include <unistd.h>
+//#include <unistd.h>
 #include <math.h>
 #include <algorithm>
 #include <memory.h>
-#include <pcl/point_types.h>
+// #include <pcl/point_types.h>
+#include <Eigen/Core>
 
 #define EPSS 1e-6
 #define Minimal_Unbalanced_Tree_Size 10
@@ -16,8 +18,6 @@
 #define DOWNSAMPLE_SWITCH true
 #define ForceRebuildPercentage 0.2
 #define Q_LEN 1000000
-
-using namespace std;
 
 // typedef pcl::PointXYZINormal PointType;
 // typedef vector<PointType, Eigen::aligned_allocator<PointType>>  PointVector;
@@ -70,7 +70,7 @@ public:
         bool need_push_down_to_left = false;
         bool need_push_down_to_right = false;
         bool working_flag = false;
-        pthread_mutex_t push_down_mutex_lock;
+        std::mutex push_down_mutex_lock;
         float node_range_x[2], node_range_y[2], node_range_z[2];
         float radius_sq;
         KD_TREE_NODE *left_son_ptr = nullptr;
@@ -258,9 +258,9 @@ private:
     // Multi-thread Tree Rebuild
     bool termination_flag = false;
     bool rebuild_flag = false;
-    pthread_t rebuild_thread;
-    pthread_mutex_t termination_flag_mutex_lock, rebuild_ptr_mutex_lock, working_flag_mutex, search_flag_mutex;
-    pthread_mutex_t rebuild_logger_mutex_lock, points_deleted_rebuild_mutex_lock;
+    std::thread rebuild_thread;
+    std::mutex termination_flag_mutex_lock, rebuild_ptr_mutex_lock, working_flag_mutex, search_flag_mutex;
+    std::mutex rebuild_logger_mutex_lock, points_deleted_rebuild_mutex_lock;
     // queue<Operation_Logger_Type> Rebuild_Logger;
     MANUAL_Q Rebuild_Logger;
     PointVector Rebuild_PCL_Storage;
@@ -325,13 +325,13 @@ public:
     int validnum();
     void root_alpha(float &alpha_bal, float &alpha_del);
     void Build(PointVector point_cloud);
-    void Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> &Point_Distance, float max_dist = INFINITY);
+    void Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, std::vector<float> &Point_Distance, float max_dist = INFINITY);
     void Box_Search(const BoxPointType &Box_of_Point, PointVector &Storage);
     void Radius_Search(PointType point, const float radius, PointVector &Storage);
     int Add_Points(PointVector &PointToAdd, bool downsample_on);
-    void Add_Point_Boxes(vector<BoxPointType> &BoxPoints);
+    void Add_Point_Boxes(std::vector<BoxPointType> &BoxPoints);
     void Delete_Points(PointVector &PointToDel);
-    int Delete_Point_Boxes(vector<BoxPointType> &BoxPoints);
+    int Delete_Point_Boxes(std::vector<BoxPointType> &BoxPoints);
     void flatten(KD_TREE_NODE *root, PointVector &Storage, delete_point_storage_set storage_type);
     void acquire_removed_points(PointVector &removed_points);
     BoxPointType tree_range();

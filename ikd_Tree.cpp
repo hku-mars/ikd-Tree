@@ -1,10 +1,20 @@
 #include "ikd_Tree.h"
+#include <pcl/point_types.h>
+#include <thread>
+#include <chrono>
 
 /*
 Description: ikd-Tree: an incremental k-d tree for robotic applications 
 Author: Yixi Cai
 email: yixicai@connect.hku.hk
 */
+
+template<class T>
+void usleep(T microseconds)
+{
+    using namespace std::chrono_literals;
+    std::this_thread::sleep_for(1us * microseconds);
+}
 
 template <typename PointType>
 KD_TREE<PointType>::KD_TREE(float delete_param, float balance_param, float box_length)
@@ -63,7 +73,6 @@ void KD_TREE<PointType>::InitTreeNode(KD_TREE_NODE *root)
     root->need_push_down_to_right = false;
     root->point_downsample_deleted = false;
     root->working_flag = false;
-    pthread_mutex_init(&(root->push_down_mutex_lock), NULL);
 }
 
 template <typename PointType>
@@ -83,10 +92,10 @@ int KD_TREE<PointType>::size()
     }
     else
     {
-        if (!pthread_mutex_trylock(&working_flag_mutex))
+        if (true == working_flag_mutex.try_lock())
         {
             s = Root_Node->TreeSize;
-            pthread_mutex_unlock(&working_flag_mutex);
+            working_flag_mutex.unlock();
             return s;
         }
         else
@@ -118,7 +127,7 @@ BoxPointType KD_TREE<PointType>::tree_range()
     }
     else
     {
-        if (!pthread_mutex_trylock(&working_flag_mutex))
+        if (true == working_flag_mutex.try_lock())
         {
             range.vertex_min[0] = Root_Node->node_range_x[0];
             range.vertex_min[1] = Root_Node->node_range_y[0];
@@ -126,7 +135,7 @@ BoxPointType KD_TREE<PointType>::tree_range()
             range.vertex_max[0] = Root_Node->node_range_x[1];
             range.vertex_max[1] = Root_Node->node_range_y[1];
             range.vertex_max[2] = Root_Node->node_range_z[1];
-            pthread_mutex_unlock(&working_flag_mutex);
+            working_flag_mutex.unlock();
         }
         else
         {
@@ -149,10 +158,10 @@ int KD_TREE<PointType>::validnum()
     }
     else
     {
-        if (!pthread_mutex_trylock(&working_flag_mutex))
+        if (true == working_flag_mutex.try_lock())
         {
             s = Root_Node->TreeSize - Root_Node->invalid_point_num;
-            pthread_mutex_unlock(&working_flag_mutex);
+            working_flag_mutex.unlock();
             return s;
         }
         else
@@ -173,11 +182,11 @@ void KD_TREE<PointType>::root_alpha(float &alpha_bal, float &alpha_del)
     }
     else
     {
-        if (!pthread_mutex_trylock(&working_flag_mutex))
+        if (true == working_flag_mutex.try_lock())
         {
             alpha_bal = Root_Node->alpha_bal;
             alpha_del = Root_Node->alpha_del;
-            pthread_mutex_unlock(&working_flag_mutex);
+            working_flag_mutex.unlock();
             return;
         }
         else
@@ -192,30 +201,18 @@ void KD_TREE<PointType>::root_alpha(float &alpha_bal, float &alpha_del)
 template <typename PointType>
 void KD_TREE<PointType>::start_thread()
 {
-    pthread_mutex_init(&termination_flag_mutex_lock, NULL);
-    pthread_mutex_init(&rebuild_ptr_mutex_lock, NULL);
-    pthread_mutex_init(&rebuild_logger_mutex_lock, NULL);
-    pthread_mutex_init(&points_deleted_rebuild_mutex_lock, NULL);
-    pthread_mutex_init(&working_flag_mutex, NULL);
-    pthread_mutex_init(&search_flag_mutex, NULL);
-    pthread_create(&rebuild_thread, NULL, multi_thread_ptr, (void *)this);
+    rebuild_thread = std::thread(&KD_TREE<PointType>::multi_thread_ptr, this);
     printf("Multi thread started \n");
 }
 
 template <typename PointType>
 void KD_TREE<PointType>::stop_thread()
 {
-    pthread_mutex_lock(&termination_flag_mutex_lock);
+    termination_flag_mutex_lock.lock();
     termination_flag = true;
-    pthread_mutex_unlock(&termination_flag_mutex_lock);
-    if (rebuild_thread)
-        pthread_join(rebuild_thread, NULL);
-    pthread_mutex_destroy(&termination_flag_mutex_lock);
-    pthread_mutex_destroy(&rebuild_logger_mutex_lock);
-    pthread_mutex_destroy(&rebuild_ptr_mutex_lock);
-    pthread_mutex_destroy(&points_deleted_rebuild_mutex_lock);
-    pthread_mutex_destroy(&working_flag_mutex);
-    pthread_mutex_destroy(&search_flag_mutex);
+    termination_flag_mutex_lock.unlock();
+    if (rebuild_thread.joinable())
+        rebuild_thread.join();
 }
 
 template <typename PointType>
@@ -231,13 +228,13 @@ void KD_TREE<PointType>::multi_thread_rebuild()
 {
     bool terminated = false;
     KD_TREE_NODE *father_ptr, **new_node_ptr;
-    pthread_mutex_lock(&termination_flag_mutex_lock);
+    termination_flag_mutex_lock.lock();
     terminated = termination_flag;
-    pthread_mutex_unlock(&termination_flag_mutex_lock);
+    termination_flag_mutex_lock.unlock();
     while (!terminated)
     {
-        pthread_mutex_lock(&rebuild_ptr_mutex_lock);
-        pthread_mutex_lock(&working_flag_mutex);
+        rebuild_ptr_mutex_lock.lock();
+        working_flag_mutex.lock();
         if (Rebuild_Ptr != nullptr)
         {
             /* Traverse and copy */
@@ -257,25 +254,25 @@ void KD_TREE<PointType>::multi_thread_rebuild()
             father_ptr = (*Rebuild_Ptr)->father_ptr;
             PointVector().swap(Rebuild_PCL_Storage);
             // Lock Search
-            pthread_mutex_lock(&search_flag_mutex);
+            search_flag_mutex.lock();
             while (search_mutex_counter != 0)
             {
-                pthread_mutex_unlock(&search_flag_mutex);
+                search_flag_mutex.unlock();
                 usleep(1);
-                pthread_mutex_lock(&search_flag_mutex);
+                search_flag_mutex.lock();
             }
             search_mutex_counter = -1;
-            pthread_mutex_unlock(&search_flag_mutex);
+            search_flag_mutex.unlock();
             // Lock deleted points cache
-            pthread_mutex_lock(&points_deleted_rebuild_mutex_lock);
+            points_deleted_rebuild_mutex_lock.lock();
             flatten(*Rebuild_Ptr, Rebuild_PCL_Storage, MULTI_THREAD_REC);
             // Unlock deleted points cache
-            pthread_mutex_unlock(&points_deleted_rebuild_mutex_lock);
+            points_deleted_rebuild_mutex_lock.unlock();
             // Unlock Search
-            pthread_mutex_lock(&search_flag_mutex);
+            search_flag_mutex.lock();
             search_mutex_counter = 0;
-            pthread_mutex_unlock(&search_flag_mutex);
-            pthread_mutex_unlock(&working_flag_mutex);
+            search_flag_mutex.unlock();
+            working_flag_mutex.unlock();
             /* Rebuild and update missed operations*/
             Operation_Logger_Type Operation;
             KD_TREE_NODE *new_root_node = nullptr;
@@ -283,36 +280,36 @@ void KD_TREE<PointType>::multi_thread_rebuild()
             {
                 BuildTree(&new_root_node, 0, Rebuild_PCL_Storage.size() - 1, Rebuild_PCL_Storage);
                 // Rebuild has been done. Updates the blocked operations into the new tree
-                pthread_mutex_lock(&working_flag_mutex);
-                pthread_mutex_lock(&rebuild_logger_mutex_lock);
+                working_flag_mutex.lock();
+                rebuild_logger_mutex_lock.lock();
                 int tmp_counter = 0;
                 while (!Rebuild_Logger.empty())
                 {
                     Operation = Rebuild_Logger.front();
-                    max_queue_size = max(max_queue_size, Rebuild_Logger.size());
+                    max_queue_size = std::max(max_queue_size, Rebuild_Logger.size());
                     Rebuild_Logger.pop();
-                    pthread_mutex_unlock(&rebuild_logger_mutex_lock);
-                    pthread_mutex_unlock(&working_flag_mutex);
+                    rebuild_logger_mutex_lock.unlock();
+                    working_flag_mutex.unlock();
                     run_operation(&new_root_node, Operation);
                     tmp_counter++;
                     if (tmp_counter % 10 == 0)
                         usleep(1);
-                    pthread_mutex_lock(&working_flag_mutex);
-                    pthread_mutex_lock(&rebuild_logger_mutex_lock);
+                    working_flag_mutex.lock();
+                    rebuild_logger_mutex_lock.lock();
                 }
-                pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+                rebuild_logger_mutex_lock.unlock();
             }
             /* Replace to original tree*/
-            // pthread_mutex_lock(&working_flag_mutex);
-            pthread_mutex_lock(&search_flag_mutex);
+            // working_flag_mutex.lock();
+            search_flag_mutex.lock();
             while (search_mutex_counter != 0)
             {
-                pthread_mutex_unlock(&search_flag_mutex);
+                search_flag_mutex.unlock();
                 usleep(1);
-                pthread_mutex_lock(&search_flag_mutex);
+                search_flag_mutex.lock();
             }
             search_mutex_counter = -1;
-            pthread_mutex_unlock(&search_flag_mutex);
+            search_flag_mutex.unlock();
             if (father_ptr->left_son_ptr == *Rebuild_Ptr)
             {
                 father_ptr->left_son_ptr = new_root_node;
@@ -344,23 +341,23 @@ void KD_TREE<PointType>::multi_thread_rebuild()
                     break;
                 Update(update_root);
             }
-            pthread_mutex_lock(&search_flag_mutex);
+            search_flag_mutex.lock();
             search_mutex_counter = 0;
-            pthread_mutex_unlock(&search_flag_mutex);
+            search_flag_mutex.unlock();
             Rebuild_Ptr = nullptr;
-            pthread_mutex_unlock(&working_flag_mutex);
+            working_flag_mutex.unlock();
             rebuild_flag = false;
             /* Delete discarded tree nodes */
             delete_tree_nodes(&old_root_node);
         }
         else
         {
-            pthread_mutex_unlock(&working_flag_mutex);
+            working_flag_mutex.unlock();
         }
-        pthread_mutex_unlock(&rebuild_ptr_mutex_lock);
-        pthread_mutex_lock(&termination_flag_mutex_lock);
+        rebuild_ptr_mutex_lock.unlock();
+        termination_flag_mutex_lock.lock();
         terminated = termination_flag;
-        pthread_mutex_unlock(&termination_flag_mutex_lock);
+        termination_flag_mutex_lock.unlock();
         usleep(100);
     }
     printf("Rebuild thread terminated normally\n");
@@ -423,34 +420,34 @@ void KD_TREE<PointType>::Build(PointVector point_cloud)
 }
 
 template <typename PointType>
-void KD_TREE<PointType>::Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> &Point_Distance, float max_dist)
+void KD_TREE<PointType>::Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, std::vector<float> &Point_Distance, float max_dist)
 {
     MANUAL_HEAP q(2 * k_nearest);
     q.clear();
-    vector<float>().swap(Point_Distance);
+    std::vector<float>().swap(Point_Distance);
     if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node)
     {
         Search(Root_Node, k_nearest, point, q, max_dist);
     }
     else
     {
-        pthread_mutex_lock(&search_flag_mutex);
+        search_flag_mutex.lock();
         while (search_mutex_counter == -1)
         {
-            pthread_mutex_unlock(&search_flag_mutex);
+            search_flag_mutex.unlock();
             usleep(1);
-            pthread_mutex_lock(&search_flag_mutex);
+            search_flag_mutex.lock();
         }
         search_mutex_counter += 1;
-        pthread_mutex_unlock(&search_flag_mutex);
+        search_flag_mutex.unlock();
         Search(Root_Node, k_nearest, point, q, max_dist);
-        pthread_mutex_lock(&search_flag_mutex);
+        search_flag_mutex.lock();
         search_mutex_counter -= 1;
-        pthread_mutex_unlock(&search_flag_mutex);
+        search_flag_mutex.unlock();
     }
-    int k_found = min(k_nearest, int(q.size()));
+    int k_found = std::min(k_nearest, int(q.size()));
     PointVector().swap(Nearest_Points);
-    vector<float>().swap(Point_Distance);
+    std::vector<float>().swap(Point_Distance);
     for (int i = 0; i < k_found; i++)
     {
         Nearest_Points.insert(Nearest_Points.begin(), q.top().point);
@@ -529,20 +526,20 @@ int KD_TREE<PointType>::Add_Points(PointVector &PointToAdd, bool downsample_on)
                     operation_delete.op = DOWNSAMPLE_DELETE;
                     operation.point = downsample_result;
                     operation.op = ADD_POINT;
-                    pthread_mutex_lock(&working_flag_mutex);
+                    working_flag_mutex.lock();
                     if (Downsample_Storage.size() > 0)
                         Delete_by_range(&Root_Node, Box_of_Point, false, true);
                     Add_by_point(&Root_Node, downsample_result, false, Root_Node->division_axis);
                     tmp_counter++;
                     if (rebuild_flag)
                     {
-                        pthread_mutex_lock(&rebuild_logger_mutex_lock);
+                        rebuild_logger_mutex_lock.lock();
                         if (Downsample_Storage.size() > 0)
                             Rebuild_Logger.push(operation_delete);
                         Rebuild_Logger.push(operation);
-                        pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+                        rebuild_logger_mutex_lock.unlock();
                     }
-                    pthread_mutex_unlock(&working_flag_mutex);
+                    working_flag_mutex.unlock();
                 };
             }
         }
@@ -557,15 +554,15 @@ int KD_TREE<PointType>::Add_Points(PointVector &PointToAdd, bool downsample_on)
                 Operation_Logger_Type operation;
                 operation.point = PointToAdd[i];
                 operation.op = ADD_POINT;
-                pthread_mutex_lock(&working_flag_mutex);
+                working_flag_mutex.lock();
                 Add_by_point(&Root_Node, PointToAdd[i], false, Root_Node->division_axis);
                 if (rebuild_flag)
                 {
-                    pthread_mutex_lock(&rebuild_logger_mutex_lock);
+                    rebuild_logger_mutex_lock.lock();
                     Rebuild_Logger.push(operation);
-                    pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+                    rebuild_logger_mutex_lock.unlock();
                 }
-                pthread_mutex_unlock(&working_flag_mutex);
+                working_flag_mutex.unlock();
             }
         }
     }
@@ -573,7 +570,7 @@ int KD_TREE<PointType>::Add_Points(PointVector &PointToAdd, bool downsample_on)
 }
 
 template <typename PointType>
-void KD_TREE<PointType>::Add_Point_Boxes(vector<BoxPointType> &BoxPoints)
+void KD_TREE<PointType>::Add_Point_Boxes(std::vector<BoxPointType> &BoxPoints)
 {
     for (int i = 0; i < BoxPoints.size(); i++)
     {
@@ -586,15 +583,15 @@ void KD_TREE<PointType>::Add_Point_Boxes(vector<BoxPointType> &BoxPoints)
             Operation_Logger_Type operation;
             operation.boxpoint = BoxPoints[i];
             operation.op = ADD_BOX;
-            pthread_mutex_lock(&working_flag_mutex);
+            working_flag_mutex.lock();
             Add_by_range(&Root_Node, BoxPoints[i], false);
             if (rebuild_flag)
             {
-                pthread_mutex_lock(&rebuild_logger_mutex_lock);
+                rebuild_logger_mutex_lock.lock();
                 Rebuild_Logger.push(operation);
-                pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+                rebuild_logger_mutex_lock.unlock();
             }
-            pthread_mutex_unlock(&working_flag_mutex);
+            working_flag_mutex.unlock();
         }
     }
     return;
@@ -614,22 +611,22 @@ void KD_TREE<PointType>::Delete_Points(PointVector &PointToDel)
             Operation_Logger_Type operation;
             operation.point = PointToDel[i];
             operation.op = DELETE_POINT;
-            pthread_mutex_lock(&working_flag_mutex);
+            working_flag_mutex.lock();
             Delete_by_point(&Root_Node, PointToDel[i], false);
             if (rebuild_flag)
             {
-                pthread_mutex_lock(&rebuild_logger_mutex_lock);
+                rebuild_logger_mutex_lock.lock();
                 Rebuild_Logger.push(operation);
-                pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+                rebuild_logger_mutex_lock.unlock();
             }
-            pthread_mutex_unlock(&working_flag_mutex);
+            working_flag_mutex.unlock();
         }
     }
     return;
 }
 
 template <typename PointType>
-int KD_TREE<PointType>::Delete_Point_Boxes(vector<BoxPointType> &BoxPoints)
+int KD_TREE<PointType>::Delete_Point_Boxes(std::vector<BoxPointType> &BoxPoints)
 {
     int tmp_counter = 0;
     for (int i = 0; i < BoxPoints.size(); i++)
@@ -643,15 +640,15 @@ int KD_TREE<PointType>::Delete_Point_Boxes(vector<BoxPointType> &BoxPoints)
             Operation_Logger_Type operation;
             operation.boxpoint = BoxPoints[i];
             operation.op = DELETE_BOX;
-            pthread_mutex_lock(&working_flag_mutex);
+            working_flag_mutex.lock();
             tmp_counter += Delete_by_range(&Root_Node, BoxPoints[i], false, false);
             if (rebuild_flag)
             {
-                pthread_mutex_lock(&rebuild_logger_mutex_lock);
+                rebuild_logger_mutex_lock.lock();
                 Rebuild_Logger.push(operation);
-                pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+                rebuild_logger_mutex_lock.unlock();
             }
-            pthread_mutex_unlock(&working_flag_mutex);
+            working_flag_mutex.unlock();
         }
     }
     return tmp_counter;
@@ -660,7 +657,7 @@ int KD_TREE<PointType>::Delete_Point_Boxes(vector<BoxPointType> &BoxPoints)
 template <typename PointType>
 void KD_TREE<PointType>::acquire_removed_points(PointVector &removed_points)
 {
-    pthread_mutex_lock(&points_deleted_rebuild_mutex_lock);
+    points_deleted_rebuild_mutex_lock.lock();
     for (int i = 0; i < Points_deleted.size(); i++)
     {
         removed_points.push_back(Points_deleted[i]);
@@ -671,7 +668,7 @@ void KD_TREE<PointType>::acquire_removed_points(PointVector &removed_points)
     }
     Points_deleted.clear();
     Multithread_Points_deleted.clear();
-    pthread_mutex_unlock(&points_deleted_rebuild_mutex_lock);
+    points_deleted_rebuild_mutex_lock.unlock();
     return;
 }
 
@@ -691,12 +688,12 @@ void KD_TREE<PointType>::BuildTree(KD_TREE_NODE **root, int l, int r, PointVecto
     float dim_range[3] = {0, 0, 0};
     for (i = l; i <= r; i++)
     {
-        min_value[0] = min(min_value[0], Storage[i].x);
-        min_value[1] = min(min_value[1], Storage[i].y);
-        min_value[2] = min(min_value[2], Storage[i].z);
-        max_value[0] = max(max_value[0], Storage[i].x);
-        max_value[1] = max(max_value[1], Storage[i].y);
-        max_value[2] = max(max_value[2], Storage[i].z);
+        min_value[0] = std::min(min_value[0], Storage[i].x);
+        min_value[1] = std::min(min_value[1], Storage[i].y);
+        min_value[2] = std::min(min_value[2], Storage[i].z);
+        max_value[0] = std::max(max_value[0], Storage[i].x);
+        max_value[1] = std::max(max_value[1], Storage[i].y);
+        max_value[2] = std::max(max_value[2], Storage[i].z);
     }
     // Select the longest dimension as division axis
     for (i = 0; i < 3; i++)
@@ -738,13 +735,13 @@ void KD_TREE<PointType>::Rebuild(KD_TREE_NODE **root)
     KD_TREE_NODE *father_ptr;
     if ((*root)->TreeSize >= Multi_Thread_Rebuild_Point_Num)
     {
-        if (!pthread_mutex_trylock(&rebuild_ptr_mutex_lock))
+        if (true == rebuild_ptr_mutex_lock.try_lock())
         {
             if (Rebuild_Ptr == nullptr || ((*root)->TreeSize > (*Rebuild_Ptr)->TreeSize))
             {
                 Rebuild_Ptr = root;
             }
-            pthread_mutex_unlock(&rebuild_ptr_mutex_lock);
+            rebuild_ptr_mutex_lock.unlock();
         }
     }
     else
@@ -813,15 +810,15 @@ int KD_TREE<PointType>::Delete_by_range(KD_TREE_NODE **root, BoxPointType boxpoi
     }
     else
     {
-        pthread_mutex_lock(&working_flag_mutex);
+        working_flag_mutex.lock();
         tmp_counter += Delete_by_range(&((*root)->left_son_ptr), boxpoint, false, is_downsample);
         if (rebuild_flag)
         {
-            pthread_mutex_lock(&rebuild_logger_mutex_lock);
+            rebuild_logger_mutex_lock.lock();
             Rebuild_Logger.push(delete_box_log);
-            pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+            rebuild_logger_mutex_lock.unlock();
         }
-        pthread_mutex_unlock(&working_flag_mutex);
+        working_flag_mutex.unlock();
     }
     if ((Rebuild_Ptr == nullptr) || (*root)->right_son_ptr != *Rebuild_Ptr)
     {
@@ -829,15 +826,15 @@ int KD_TREE<PointType>::Delete_by_range(KD_TREE_NODE **root, BoxPointType boxpoi
     }
     else
     {
-        pthread_mutex_lock(&working_flag_mutex);
+        working_flag_mutex.lock();
         tmp_counter += Delete_by_range(&((*root)->right_son_ptr), boxpoint, false, is_downsample);
         if (rebuild_flag)
         {
-            pthread_mutex_lock(&rebuild_logger_mutex_lock);
+            rebuild_logger_mutex_lock.lock();
             Rebuild_Logger.push(delete_box_log);
-            pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+            rebuild_logger_mutex_lock.unlock();
         }
-        pthread_mutex_unlock(&working_flag_mutex);
+        working_flag_mutex.unlock();
     }
     Update(*root);
     if (Rebuild_Ptr != nullptr && *Rebuild_Ptr == *root && (*root)->TreeSize < Multi_Thread_Rebuild_Point_Num)
@@ -877,15 +874,15 @@ void KD_TREE<PointType>::Delete_by_point(KD_TREE_NODE **root, PointType point, b
         }
         else
         {
-            pthread_mutex_lock(&working_flag_mutex);
+            working_flag_mutex.lock();
             Delete_by_point(&(*root)->left_son_ptr, point, false);
             if (rebuild_flag)
             {
-                pthread_mutex_lock(&rebuild_logger_mutex_lock);
+                rebuild_logger_mutex_lock.lock();
                 Rebuild_Logger.push(delete_log);
-                pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+                rebuild_logger_mutex_lock.unlock();
             }
-            pthread_mutex_unlock(&working_flag_mutex);
+            working_flag_mutex.unlock();
         }
     }
     else
@@ -896,15 +893,15 @@ void KD_TREE<PointType>::Delete_by_point(KD_TREE_NODE **root, PointType point, b
         }
         else
         {
-            pthread_mutex_lock(&working_flag_mutex);
+            working_flag_mutex.lock();
             Delete_by_point(&(*root)->right_son_ptr, point, false);
             if (rebuild_flag)
             {
-                pthread_mutex_lock(&rebuild_logger_mutex_lock);
+                rebuild_logger_mutex_lock.lock();
                 Rebuild_Logger.push(delete_log);
-                pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+                rebuild_logger_mutex_lock.unlock();
             }
-            pthread_mutex_unlock(&working_flag_mutex);
+            working_flag_mutex.unlock();
         }
     }
     Update(*root);
@@ -954,15 +951,15 @@ void KD_TREE<PointType>::Add_by_range(KD_TREE_NODE **root, BoxPointType boxpoint
     }
     else
     {
-        pthread_mutex_lock(&working_flag_mutex);
+        working_flag_mutex.lock();
         Add_by_range(&((*root)->left_son_ptr), boxpoint, false);
         if (rebuild_flag)
         {
-            pthread_mutex_lock(&rebuild_logger_mutex_lock);
+            rebuild_logger_mutex_lock.lock();
             Rebuild_Logger.push(add_box_log);
-            pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+            rebuild_logger_mutex_lock.unlock();
         }
-        pthread_mutex_unlock(&working_flag_mutex);
+        working_flag_mutex.unlock();
     }
     if ((Rebuild_Ptr == nullptr) || (*root)->right_son_ptr != *Rebuild_Ptr)
     {
@@ -970,15 +967,15 @@ void KD_TREE<PointType>::Add_by_range(KD_TREE_NODE **root, BoxPointType boxpoint
     }
     else
     {
-        pthread_mutex_lock(&working_flag_mutex);
+        working_flag_mutex.lock();
         Add_by_range(&((*root)->right_son_ptr), boxpoint, false);
         if (rebuild_flag)
         {
-            pthread_mutex_lock(&rebuild_logger_mutex_lock);
+            rebuild_logger_mutex_lock.lock();
             Rebuild_Logger.push(add_box_log);
-            pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+            rebuild_logger_mutex_lock.unlock();
         }
-        pthread_mutex_unlock(&working_flag_mutex);
+        working_flag_mutex.unlock();
     }
     Update(*root);
     if (Rebuild_Ptr != nullptr && *Rebuild_Ptr == *root && (*root)->TreeSize < Multi_Thread_Rebuild_Point_Num)
@@ -1017,15 +1014,15 @@ void KD_TREE<PointType>::Add_by_point(KD_TREE_NODE **root, PointType point, bool
         }
         else
         {
-            pthread_mutex_lock(&working_flag_mutex);
+            working_flag_mutex.lock();
             Add_by_point(&(*root)->left_son_ptr, point, false, (*root)->division_axis);
             if (rebuild_flag)
             {
-                pthread_mutex_lock(&rebuild_logger_mutex_lock);
+                rebuild_logger_mutex_lock.lock();
                 Rebuild_Logger.push(add_log);
-                pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+                rebuild_logger_mutex_lock.unlock();
             }
-            pthread_mutex_unlock(&working_flag_mutex);
+            working_flag_mutex.unlock();
         }
     }
     else
@@ -1036,15 +1033,15 @@ void KD_TREE<PointType>::Add_by_point(KD_TREE_NODE **root, PointType point, bool
         }
         else
         {
-            pthread_mutex_lock(&working_flag_mutex);
+            working_flag_mutex.lock();
             Add_by_point(&(*root)->right_son_ptr, point, false, (*root)->division_axis);
             if (rebuild_flag)
             {
-                pthread_mutex_lock(&rebuild_logger_mutex_lock);
+                rebuild_logger_mutex_lock.lock();
                 Rebuild_Logger.push(add_log);
-                pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+                rebuild_logger_mutex_lock.unlock();
             }
-            pthread_mutex_unlock(&working_flag_mutex);
+            working_flag_mutex.unlock();
         }
     }
     Update(*root);
@@ -1067,19 +1064,17 @@ void KD_TREE<PointType>::Search(KD_TREE_NODE *root, int k_nearest, PointType poi
     float max_dist_sqr = max_dist * max_dist;
     if (cur_dist > max_dist_sqr)
         return;
-    int retval;
     if (root->need_push_down_to_left || root->need_push_down_to_right)
     {
-        retval = pthread_mutex_trylock(&(root->push_down_mutex_lock));
-        if (retval == 0)
+        if (true == root->push_down_mutex_lock.try_lock())
         {
             Push_Down(root);
-            pthread_mutex_unlock(&(root->push_down_mutex_lock));
+            root->push_down_mutex_lock.unlock();
         }
         else
         {
-            pthread_mutex_lock(&(root->push_down_mutex_lock));
-            pthread_mutex_unlock(&(root->push_down_mutex_lock));
+            root->push_down_mutex_lock.lock();
+            root->push_down_mutex_lock.unlock();
         }
     }
     if (!root->point_deleted)
@@ -1106,19 +1101,19 @@ void KD_TREE<PointType>::Search(KD_TREE_NODE *root, int k_nearest, PointType poi
             }
             else
             {
-                pthread_mutex_lock(&search_flag_mutex);
+                search_flag_mutex.lock();
                 while (search_mutex_counter == -1)
                 {
-                    pthread_mutex_unlock(&search_flag_mutex);
+                    search_flag_mutex.unlock();
                     usleep(1);
-                    pthread_mutex_lock(&search_flag_mutex);
+                    search_flag_mutex.lock();
                 }
                 search_mutex_counter += 1;
-                pthread_mutex_unlock(&search_flag_mutex);
+                search_flag_mutex.unlock();
                 Search(root->left_son_ptr, k_nearest, point, q, max_dist);
-                pthread_mutex_lock(&search_flag_mutex);
+                search_flag_mutex.lock();
                 search_mutex_counter -= 1;
-                pthread_mutex_unlock(&search_flag_mutex);
+                search_flag_mutex.unlock();
             }
             if (q.size() < k_nearest || dist_right_node < q.top().dist)
             {
@@ -1128,19 +1123,19 @@ void KD_TREE<PointType>::Search(KD_TREE_NODE *root, int k_nearest, PointType poi
                 }
                 else
                 {
-                    pthread_mutex_lock(&search_flag_mutex);
+                    search_flag_mutex.lock();
                     while (search_mutex_counter == -1)
                     {
-                        pthread_mutex_unlock(&search_flag_mutex);
+                        search_flag_mutex.unlock();
                         usleep(1);
-                        pthread_mutex_lock(&search_flag_mutex);
+                        search_flag_mutex.lock();
                     }
                     search_mutex_counter += 1;
-                    pthread_mutex_unlock(&search_flag_mutex);
+                    search_flag_mutex.unlock();
                     Search(root->right_son_ptr, k_nearest, point, q, max_dist);
-                    pthread_mutex_lock(&search_flag_mutex);
+                    search_flag_mutex.lock();
                     search_mutex_counter -= 1;
-                    pthread_mutex_unlock(&search_flag_mutex);
+                    search_flag_mutex.unlock();
                 }
             }
         }
@@ -1152,19 +1147,19 @@ void KD_TREE<PointType>::Search(KD_TREE_NODE *root, int k_nearest, PointType poi
             }
             else
             {
-                pthread_mutex_lock(&search_flag_mutex);
+                search_flag_mutex.lock();
                 while (search_mutex_counter == -1)
                 {
-                    pthread_mutex_unlock(&search_flag_mutex);
+                    search_flag_mutex.unlock();
                     usleep(1);
-                    pthread_mutex_lock(&search_flag_mutex);
+                    search_flag_mutex.lock();
                 }
                 search_mutex_counter += 1;
-                pthread_mutex_unlock(&search_flag_mutex);
+                search_flag_mutex.unlock();
                 Search(root->right_son_ptr, k_nearest, point, q, max_dist);
-                pthread_mutex_lock(&search_flag_mutex);
+                search_flag_mutex.lock();
                 search_mutex_counter -= 1;
-                pthread_mutex_unlock(&search_flag_mutex);
+                search_flag_mutex.unlock();
             }
             if (q.size() < k_nearest || dist_left_node < q.top().dist)
             {
@@ -1174,19 +1169,19 @@ void KD_TREE<PointType>::Search(KD_TREE_NODE *root, int k_nearest, PointType poi
                 }
                 else
                 {
-                    pthread_mutex_lock(&search_flag_mutex);
+                    search_flag_mutex.lock();
                     while (search_mutex_counter == -1)
                     {
-                        pthread_mutex_unlock(&search_flag_mutex);
+                        search_flag_mutex.unlock();
                         usleep(1);
-                        pthread_mutex_lock(&search_flag_mutex);
+                        search_flag_mutex.lock();
                     }
                     search_mutex_counter += 1;
-                    pthread_mutex_unlock(&search_flag_mutex);
+                    search_flag_mutex.unlock();
                     Search(root->left_son_ptr, k_nearest, point, q, max_dist);
-                    pthread_mutex_lock(&search_flag_mutex);
+                    search_flag_mutex.lock();
                     search_mutex_counter -= 1;
-                    pthread_mutex_unlock(&search_flag_mutex);
+                    search_flag_mutex.unlock();
                 }
             }
         }
@@ -1201,19 +1196,19 @@ void KD_TREE<PointType>::Search(KD_TREE_NODE *root, int k_nearest, PointType poi
             }
             else
             {
-                pthread_mutex_lock(&search_flag_mutex);
+                search_flag_mutex.lock();
                 while (search_mutex_counter == -1)
                 {
-                    pthread_mutex_unlock(&search_flag_mutex);
+                    search_flag_mutex.unlock();
                     usleep(1);
-                    pthread_mutex_lock(&search_flag_mutex);
+                    search_flag_mutex.lock();
                 }
                 search_mutex_counter += 1;
-                pthread_mutex_unlock(&search_flag_mutex);
+                search_flag_mutex.unlock();
                 Search(root->left_son_ptr, k_nearest, point, q, max_dist);
-                pthread_mutex_lock(&search_flag_mutex);
+                search_flag_mutex.lock();
                 search_mutex_counter -= 1;
-                pthread_mutex_unlock(&search_flag_mutex);
+                search_flag_mutex.unlock();
             }
         }
         if (dist_right_node < q.top().dist)
@@ -1224,19 +1219,19 @@ void KD_TREE<PointType>::Search(KD_TREE_NODE *root, int k_nearest, PointType poi
             }
             else
             {
-                pthread_mutex_lock(&search_flag_mutex);
+                search_flag_mutex.lock();
                 while (search_mutex_counter == -1)
                 {
-                    pthread_mutex_unlock(&search_flag_mutex);
+                    search_flag_mutex.unlock();
                     usleep(1);
-                    pthread_mutex_lock(&search_flag_mutex);
+                    search_flag_mutex.lock();
                 }
                 search_mutex_counter += 1;
-                pthread_mutex_unlock(&search_flag_mutex);
+                search_flag_mutex.unlock();
                 Search(root->right_son_ptr, k_nearest, point, q, max_dist);
-                pthread_mutex_lock(&search_flag_mutex);
+                search_flag_mutex.lock();
                 search_mutex_counter -= 1;
-                pthread_mutex_unlock(&search_flag_mutex);
+                search_flag_mutex.unlock();
             }
         }
     }
@@ -1271,9 +1266,9 @@ void KD_TREE<PointType>::Search_by_range(KD_TREE_NODE *root, BoxPointType boxpoi
     }
     else
     {
-        pthread_mutex_lock(&search_flag_mutex);
+        search_flag_mutex.lock();
         Search_by_range(root->left_son_ptr, boxpoint, Storage);
-        pthread_mutex_unlock(&search_flag_mutex);
+        search_flag_mutex.unlock();
     }
     if ((Rebuild_Ptr == nullptr) || root->right_son_ptr != *Rebuild_Ptr)
     {
@@ -1281,9 +1276,9 @@ void KD_TREE<PointType>::Search_by_range(KD_TREE_NODE *root, BoxPointType boxpoi
     }
     else
     {
-        pthread_mutex_lock(&search_flag_mutex);
+        search_flag_mutex.lock();
         Search_by_range(root->right_son_ptr, boxpoint, Storage);
-        pthread_mutex_unlock(&search_flag_mutex);
+        search_flag_mutex.unlock();
     }
     return;
 }
@@ -1314,9 +1309,9 @@ void KD_TREE<PointType>::Search_by_radius(KD_TREE_NODE *root, PointType point, f
     }
     else
     {
-        pthread_mutex_lock(&search_flag_mutex);
+        search_flag_mutex.lock();
         Search_by_radius(root->left_son_ptr, point, radius, Storage);
-        pthread_mutex_unlock(&search_flag_mutex);
+        search_flag_mutex.unlock();
     }
     if ((Rebuild_Ptr == nullptr) || root->right_son_ptr != *Rebuild_Ptr)
     {
@@ -1324,9 +1319,9 @@ void KD_TREE<PointType>::Search_by_radius(KD_TREE_NODE *root, PointType point, f
     }
     else
     {
-        pthread_mutex_lock(&search_flag_mutex);
+        search_flag_mutex.lock();
         Search_by_radius(root->right_son_ptr, point, radius, Storage);
-        pthread_mutex_unlock(&search_flag_mutex);
+        search_flag_mutex.unlock();
     }    
     return;
 }
@@ -1385,7 +1380,7 @@ void KD_TREE<PointType>::Push_Down(KD_TREE_NODE *root)
         }
         else
         {
-            pthread_mutex_lock(&working_flag_mutex);
+            working_flag_mutex.lock();
             root->left_son_ptr->tree_downsample_deleted |= root->tree_downsample_deleted;
             root->left_son_ptr->point_downsample_deleted |= root->tree_downsample_deleted;
             root->left_son_ptr->tree_deleted = root->tree_deleted || root->left_son_ptr->tree_downsample_deleted;
@@ -1400,12 +1395,12 @@ void KD_TREE<PointType>::Push_Down(KD_TREE_NODE *root)
             root->left_son_ptr->need_push_down_to_right = true;
             if (rebuild_flag)
             {
-                pthread_mutex_lock(&rebuild_logger_mutex_lock);
+                rebuild_logger_mutex_lock.lock();
                 Rebuild_Logger.push(operation);
-                pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+                rebuild_logger_mutex_lock.unlock();
             }
             root->need_push_down_to_left = false;
-            pthread_mutex_unlock(&working_flag_mutex);
+            working_flag_mutex.unlock();
         }
     }
     if (root->need_push_down_to_right && root->right_son_ptr != nullptr)
@@ -1428,7 +1423,7 @@ void KD_TREE<PointType>::Push_Down(KD_TREE_NODE *root)
         }
         else
         {
-            pthread_mutex_lock(&working_flag_mutex);
+            working_flag_mutex.lock();
             root->right_son_ptr->tree_downsample_deleted |= root->tree_downsample_deleted;
             root->right_son_ptr->point_downsample_deleted |= root->tree_downsample_deleted;
             root->right_son_ptr->tree_deleted = root->tree_deleted || root->right_son_ptr->tree_downsample_deleted;
@@ -1443,12 +1438,12 @@ void KD_TREE<PointType>::Push_Down(KD_TREE_NODE *root)
             root->right_son_ptr->need_push_down_to_right = true;
             if (rebuild_flag)
             {
-                pthread_mutex_lock(&rebuild_logger_mutex_lock);
+                rebuild_logger_mutex_lock.lock();
                 Rebuild_Logger.push(operation);
-                pthread_mutex_unlock(&rebuild_logger_mutex_lock);
+                rebuild_logger_mutex_lock.unlock();
             }
             root->need_push_down_to_right = false;
-            pthread_mutex_unlock(&working_flag_mutex);
+            working_flag_mutex.unlock();
         }
     }
     return;
@@ -1472,41 +1467,41 @@ void KD_TREE<PointType>::Update(KD_TREE_NODE *root)
         root->tree_deleted = left_son_ptr->tree_deleted && right_son_ptr->tree_deleted && root->point_deleted;
         if (root->tree_deleted || (!left_son_ptr->tree_deleted && !right_son_ptr->tree_deleted && !root->point_deleted))
         {
-            tmp_range_x[0] = min(min(left_son_ptr->node_range_x[0], right_son_ptr->node_range_x[0]), root->point.x);
-            tmp_range_x[1] = max(max(left_son_ptr->node_range_x[1], right_son_ptr->node_range_x[1]), root->point.x);
-            tmp_range_y[0] = min(min(left_son_ptr->node_range_y[0], right_son_ptr->node_range_y[0]), root->point.y);
-            tmp_range_y[1] = max(max(left_son_ptr->node_range_y[1], right_son_ptr->node_range_y[1]), root->point.y);
-            tmp_range_z[0] = min(min(left_son_ptr->node_range_z[0], right_son_ptr->node_range_z[0]), root->point.z);
-            tmp_range_z[1] = max(max(left_son_ptr->node_range_z[1], right_son_ptr->node_range_z[1]), root->point.z);
+            tmp_range_x[0] = std::min(std::min(left_son_ptr->node_range_x[0], right_son_ptr->node_range_x[0]), root->point.x);
+            tmp_range_x[1] = std::max(std::max(left_son_ptr->node_range_x[1], right_son_ptr->node_range_x[1]), root->point.x);
+            tmp_range_y[0] = std::min(std::min(left_son_ptr->node_range_y[0], right_son_ptr->node_range_y[0]), root->point.y);
+            tmp_range_y[1] = std::max(std::max(left_son_ptr->node_range_y[1], right_son_ptr->node_range_y[1]), root->point.y);
+            tmp_range_z[0] = std::min(std::min(left_son_ptr->node_range_z[0], right_son_ptr->node_range_z[0]), root->point.z);
+            tmp_range_z[1] = std::max(std::max(left_son_ptr->node_range_z[1], right_son_ptr->node_range_z[1]), root->point.z);
         }
         else
         {
             if (!left_son_ptr->tree_deleted)
             {
-                tmp_range_x[0] = min(tmp_range_x[0], left_son_ptr->node_range_x[0]);
-                tmp_range_x[1] = max(tmp_range_x[1], left_son_ptr->node_range_x[1]);
-                tmp_range_y[0] = min(tmp_range_y[0], left_son_ptr->node_range_y[0]);
-                tmp_range_y[1] = max(tmp_range_y[1], left_son_ptr->node_range_y[1]);
-                tmp_range_z[0] = min(tmp_range_z[0], left_son_ptr->node_range_z[0]);
-                tmp_range_z[1] = max(tmp_range_z[1], left_son_ptr->node_range_z[1]);
+                tmp_range_x[0] = std::min(tmp_range_x[0], left_son_ptr->node_range_x[0]);
+                tmp_range_x[1] = std::max(tmp_range_x[1], left_son_ptr->node_range_x[1]);
+                tmp_range_y[0] = std::min(tmp_range_y[0], left_son_ptr->node_range_y[0]);
+                tmp_range_y[1] = std::max(tmp_range_y[1], left_son_ptr->node_range_y[1]);
+                tmp_range_z[0] = std::min(tmp_range_z[0], left_son_ptr->node_range_z[0]);
+                tmp_range_z[1] = std::max(tmp_range_z[1], left_son_ptr->node_range_z[1]);
             }
             if (!right_son_ptr->tree_deleted)
             {
-                tmp_range_x[0] = min(tmp_range_x[0], right_son_ptr->node_range_x[0]);
-                tmp_range_x[1] = max(tmp_range_x[1], right_son_ptr->node_range_x[1]);
-                tmp_range_y[0] = min(tmp_range_y[0], right_son_ptr->node_range_y[0]);
-                tmp_range_y[1] = max(tmp_range_y[1], right_son_ptr->node_range_y[1]);
-                tmp_range_z[0] = min(tmp_range_z[0], right_son_ptr->node_range_z[0]);
-                tmp_range_z[1] = max(tmp_range_z[1], right_son_ptr->node_range_z[1]);
+                tmp_range_x[0] = std::min(tmp_range_x[0], right_son_ptr->node_range_x[0]);
+                tmp_range_x[1] = std::max(tmp_range_x[1], right_son_ptr->node_range_x[1]);
+                tmp_range_y[0] = std::min(tmp_range_y[0], right_son_ptr->node_range_y[0]);
+                tmp_range_y[1] = std::max(tmp_range_y[1], right_son_ptr->node_range_y[1]);
+                tmp_range_z[0] = std::min(tmp_range_z[0], right_son_ptr->node_range_z[0]);
+                tmp_range_z[1] = std::max(tmp_range_z[1], right_son_ptr->node_range_z[1]);
             }
             if (!root->point_deleted)
             {
-                tmp_range_x[0] = min(tmp_range_x[0], root->point.x);
-                tmp_range_x[1] = max(tmp_range_x[1], root->point.x);
-                tmp_range_y[0] = min(tmp_range_y[0], root->point.y);
-                tmp_range_y[1] = max(tmp_range_y[1], root->point.y);
-                tmp_range_z[0] = min(tmp_range_z[0], root->point.z);
-                tmp_range_z[1] = max(tmp_range_z[1], root->point.z);
+                tmp_range_x[0] = std::min(tmp_range_x[0], root->point.x);
+                tmp_range_x[1] = std::max(tmp_range_x[1], root->point.x);
+                tmp_range_y[0] = std::min(tmp_range_y[0], root->point.y);
+                tmp_range_y[1] = std::max(tmp_range_y[1], root->point.y);
+                tmp_range_z[0] = std::min(tmp_range_z[0], root->point.z);
+                tmp_range_z[1] = std::max(tmp_range_z[1], root->point.z);
             }
         }
     }
@@ -1519,32 +1514,32 @@ void KD_TREE<PointType>::Update(KD_TREE_NODE *root)
         root->tree_deleted = left_son_ptr->tree_deleted && root->point_deleted;
         if (root->tree_deleted || (!left_son_ptr->tree_deleted && !root->point_deleted))
         {
-            tmp_range_x[0] = min(left_son_ptr->node_range_x[0], root->point.x);
-            tmp_range_x[1] = max(left_son_ptr->node_range_x[1], root->point.x);
-            tmp_range_y[0] = min(left_son_ptr->node_range_y[0], root->point.y);
-            tmp_range_y[1] = max(left_son_ptr->node_range_y[1], root->point.y);
-            tmp_range_z[0] = min(left_son_ptr->node_range_z[0], root->point.z);
-            tmp_range_z[1] = max(left_son_ptr->node_range_z[1], root->point.z);
+            tmp_range_x[0] = std::min(left_son_ptr->node_range_x[0], root->point.x);
+            tmp_range_x[1] = std::max(left_son_ptr->node_range_x[1], root->point.x);
+            tmp_range_y[0] = std::min(left_son_ptr->node_range_y[0], root->point.y);
+            tmp_range_y[1] = std::max(left_son_ptr->node_range_y[1], root->point.y);
+            tmp_range_z[0] = std::min(left_son_ptr->node_range_z[0], root->point.z);
+            tmp_range_z[1] = std::max(left_son_ptr->node_range_z[1], root->point.z);
         }
         else
         {
             if (!left_son_ptr->tree_deleted)
             {
-                tmp_range_x[0] = min(tmp_range_x[0], left_son_ptr->node_range_x[0]);
-                tmp_range_x[1] = max(tmp_range_x[1], left_son_ptr->node_range_x[1]);
-                tmp_range_y[0] = min(tmp_range_y[0], left_son_ptr->node_range_y[0]);
-                tmp_range_y[1] = max(tmp_range_y[1], left_son_ptr->node_range_y[1]);
-                tmp_range_z[0] = min(tmp_range_z[0], left_son_ptr->node_range_z[0]);
-                tmp_range_z[1] = max(tmp_range_z[1], left_son_ptr->node_range_z[1]);
+                tmp_range_x[0] = std::min(tmp_range_x[0], left_son_ptr->node_range_x[0]);
+                tmp_range_x[1] = std::max(tmp_range_x[1], left_son_ptr->node_range_x[1]);
+                tmp_range_y[0] = std::min(tmp_range_y[0], left_son_ptr->node_range_y[0]);
+                tmp_range_y[1] = std::max(tmp_range_y[1], left_son_ptr->node_range_y[1]);
+                tmp_range_z[0] = std::min(tmp_range_z[0], left_son_ptr->node_range_z[0]);
+                tmp_range_z[1] = std::max(tmp_range_z[1], left_son_ptr->node_range_z[1]);
             }
             if (!root->point_deleted)
             {
-                tmp_range_x[0] = min(tmp_range_x[0], root->point.x);
-                tmp_range_x[1] = max(tmp_range_x[1], root->point.x);
-                tmp_range_y[0] = min(tmp_range_y[0], root->point.y);
-                tmp_range_y[1] = max(tmp_range_y[1], root->point.y);
-                tmp_range_z[0] = min(tmp_range_z[0], root->point.z);
-                tmp_range_z[1] = max(tmp_range_z[1], root->point.z);
+                tmp_range_x[0] = std::min(tmp_range_x[0], root->point.x);
+                tmp_range_x[1] = std::max(tmp_range_x[1], root->point.x);
+                tmp_range_y[0] = std::min(tmp_range_y[0], root->point.y);
+                tmp_range_y[1] = std::max(tmp_range_y[1], root->point.y);
+                tmp_range_z[0] = std::min(tmp_range_z[0], root->point.z);
+                tmp_range_z[1] = std::max(tmp_range_z[1], root->point.z);
             }
         }
     }
@@ -1557,32 +1552,32 @@ void KD_TREE<PointType>::Update(KD_TREE_NODE *root)
         root->tree_deleted = right_son_ptr->tree_deleted && root->point_deleted;
         if (root->tree_deleted || (!right_son_ptr->tree_deleted && !root->point_deleted))
         {
-            tmp_range_x[0] = min(right_son_ptr->node_range_x[0], root->point.x);
-            tmp_range_x[1] = max(right_son_ptr->node_range_x[1], root->point.x);
-            tmp_range_y[0] = min(right_son_ptr->node_range_y[0], root->point.y);
-            tmp_range_y[1] = max(right_son_ptr->node_range_y[1], root->point.y);
-            tmp_range_z[0] = min(right_son_ptr->node_range_z[0], root->point.z);
-            tmp_range_z[1] = max(right_son_ptr->node_range_z[1], root->point.z);
+            tmp_range_x[0] = std::min(right_son_ptr->node_range_x[0], root->point.x);
+            tmp_range_x[1] = std::max(right_son_ptr->node_range_x[1], root->point.x);
+            tmp_range_y[0] = std::min(right_son_ptr->node_range_y[0], root->point.y);
+            tmp_range_y[1] = std::max(right_son_ptr->node_range_y[1], root->point.y);
+            tmp_range_z[0] = std::min(right_son_ptr->node_range_z[0], root->point.z);
+            tmp_range_z[1] = std::max(right_son_ptr->node_range_z[1], root->point.z);
         }
         else
         {
             if (!right_son_ptr->tree_deleted)
             {
-                tmp_range_x[0] = min(tmp_range_x[0], right_son_ptr->node_range_x[0]);
-                tmp_range_x[1] = max(tmp_range_x[1], right_son_ptr->node_range_x[1]);
-                tmp_range_y[0] = min(tmp_range_y[0], right_son_ptr->node_range_y[0]);
-                tmp_range_y[1] = max(tmp_range_y[1], right_son_ptr->node_range_y[1]);
-                tmp_range_z[0] = min(tmp_range_z[0], right_son_ptr->node_range_z[0]);
-                tmp_range_z[1] = max(tmp_range_z[1], right_son_ptr->node_range_z[1]);
+                tmp_range_x[0] = std::min(tmp_range_x[0], right_son_ptr->node_range_x[0]);
+                tmp_range_x[1] = std::max(tmp_range_x[1], right_son_ptr->node_range_x[1]);
+                tmp_range_y[0] = std::min(tmp_range_y[0], right_son_ptr->node_range_y[0]);
+                tmp_range_y[1] = std::max(tmp_range_y[1], right_son_ptr->node_range_y[1]);
+                tmp_range_z[0] = std::min(tmp_range_z[0], right_son_ptr->node_range_z[0]);
+                tmp_range_z[1] = std::max(tmp_range_z[1], right_son_ptr->node_range_z[1]);
             }
             if (!root->point_deleted)
             {
-                tmp_range_x[0] = min(tmp_range_x[0], root->point.x);
-                tmp_range_x[1] = max(tmp_range_x[1], root->point.x);
-                tmp_range_y[0] = min(tmp_range_y[0], root->point.y);
-                tmp_range_y[1] = max(tmp_range_y[1], root->point.y);
-                tmp_range_z[0] = min(tmp_range_z[0], root->point.z);
-                tmp_range_z[1] = max(tmp_range_z[1], root->point.z);
+                tmp_range_x[0] = std::min(tmp_range_x[0], root->point.x);
+                tmp_range_x[1] = std::max(tmp_range_x[1], root->point.x);
+                tmp_range_y[0] = std::min(tmp_range_y[0], root->point.y);
+                tmp_range_y[1] = std::max(tmp_range_y[1], root->point.y);
+                tmp_range_z[0] = std::min(tmp_range_z[0], root->point.z);
+                tmp_range_z[1] = std::max(tmp_range_z[1], root->point.z);
             }
         }
     }
@@ -1666,7 +1661,6 @@ void KD_TREE<PointType>::delete_tree_nodes(KD_TREE_NODE **root)
     delete_tree_nodes(&(*root)->left_son_ptr);
     delete_tree_nodes(&(*root)->right_son_ptr);
 
-    pthread_mutex_destroy(&(*root)->push_down_mutex_lock);
     delete *root;
     *root = nullptr;
 
