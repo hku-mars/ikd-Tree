@@ -92,7 +92,7 @@ int KD_TREE<PointType>::size()
     }
     else
     {
-        if (!working_flag_mutex.try_lock())
+        if (true == working_flag_mutex.try_lock())
         {
             s = Root_Node->TreeSize;
             working_flag_mutex.unlock();
@@ -127,7 +127,7 @@ BoxPointType KD_TREE<PointType>::tree_range()
     }
     else
     {
-        if (!working_flag_mutex.try_lock())
+        if (true == working_flag_mutex.try_lock())
         {
             range.vertex_min[0] = Root_Node->node_range_x[0];
             range.vertex_min[1] = Root_Node->node_range_y[0];
@@ -158,7 +158,7 @@ int KD_TREE<PointType>::validnum()
     }
     else
     {
-        if (!working_flag_mutex.try_lock())
+        if (true == working_flag_mutex.try_lock())
         {
             s = Root_Node->TreeSize - Root_Node->invalid_point_num;
             working_flag_mutex.unlock();
@@ -182,7 +182,7 @@ void KD_TREE<PointType>::root_alpha(float &alpha_bal, float &alpha_del)
     }
     else
     {
-        if (!working_flag_mutex.try_lock())
+        if (true == working_flag_mutex.try_lock())
         {
             alpha_bal = Root_Node->alpha_bal;
             alpha_del = Root_Node->alpha_del;
@@ -735,7 +735,7 @@ void KD_TREE<PointType>::Rebuild(KD_TREE_NODE **root)
     KD_TREE_NODE *father_ptr;
     if ((*root)->TreeSize >= Multi_Thread_Rebuild_Point_Num)
     {
-        if (!rebuild_ptr_mutex_lock.try_lock())
+        if (true == rebuild_ptr_mutex_lock.try_lock())
         {
             if (Rebuild_Ptr == nullptr || ((*root)->TreeSize > (*Rebuild_Ptr)->TreeSize))
             {
@@ -1064,11 +1064,9 @@ void KD_TREE<PointType>::Search(KD_TREE_NODE *root, int k_nearest, PointType poi
     float max_dist_sqr = max_dist * max_dist;
     if (cur_dist > max_dist_sqr)
         return;
-    int retval;
     if (root->need_push_down_to_left || root->need_push_down_to_right)
     {
-        retval = root->push_down_mutex_lock.try_lock();
-        if (retval == 0)
+        if (true == root->push_down_mutex_lock.try_lock())
         {
             Push_Down(root);
             root->push_down_mutex_lock.unlock();
