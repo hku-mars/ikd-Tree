@@ -1,7 +1,8 @@
 #pragma once
 #include <stdio.h>
 #include <queue>
-#include <pthread.h>
+#include <thread>
+#include <mutex>
 #include <chrono>
 #include <time.h>
 //#include <unistd.h>
@@ -69,7 +70,7 @@ public:
         bool need_push_down_to_left = false;
         bool need_push_down_to_right = false;
         bool working_flag = false;
-        pthread_mutex_t push_down_mutex_lock;
+        std::mutex push_down_mutex_lock;
         float node_range_x[2], node_range_y[2], node_range_z[2];
         float radius_sq;
         KD_TREE_NODE *left_son_ptr = nullptr;
@@ -257,9 +258,9 @@ private:
     // Multi-thread Tree Rebuild
     bool termination_flag = false;
     bool rebuild_flag = false;
-    pthread_t rebuild_thread;
-    pthread_mutex_t termination_flag_mutex_lock, rebuild_ptr_mutex_lock, working_flag_mutex, search_flag_mutex;
-    pthread_mutex_t rebuild_logger_mutex_lock, points_deleted_rebuild_mutex_lock;
+    std::thread rebuild_thread;
+    std::mutex termination_flag_mutex_lock, rebuild_ptr_mutex_lock, working_flag_mutex, search_flag_mutex;
+    std::mutex rebuild_logger_mutex_lock, points_deleted_rebuild_mutex_lock;
     // queue<Operation_Logger_Type> Rebuild_Logger;
     MANUAL_Q Rebuild_Logger;
     PointVector Rebuild_PCL_Storage;
