@@ -311,7 +311,7 @@ void KD_TREE<PointType>::multi_thread_rebuild(){
         pthread_mutex_unlock(&termination_flag_mutex_lock);
         usleep(100); 
     }
-    printf("Rebuild thread terminated normally\n");    
+//    printf("Rebuild thread terminated normally\n");
 }
 
 template <typename PointType>
