@@ -182,6 +182,8 @@ PointType generate_target_point(){
 }
 
 int main(int argc, char** argv){
+	//const char* name = std::string("hello").c_str();
+	//puts(name);
     srand((unsigned) time(NULL));
     printf("Testing ...\n");
     int counter = 0;
