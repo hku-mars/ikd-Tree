@@ -1085,18 +1085,28 @@ void KD_TREE<PointType>::Search(KD_TREE_NODE *root, int k_nearest, PointType poi
     if (!root->point_deleted)
     {
         float dist = calc_dist(point, root->point);
-        if (dist <= max_dist_sqr && (q.size() < k_nearest || dist < q.top().dist))
+        if (dist <= max_dist_sqr && (q.size() < k_nearest || dist <= q.top().dist))
         {
-            if (q.size() >= k_nearest)
-                q.pop();
-            PointType_CMP current_point{root->point, dist};
-            q.push(current_point);
+            bool add_flag = true;
+            if (q.size() >= k_nearest) {
+                if (dist < q.top().dist) {
+                  q.pop();
+                } else if (dist == q.top().dist and root->point.x < q.top().point.x) {
+                  q.pop();
+                } else {
+                  add_flag = false;
+                }
+            }
+            if (add_flag) {
+              PointType_CMP current_point{root->point, dist};
+              q.push(current_point);
+            }
         }
     }
     int cur_search_counter;
     float dist_left_node = calc_box_dist(root->left_son_ptr, point);
     float dist_right_node = calc_box_dist(root->right_son_ptr, point);
-    if (q.size() < k_nearest || dist_left_node < q.top().dist && dist_right_node < q.top().dist)
+    if (q.size() < k_nearest || dist_left_node <= q.top().dist && dist_right_node <= q.top().dist)
     {
         if (dist_left_node <= dist_right_node)
         {
@@ -1120,7 +1130,7 @@ void KD_TREE<PointType>::Search(KD_TREE_NODE *root, int k_nearest, PointType poi
                 search_mutex_counter -= 1;
                 pthread_mutex_unlock(&search_flag_mutex);
             }
-            if (q.size() < k_nearest || dist_right_node < q.top().dist)
+            if (q.size() < k_nearest || dist_right_node <= q.top().dist)
             {
                 if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != root->right_son_ptr)
                 {
@@ -1166,7 +1176,7 @@ void KD_TREE<PointType>::Search(KD_TREE_NODE *root, int k_nearest, PointType poi
                 search_mutex_counter -= 1;
                 pthread_mutex_unlock(&search_flag_mutex);
             }
-            if (q.size() < k_nearest || dist_left_node < q.top().dist)
+            if (q.size() < k_nearest || dist_left_node <= q.top().dist)
             {
                 if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != root->left_son_ptr)
                 {
@@ -1193,7 +1203,7 @@ void KD_TREE<PointType>::Search(KD_TREE_NODE *root, int k_nearest, PointType poi
     }
     else
     {
-        if (dist_left_node < q.top().dist)
+        if (dist_left_node <= q.top().dist)
         {
             if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != root->left_son_ptr)
             {
@@ -1216,7 +1226,7 @@ void KD_TREE<PointType>::Search(KD_TREE_NODE *root, int k_nearest, PointType poi
                 pthread_mutex_unlock(&search_flag_mutex);
             }
         }
-        if (dist_right_node < q.top().dist)
+        if (dist_right_node <= q.top().dist)
         {
             if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != root->right_son_ptr)
             {
